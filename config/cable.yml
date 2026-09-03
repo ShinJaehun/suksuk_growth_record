@@ -1,0 +1,9 @@
+development:
+  adapter: async
+
+test:
+  adapter: test
+
+production:
+  adapter: postgresql
+  channel_prefix: suksuk_praise_production

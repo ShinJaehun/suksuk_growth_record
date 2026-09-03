@@ -1,0 +1,76 @@
+require 'rails_helper'
+
+RSpec.describe ComplimentPolicy::Scope do
+  describe '#resolve' do
+    let(:teacher) { create(:user, :teacher) }
+    let(:student) { create(:user, :student) }
+    let(:other_student) { create(:user, :student) }
+    let(:teacher_classroom) { create(:classroom) }
+    let(:other_classroom) { create(:classroom) }
+    let!(:teacher_membership) do
+      create(:classroom_membership, user: teacher, classroom: teacher_classroom, role: 'teacher')
+    end
+    let!(:student_membership) do
+      create(:classroom_membership, user: student, classroom: teacher_classroom, role: 'student')
+    end
+    let!(:other_student_membership) do
+      create(:classroom_membership, user: other_student, classroom: other_classroom, role: 'student')
+    end
+    let!(:visible_compliment) do
+      create(:compliment, giver: teacher, receiver: student, classroom: teacher_classroom)
+    end
+    let!(:hidden_compliment) do
+      create(:compliment, receiver: other_student, classroom: other_classroom)
+    end
+
+    it 'returns all compliments for admin' do
+      admin = create(:user, :admin)
+
+      resolved = described_class.new(admin, Compliment.all).resolve
+
+      expect(resolved).to contain_exactly(visible_compliment, hidden_compliment)
+    end
+
+    it "returns compliments only from the teacher's classrooms" do
+      resolved = described_class.new(teacher, Compliment.all).resolve
+
+      expect(resolved).to contain_exactly(visible_compliment)
+    end
+
+    it 'returns only compliments received by the student in an active classroom' do
+      create(
+        :classroom_membership,
+        user: student,
+        classroom: other_classroom,
+        role: 'student',
+        status: 'inactive'
+      )
+
+      received_in_other_classroom = create(
+        :compliment,
+        giver: teacher,
+        receiver: student,
+        classroom: other_classroom
+      )
+
+      resolved = described_class.new(student, Compliment.all).resolve
+
+      expect(resolved).to contain_exactly(visible_compliment)
+      expect(resolved).not_to include(received_in_other_classroom)
+    end
+
+    it "returns no compliments for an inactive student membership" do
+      student_membership.inactive!
+
+      resolved = described_class.new(student, Compliment.all).resolve
+
+      expect(resolved).to be_empty
+    end
+
+    it 'returns no compliments for guest' do
+      resolved = described_class.new(nil, Compliment.all).resolve
+
+      expect(resolved).to be_empty
+    end
+  end
+end

@@ -1,0 +1,19 @@
+<section class="mx-auto w-full max-w-5xl space-y-6 pt-4">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="space-y-1">
+      <h1 class="text-2xl font-extrabold tracking-tight text-slate-900"><%= @classroom.name %></h1>
+      <p class="text-sm font-semibold text-slate-500"><%= t("classrooms.show.manage_members") %></p>
+    </div>
+
+    <div class="flex flex-col gap-2 sm:flex-row">
+      <%= link_to t("classrooms.actions.settings"),
+            edit_classroom_path(@classroom),
+            class: "inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" %>
+      <%= link_to "교실로 돌아가기",
+            classroom_path(@classroom),
+            class: "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
+    </div>
+  </div>
+
+  <%= render "classrooms/members/student_management" %>
+</section>

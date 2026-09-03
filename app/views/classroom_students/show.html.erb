@@ -1,0 +1,55 @@
+<section class="mx-auto w-full max-w-6xl pt-4 space-y-6">
+  <% if current_user.student? && current_user == @user %>
+    <%= turbo_stream_from @user, :student_coupons %>
+  <% else %>
+    <%= turbo_stream_from @user, :managed_coupons, @classroom, current_user %>
+  <% end %>
+
+  <%= render "classroom_students/student_profile_card",
+        classroom: @classroom,
+        user: @user,
+        kpi_counts: @kpi_counts,
+        current_section: :coupons,
+        student_messages_enabled: @student_messages_enabled,
+        can_manage_student: @can_manage_student,
+        can_create_compliment: @can_create_compliment,
+        can_issue_coupon: @can_issue_coupon,
+        can_manage_own_student_pin: @can_manage_own_student_pin,
+        student_active: @student_active_in_classroom %>
+
+  <% if @can_issue_coupon %>
+    <%= turbo_frame_tag dom_id(@user, :coupon_assignment),
+          src: (@open_coupon_assignment ? coupon_assignment_classroom_student_path(@classroom, @user) : nil),
+          class: "block empty:hidden scroll-mt-24" %>
+  <% end %>
+
+  <% if !current_user.student? && @pending_coupon_use_request_count.positive? %>
+    <section class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-amber-700"><%= t("students.show.pending.title") %></p>
+      <%= link_to t("students.show.pending.coupon_use_requests", count: @pending_coupon_use_request_count),
+            "##{dom_id(@user, :coupons)}",
+            class: "mt-1 inline-flex text-sm font-bold text-amber-900 underline decoration-amber-400 underline-offset-2" %>
+    </section>
+  <% end %>
+
+  <div class="space-y-6">
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold text-slate-900"><%= t("students.show.coupons.title") %></h2>
+        <span class="text-xs text-slate-500"><%= t("students.show.coupons.status_hint") %></span>
+      </div>
+      <div class="mt-3">
+        <%= turbo_frame_tag dom_id(@user, :coupons), class: "scroll-mt-24" do %>
+          <%= render partial: "user_coupons/list",
+                locals: {
+                  coupons: @coupons,
+                  user: @user,
+                  viewer: current_user,
+                  pending_coupon_use_requests_by_coupon_id: @pending_coupon_use_requests_by_coupon_id
+                } %>
+        <% end %>
+      </div>
+    </section>
+
+  </div>
+</section>

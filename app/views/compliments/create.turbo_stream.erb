@@ -1,0 +1,32 @@
+<% if defined?(@kpi_counts) %>
+  <%= turbo_stream.update dom_id(@receiver, :kpis) do %>
+    <%= render partial: "users/kpi_chips",
+      locals: { user: @receiver, kpi_counts: @kpi_counts } %>
+  <% end %>
+<% end %>
+
+<%# 교실 화면 학생 카드 즉시 갱신 %>
+<%= turbo_stream.replace dom_id(@receiver) do %>
+  <%= render partial: "users/user",
+    locals: {
+      user: @receiver,
+      student_membership: @student_membership,
+      classroom: @classroom,
+      today_compliment_count: @today_compliment_count_for_receiver,
+      active_compliment_presets: @active_compliment_presets
+    } %>
+<% end %>
+
+<% if defined?(@compliments) %>
+  <%= turbo_stream.update dom_id(@receiver, :compliments) do %>
+    <%= render partial: "users/compliments_timeline", locals: { compliments: @compliments } %>
+  <% end %>
+<% end %>
+
+<% if defined?(@created_compliment) && @created_compliment.present? %>
+  <%= turbo_stream.update "modal", "" %>
+  <%= turbo_stream.append "effects" do %>
+    <div data-controller="highlight"
+         data-highlight-id-value="<%= dom_id(@created_compliment) %>"></div>
+  <% end %>
+<% end %>

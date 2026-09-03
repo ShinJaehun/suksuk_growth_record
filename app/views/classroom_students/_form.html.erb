@@ -1,0 +1,63 @@
+<%= turbo_frame_tag :modal  do %>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-controller="modal">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-8 relative">
+        <%= form_with model: user, url: classroom_students_path(classroom),
+            data: { turbo_submits_with: "처리중..." } do |f| %>
+            <%= hidden_field_tag :return_to, return_to if local_assigns[:return_to].present? %>
+            <h2 class="text-xl font-bold mb-4">학생 개별 추가</h2>
+            <% if user.errors.any? || @student_membership&.errors&.any? %>
+              <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                <%= (user.errors.full_messages + Array(@student_membership&.errors&.full_messages)).to_sentence %>
+              </div>
+            <% end %>
+            <div class="mb-2">
+                <%= label_tag "classroom_membership_student_number",
+                      t("students.form.student_number") %>
+                <%= number_field_tag "classroom_membership[student_number]",
+                      @student_membership&.student_number_before_type_cast,
+                      id: "classroom_membership_student_number",
+                      min: 1,
+                      step: 1,
+                      required: true,
+                      inputmode: "numeric",
+                      aria: { describedby: "student-number-hint student-number-errors" },
+                      class: "w-28 rounded border px-2 py-1" %>
+                <p id="student-number-hint" class="mt-1 text-xs text-gray-500">
+                  <%= t("students.form.student_number_hint") %>
+                </p>
+                <% if @student_membership&.errors&.[](:student_number)&.any? %>
+                  <p id="student-number-errors" class="mt-1 text-sm text-rose-600">
+                    <%= @student_membership.errors[:student_number].to_sentence %>
+                  </p>
+                <% end %>
+            </div>
+            <div class="mb-2">
+                <%= f.label :name, t('ui.user_labels.name') %>
+                <%= f.text_field :name, class: "border px-2 py-1 rounded w-full" %>
+            </div>
+            <div class="mb-2">
+                <%= f.label :gender, "성별" %>
+                <%= f.select :gender,
+                    [["남학생", "boy"], ["여학생", "girl"]],
+                    { prompt: "선택해 주세요" },
+                    class: "border px-2 py-1 rounded w-full" %>
+            </div>
+            <div class="mb-2">
+                <%= f.label :student_pin, "학생 PIN (4자리)" %>
+                <%= f.password_field :student_pin,
+                    maxlength: 4,
+                    inputmode: "numeric",
+                    pattern: "\\d{4}",
+                    required: true,
+                    class: "border px-2 py-1 rounded w-full" %>
+            </div>
+            <div class="flex gap-2">
+                <%= f.submit t('ui.buttons.create_student'), class: "bg-green-500 text-white px-4 py-2 rounded" %>
+                <button type="button" data-action="modal#close" class="bg-gray-300 px-4 py-2 rounded">닫기</button>
+            </div>
+        <% end %>
+        <!-- 닫기 버튼 -->
+        <button type="button" data-action="modal#close" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+     </div>
+    </div>
+<% end %>

@@ -1,0 +1,235 @@
+# Roles And Permissions
+
+## 권한 구조 요약
+
+- 서버측 권한 판단의 중심은 Pundit policy와 `policy_scope`이다.
+- 모든 비-`index` 액션은 `ApplicationController`의 `verify_authorized`, `index` 액션은 `verify_policy_scoped` 대상으로 관리된다.
+- 실제 권한 경계는 전역 `User#role`(`admin`, `teacher`, `student`), 교실 단위 `ClassroomMembership#role`(`teacher`, `student`), 학교 단위 `SchoolMembership#role`(`member`, `manager`)의 조합으로 형성된다.
+- `teacher` 권한은 전역 role만으로 충분하지 않고, 대부분의 교실 관련 쓰기 권한은 "해당 classroom의 teacher membership"이 있어야 허용된다.
+- 일부 리소스는 policy 외에 controller/service guard가 추가로 있다.
+  - `UsersController#show`의 classroom membership 확인
+  - `CouponDraw::Issue`의 대상 학생 소속 및 daily king 확인
+  - `UserCoupon#user_belongs_to_classroom`
+
+## 역할 설명
+
+- `admin`
+  - 전역 관리 권한을 가진다.
+  - 대부분의 scope 전체 조회와 관리 액션이 허용된다.
+- `teacher`
+  - 전역 role은 `teacher`지만, 교실 관련 권한은 해당 교실의 teacher membership 여부로 다시 제한된다.
+  - 쿠폰 템플릿은 개인 세트(personal) 소유권 기준으로 관리한다.
+- `student`
+  - 본인 리소스와 자신이 속한 교실 조회 중심이다.
+  - 교실 관리, 칭찬 생성, 쿠폰 발급, 쿠폰 이벤트 조회는 허용되지 않는다.
+- `guest`
+  - 주요 컨트롤러가 `authenticate_user!`를 사용하므로 사실상 본 문서 대상 액션 대부분에 접근하지 못한다.
+
+## 기본 원칙
+
+- `Classroom`, `Compliment`, 교실 내 학생 관리는 classroom membership이 핵심 기준이다.
+- `CouponTemplate` personal 영역은 소유권(`created_by_id`)이 핵심 기준이다.
+- `UserCoupon` 조회는 scope, 사용은 `use?` policy로 나뉜다.
+- admin 전용 UI라도 controller/policy가 별도 서버측 가드를 갖는지 함께 확인한다.
+- 권한 실패 응답은 형식별로 일관되게 유지한다.
+- HTML 요청은 redirect + alert를 사용한다.
+- JSON 요청은 `403 Forbidden`과 `{ ok: false, error: "not_authorized" }`를 반환한다.
+
+## 표 읽는 법
+
+- `리소스/액션` 열은 실제 서버 엔드포인트 기준으로 `Controller#action` 형식을 사용한다.
+- `정책 기준` 열에는 해당 엔드포인트가 실제로 호출하는 policy 메서드나 scope를 적는다.
+- service/model guard는 `비고`에만 적는다.
+- 현재 운영 중인 엔드포인트만 권한 매트릭스에 포함한다.
+
+## 권한 매트릭스
+
+### Dashboard
+
+`DashboardsController#show`는 guest를 인증 화면으로 보낸다. admin, 학교 manager와 일반 teacher의 학급 분석은 `policy_scope(Classroom)`을 사용하므로 admin은 전체 학급, manager는 자기 학교 전체 학급, 일반 teacher는 담당 teacher membership 학급만 선택할 수 있다. 선택한 숫자형 `classroom_id`도 이 scope 안에서만 조회하며 범위 밖이면 `404 Not Found`로 처리한다. student에게는 이 학급 분석 권한을 부여하지 않고 기존 PIN 세션 교실 기준 개인 주간 dashboard를 유지한다.
+
+### Classroom / ClassroomStudent
+
+| 리소스/액션 | 정책 기준 | admin | teacher | student | 비고 |
+|---|---|---|---|---|---|
+| `ClassroomsController#index` | `policy_scope(Classroom)` | 가능 | 가능 | 가능 | role별 classroom scope 적용 |
+| `ClassroomsController#show` | `ClassroomPolicy#show?` | 가능 | 담당 학급 또는 manager인 자기 학교 학급만 가능 | 본인 membership 교실만 가능 | 일반 teacher는 같은 학교 미담당 학급 접근 불가 |
+| `ClassroomsController#new` | `ClassroomPolicy#create?` | 가능 | manager만 가능 | 불가 | admin은 학교·학년 입력, manager는 자기 학교 고정과 학년 입력 |
+| `ClassroomsController#create` | `ClassroomPolicy#create?` | 가능 | manager만 가능 | 불가 | school과 1~6 grade 필수. admin은 학교 지정, manager는 자기 학교로 고정. `teacher_ids`는 허용하지 않음 |
+| `ClassroomsController#edit` | `ClassroomPolicy#update?` | 가능 | 담당 학급 또는 manager인 자기 학교 학급만 가능 | 불가 | `manage_structure?`와 `manage_operations?`에 따라 form 영역 분리 |
+| `ClassroomsController#update` | `ClassroomPolicy#update?` | 가능 | 담당 학급 또는 manager인 자기 학교 학급만 가능 | 불가 | admin·manager는 구조 정보, admin·담당 teacher는 운영 설정만 허용. `teacher_ids`는 허용하지 않음 |
+| `ClassroomsController#destroy` | `ClassroomPolicy#destroy?` + model 삭제 guard | 학생 또는 운영 기록이 없는 교실만 가능 | 불가 | 불가 | manager가 담당 teacher여도 불가. teacher membership만 있는 미사용 교실은 admin이 삭제 가능 |
+| `ClassroomsController#refresh_compliment_king` | `ClassroomPolicy#show?` | 가능 | membership 교실이면 가능 | membership 교실이면 가능 | 읽기 액션으로 동작 |
+| `ClassroomsController#student_login_info` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 학생 로그인 URL/QR/재발급 modal |
+| `ClassroomsController#draw_coupon` | `ClassroomPolicy#draw_coupon?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | `CouponDraw::Issue`가 대상 학생 소속, daily king, 중복 발급을 추가 검증 |
+| `ClassroomStudentsController#show`, `#dashboard`, `#activity` | `ClassroomPolicy#view_student_data?` + `UserPolicy#show?` | 가능 | URL 교실 teacher membership일 때만 가능 | 본인이며 URL 교실에서 active일 때만 가능 | manager 권한만으로는 불가. 담당 teacher/admin은 inactive 학생의 과거 기록 조회 가능 |
+| `ClassroomStudentMessagesController#index`, `#create` | `ClassroomPolicy#view_student_data?` + `UserPolicy#show?` + `UserMessagePolicy` | 가능 | URL 교실 teacher membership일 때만 가능 | 본인이며 URL 교실에서 active일 때만 가능 | create는 active 학생과 기존 메시지 정책·model validation을 추가 적용 |
+| `ClassroomStudentsController#coupon_assignment` | `UserPolicy#show?` + `ClassroomPolicy#draw_coupon?` | 가능 | 해당 교실의 active 학생만 가능 | 불가 | Turbo Frame용 지급 카드이며 `policy_scope(CouponTemplate).active` template만 표시 |
+| `ClassroomStudentsController#new` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 |  |
+| `ClassroomStudentsController#create` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 새 user는 항상 `role: student`이며 출석번호를 함께 저장 |
+| `ClassroomStudentsController#bulk_new` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 |  |
+| `ClassroomStudentsController#bulk_create` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 벌크 생성도 동일한 membership 기준 |
+| `ClassroomStudentsController#deactivate` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | `User`를 삭제하지 않고 현재 교실 student membership을 inactive 처리 |
+| `ClassroomStudentsController#reactivate` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 다른 학급의 active membership, 정원 또는 현재 교실 active 출석번호 충돌 시 기존 상태를 유지하고 복구 거부 |
+| `ClassroomStudentsController#destroy` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 직접 DELETE 요청도 hard delete 대신 현재 교실 student membership을 inactive 처리 |
+| `Classrooms::MembersController#update_student_names` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 현재 교실·현재 필터의 student membership id 기준으로 출석번호, 이름, 성별, 기본 썸네일을 일괄 편집하며 실패 시 전체 rollback |
+| `Classrooms::MembersController#edit_student_pin`, `#update_student_pin` | `ClassroomPolicy#manage_members?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | 현재 교실 active student membership만 대상으로 PIN을 일괄 재설정하며 inactive 학생은 제외 |
+
+### User
+
+| 리소스/액션 | 정책 기준 | admin | teacher | student | 비고 |
+|---|---|---|---|---|---|
+| `UsersController#show` | `UserPolicy#show?` | 가능 | 자신이 teacher인 교실에 속한 학생만 가능 | 본인만 가능 | `classroom_id`가 있으면 classroom `show?`와 대상 user membership을 추가 확인 |
+| `Admin::TeachersController#index` | `policy_scope(User)` | 가능 | 불가 | 불가 | `Admin::BaseController#require_admin!`도 필요 |
+| `Admin::TeachersController#new`, `#create` | `UserPolicy#create?` | 가능 | 불가 | 불가 | 새 계정은 항상 `role: teacher`; User, 기본 개인 쿠폰, 선택한 SchoolMembership과 teacher ClassroomMembership을 한 transaction으로 처리 |
+| `Admin::TeachersController#edit`, `#update` | `UserPolicy#update?` | 가능 | 불가 | 불가 | 학교와 담당 교실의 최종 상태를 함께 관리. 같은 학교의 role은 유지하고 학교 변경 시 member로 초기화하며 계정 속성·role 직접 입력은 무시 |
+| `Schools::TeachersController#index` | `SchoolPolicy#manage_teachers?` + `SchoolPolicy::Scope` | 불가 | 해당 학교 manager만 가능 | 불가 | URL school 소속 teacher와 담당 학급을 조회 |
+| `Schools::TeachersController#new`, `#create` | `SchoolPolicy#manage_teachers?` + `SchoolPolicy::Scope` | 불가 | 해당 학교 manager만 가능 | 불가 | 선생님 관리 목록에서 여는 modal. 새 teacher는 URL school의 일반 구성원으로 생성하고 body의 school_id는 사용하지 않음 |
+| `Schools::TeachersController#edit`, `#update` | `SchoolPolicy#manage_teachers?` + `SchoolPolicy::Scope` | 불가 | 해당 학교 manager만 가능 | 불가 | 대상 teacher는 URL school 소속으로 제한하고 해당 학교 교실 담당만 변경. 학교 소속·manager 역할·다른 학교 교실 담당은 변경하지 않음 |
+
+학생 본인은 출석번호를 읽을 수 있지만 수정할 수 없다. 학생 PIN 수정 요청은 PIN 관련 값만 허용하므로 출석번호를 포함한 조작 parameter는 반영하지 않는다. 명단 일괄 편집도 현재 교실과 선택한 상태 필터에 포함된 student membership만 허용하며, 다른 교실·teacher membership·필터 밖 membership id는 수정하지 않는다. 상세 정책은 [`student_roster.md`](../specs/student_roster.md)를 참고한다.
+
+### School
+
+| 리소스/액션 | 정책 기준 | admin | teacher | student | 비고 |
+|---|---|---|---|---|---|
+| `Admin::SchoolsController#new`, `#create` | `SchoolPolicy#create?` | 가능 | 불가 | 불가 | `/schools` 학교 관리 화면에서 진입 |
+| `Admin::SchoolsController#edit`, `#update` | `SchoolPolicy#update?` | 가능 | 불가 | 불가 | 학교 이름만 수정 가능 |
+| `SchoolsController#show` | `SchoolPolicy#show?` + `SchoolPolicy::Scope` | 가능 | 자기 학교 | 불가 | member와 manager 모두 자기 학교 읽기 가능 |
+| `SchoolsController#edit`, `#update` | `SchoolPolicy#update?` + `SchoolPolicy::Scope` | 가능 | 불가 | 불가 | 독립된 학교 설정 페이지에서 학교 이름과 표시 색상 수정 |
+| `SchoolsController#index` | `SchoolPolicy#index?` + `SchoolPolicy::Scope` | 전체 학교 | 자기 학교 | 불가 | 단일 소속 teacher는 show로 이동 |
+| `SchoolClosuresController` CRUD | `SchoolPolicy#manage_operations?` + `SchoolPolicy::Scope` | 가능 | manager만 자기 학교 | 불가 | closure는 nested school을 통해 조회 |
+| `Admin::SchoolManagersController` | `SchoolPolicy#update?` | 가능 | 불가 | 불가 | 해당 학교 SchoolMembership의 teacher만 manager로 지정하고 해제 시 member로 변경 |
+
+`SchoolPolicy::Scope`는 global admin에게 전체 학교를, 소속 teacher에게 자신의 학교만 반환한다. 일반 member와 manager는 자신의 학교를 `show?`할 수 있다. `manage_operations?`는 global admin과 해당 학교 manager에게 허용하고, `manage_teachers?`는 해당 학교 manager에게만 허용한다. global admin의 선생님 관리는 `/admin/teachers`와 `UserPolicy`를 사용한다.
+
+`ClassroomPolicy::Scope`는 global admin에게 전체 학급을, 학교 manager에게 자기 학교의 모든 학급을, 일반 teacher에게 담당 teacher membership 학급만 반환한다. student의 기존 membership 기반 scope는 유지한다. `manage_structure?`는 global admin과 해당 학교 manager에게 이름·학년 관리를 허용하지만, 생성된 교실의 학교는 누구도 변경할 수 없다. `manage_operations?`와 `manage_members?`는 global admin과 실제 담당 teacher에게만 허용한다. 따라서 manager는 담당 teacher가 아니라면 학생 관리나 칭찬왕·메시지 운영 설정 권한을 얻지 않는다.
+
+`/schools/:id`는 학교 기본 현황과 학교 휴일을 제공하고, global admin은 독립된 `/schools/:id/edit`에서 학교 이름·표시 색상·관리자·활성 상태를 관리한다. 교실 상세 관리는 `/classrooms`에서 수행한다. 담당 teacher 배정·해제는 global admin은 `/admin/teachers`, 해당 학교 manager는 `/schools/:school_id/teachers`에서 수행하며 classroom create/update는 `teacher_ids`를 처리하지 않는다.
+
+담당 teacher는 SchoolMembership을 반드시 가지며 모든 담당 Classroom은 그 SchoolMembership과 같은 학교여야 한다. global admin이 `/admin/teachers/:id`에서 학교와 담당 학급을 함께 변경하면 `Teachers::SaveWithAssignments`가 기존 teacher assignment 제거, SchoolMembership 변경·삭제, 최종 assignment 생성을 한 transaction으로 처리한다. 잘못된 학교·학급 조합은 변경 전 거부하고 전체 기존 상태를 보존한다.
+
+학교 삭제 endpoint는 아직 구현하지 않았다. 학교 생성·이름 수정·삭제 policy와 manager 지정·해제는 global admin 전용으로 유지한다. 학교 manager는 `/schools/:school_id/teachers`에서 자기 학교 teacher를 일반 구성원으로 생성하고 자기 학교 담당 교실만 배정·해제할 수 있으며, 학교 이동·소속 해제·manager 지정/해제·다른 학교 교실 배정은 할 수 없다.
+
+`SchoolMembership`은 teacher만 가질 수 있고 교사당 한 학교로 제한한다. global admin과 student는 membership을 가질 수 없다. 같은 학교의 여러 Classroom을 담당할 수 있지만 다른 학교 소속 teacher의 담당 배정은 transaction 전에 차단한다. 담당 해제는 SchoolMembership을 삭제하거나 manager를 강등하지 않는다.
+
+전역 `User#role`은 유지하며, `SchoolMembership`은 기본값이 `member`인 `member`/`manager` 역할을 가진다. 학급 담당 교사 배정과 backfill task가 누락 소속을 member로 보완하며 manager를 강등하거나 제거하지 않는다. backfill의 다른 학교 충돌은 변경하지 않고 `conflicts`로 집계한다. 여러 학교 소속 지원은 현재 범위가 아니다.
+
+### Compliment
+
+| 리소스/액션 | 정책 기준 | admin | teacher | student | 비고 |
+|---|---|---|---|---|---|
+| `UsersController#show`의 칭찬 목록 로드 | `policy_scope(Compliment)` | 가능 | 자신이 teacher인 교실의 칭찬만 | 본인이 받은 칭찬만 | `UserShowDataLoader`에서 로드 |
+| `ComplimentsController#create` | `ClassroomPolicy#create_compliment?` | 가능 | 해당 교실 teacher membership일 때만 가능 | 불가 | `ClassroomPolicy#show?`도 함께 통과해야 하며 receiver는 classroom membership에서만 선택 가능 |
+
+### CouponTemplate
+
+| 리소스/액션 | 정책 기준 | admin | teacher | student | 비고 |
+|---|---|---|---|---|---|
+| `CouponTemplatesController#index` | `CouponTemplatePolicy#index?` | 가능 | 가능 | 불가 | personal은 `policy_scope`, library는 `library_scope` 사용 |
+| `CouponTemplatesController#new` | `CouponTemplatePolicy#create?` | 가능 | 가능 | 불가 | teacher는 personal만 가능 |
+| `CouponTemplatesController#create` | `CouponTemplatePolicy#create?` | 가능 | 가능 | 불가 | controller가 teacher의 bucket을 personal로 강제 |
+| `CouponTemplatesController#edit` | `CouponTemplatePolicy#update?` | 가능 | 본인 personal만 가능 | 불가 |  |
+| `CouponTemplatesController#update` | `CouponTemplatePolicy#update?` | 가능 | 본인 personal만 가능 | 불가 | teacher는 실제 반영 속성이 `title`로 제한됨 |
+| `CouponTemplatesController#toggle_active` | `CouponTemplatePolicy#toggle_active?` | 가능 | 본인 personal만 가능 | 불가 |  |
+| `CouponTemplatesController#destroy` | `CouponTemplatePolicy#destroy?` | 가능 | 본인 personal만 가능 | 불가 | 발급 이력 있으면 삭제 대신 비활성화 |
+| `CouponTemplatesController#bump_weight` | `CouponTemplatePolicy#bump_weight?` | 가능 | 본인 personal만 가능 | 불가 | admin은 library도 조정 가능 |
+| `CouponTemplatesController#adopt` | `CouponTemplatePolicy#adopt?` | 가능 | 가능 | 불가 | source는 `library_scope`에서만 선택 가능 |
+| `CouponTemplatesController#adopt_all_from_library` | `CouponTemplatePolicy#adopt?` | 가능 | 가능 | 불가 | active library를 personal로 반영 |
+| `CouponTemplatesController#rebalance_personal` | `CouponTemplatePolicy#rebalance_equal?` | 가능 | 가능 | 불가 | current_user personal 세트 기준 |
+| `CouponTemplatesController#rebalance_library` | `CouponTemplatePolicy#rebalance_equal?` | 가능 | 불가 | 불가 | controller가 `current_user.admin?`를 추가 확인 |
+
+### UserCoupon / CouponEvent
+
+| 리소스/액션 | 정책 기준 | admin | teacher | student | 비고 |
+|---|---|---|---|---|---|
+| `UserCouponsController#create` | `ClassroomPolicy#draw_coupon?` + `policy_scope(CouponTemplate)` | 가능 | 해당 교실의 active 학생에게만 가능 | 불가 | active template 선택 지급만 허용하며 `manual/selected`로 기록 |
+| `UserCouponsController#index` | `UserPolicy#show?` + `policy_scope(UserCoupon)` | 가능 | 담당 teacher membership 학급의 쿠폰만 가능 | 본인만 가능 | manager 권한만으로 자기 학교 전체 쿠폰 범위가 확장되지 않음 |
+| `UserCouponsController#use` | `UserCouponPolicy#use?` | 가능 | 해당 coupon classroom의 teacher membership이면 가능 | 본인 coupon만 가능 | `UserCoupons::Use`가 상태 전이와 이벤트 생성을 처리 |
+| `CouponEventsController#index` | `CouponEventPolicy#index?` + `policy_scope(CouponEvent)` | 가능 | 가능 | 불가 | teacher는 담당 교실 이벤트와 본인이 actor인 이벤트 조회 |
+
+## 현재 미사용 정책 항목
+
+- `UserPolicy#index?`
+- `UserPolicy::Scope`
+- `ComplimentPolicy#show?`
+- `ComplimentPolicy#create?`
+- `ComplimentPolicy#update?`
+- `ComplimentPolicy#destroy?`
+- `ClassroomStudentPolicy#create?`
+- `ClassroomStudentPolicy#destroy?`
+
+현재 코드베이스에는 대응하는 일반 운영 엔드포인트가 없거나, 다른 policy 경로로 대체되어 있다. 테스트 작성 시에는 운영 엔드포인트 기준 우선순위를 먼저 둔다.
+
+## 리소스별 설명
+
+### Classroom
+
+- 교실 조회 범위는 `policy_scope(Classroom)`로 role별로 나뉜다.
+- teacher의 수정 권한은 전역 role만으로 충분하지 않고, 해당 교실의 teacher membership이 필요하다.
+- 학생 데이터 조회는 학교 manager에게도 열려 있는 `show?`를 재사용하지 않고 `view_student_data?`를 사용한다. global admin, URL 교실의 실제 담당 teacher, 해당 교실 소속 student만 통과하며 student 본인의 active 상태와 대상 학생 확인은 controller와 `UserPolicy#show?`가 추가 검증한다.
+- `refresh_compliment_king`은 읽기 액션으로 취급되어 `show?`만 요구한다.
+
+### User
+
+- 일반 사용자 상세 조회는 `UserPolicy#show?`와 optional classroom context guard를 함께 본다.
+- teacher는 "내가 teacher인 교실에 속한 학생"만 볼 수 있다.
+- admin teacher 관리 화면은 별도 namespace guard(`Admin::BaseController`)와 `UserPolicy`를 함께 사용한다.
+
+### Compliment
+
+- 실제 생성 엔드포인트는 `ComplimentsController#create` 하나다.
+- 생성 가능 여부는 `ComplimentPolicy#create?`가 아니라 `ClassroomPolicy#create_compliment?`로 결정된다.
+- receiver는 controller에서 반드시 해당 classroom membership에서 찾아온다.
+
+### CouponTemplate
+
+- personal 템플릿은 owner 중심, library 템플릿은 admin 소유 + `bucket=library` 전제다.
+- teacher는 library를 읽고 adopt할 수 있지만 직접 library를 수정할 수는 없다.
+- teacher의 personal `update`는 policy상 owner이면 가능하지만, controller가 실제 반영 속성을 `title`로 제한한다.
+
+### UserCoupon
+
+- 사용 권한은 비교적 명확하다.
+  - admin
+  - coupon 소유 student 본인
+  - 해당 coupon classroom의 teacher
+- 조회 권한은 `UserPolicy#show?`와 `UserCoupon::Scope`가 결합되어 동작하므로, 실제 노출 범위는 endpoint마다 다시 확인해야 한다.
+
+### CouponEvent
+
+- 조회 전용 리소스다.
+- teacher는 자신이 담당하는 교실의 이벤트를 보며, 예외적으로 본인이 actor인 이벤트는 classroom 범위 밖이어도 scope에 포함된다.
+
+## 확인 필요 항목
+
+### 해결된 권한 경계
+
+- teacher의 `UserCouponPolicy::Scope`는 담당 teacher membership classroom의 쿠폰으로 제한한다.
+- classroom-scoped 학생 상세, 한눈에 보기, 활동 기록과 메시지는 URL classroom의 `view_student_data?`를 먼저 확인하므로, 같은 학생을 다른 학급에서 담당한다는 이유만으로 미담당 학급 데이터에 접근할 수 없다.
+- 학교 manager는 실제 classroom teacher membership이 있을 때만 학생 데이터와 담당 학급 쿠폰 범위에 접근한다.
+
+### 정책 의도 확인 필요
+
+- `admin`의 `UserPolicy#update?`는 teacher 계정에만 허용된다. student/admin 계정 관리가 의도적으로 제외된 것인지 문서 기준이 필요하다.
+  - 추천 spec 타입: policy 또는 request
+  - 위험도: 중간
+- `CouponTemplatePolicy::Scope.library_scope`는 teacher에게 active library만 노출하지만, admin은 inactive library도 본다. 이 차이가 운영 정책으로 확정됐는지 명시가 필요하다.
+  - 추천 spec 타입: policy 또는 request
+  - 위험도: 중간
+
+### 구조 정리 필요
+
+- `ClassroomStudentPolicy`는 정의되어 있지만 `ClassroomStudentsController`는 `ClassroomPolicy#manage_members?`만 사용한다. policy 책임을 단일화하거나 미사용 policy를 정리하는 편이 낫다.
+  - 추천 spec 타입: 없음
+  - 위험도: 낮음
+- `CouponTemplatePolicy`와 `UserPolicy` 일부 메서드는 `user.nil?` 방어가 약하다. 현재는 `authenticate_user!` 전제라 동작하지만 정책 기본값 관점에서는 보완 여지가 있다.
+  - 추천 spec 타입: policy
+  - 위험도: 낮음
+
+## 문서 유지 원칙
+
+- 권한 문서는 policy, controller, service guard 순으로 확인한 뒤 갱신한다.
+- "보이는 버튼"이 아니라 서버측 `authorize`, `policy_scope`, membership 조건을 기준으로 쓴다.
+- 새 액션이 추가되면 최소한 해당 엔드포인트의 matrix와 `확인 필요 항목`을 함께 검토한다.
+- 문서와 코드가 충돌하면 문서를 먼저 의심하고, 근거가 확인된 후 갱신한다.

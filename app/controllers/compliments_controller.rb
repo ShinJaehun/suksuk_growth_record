@@ -1,0 +1,144 @@
+class ComplimentsController < ApplicationController
+  include UserShowDataLoader
+
+  before_action :authenticate_user!
+  before_action :set_classroom, only: %i[new create]
+
+  DUP_WINDOW = 1.second
+
+  def new
+    authorize @classroom, :show?
+    authorize @classroom, :create_compliment?
+
+    @receiver = @classroom.classroom_memberships.find_by!(
+      user_id: compliment_params[:receiver_id],
+      role: "student",
+      status: "active"
+    ).user
+    @compliment_presets = active_compliment_presets
+
+    render layout: false if turbo_frame_request?
+  end
+
+  def create
+    authorize @classroom, :show?
+    authorize @classroom, :create_compliment?
+
+    @student_membership = @classroom.classroom_memberships.find_by!(
+      user_id: compliment_params[:receiver_id],
+      role: "student",
+      status: "active"
+    )
+    @receiver = @student_membership.user
+
+    now = Time.current
+    @compliment_preset = find_compliment_preset
+    reason = @compliment_preset&.title
+
+    @classroom.with_lock do
+      if Compliment.where(
+           classroom_id: @classroom.id,
+           giver_id:     current_user.id,
+           receiver_id:  @receiver.id
+         ).where("given_at >= ?", now - DUP_WINDOW).exists?
+
+        load_user_show_data!(
+          user: @receiver,
+          classroom: @classroom,
+          include_recent_issued: false,
+          recent_in_classroom: true
+        )
+        load_today_compliment_count_for_receiver
+        load_active_compliment_presets
+        message = t("compliments.create.duplicate")
+        return respond_to do |f|
+          f.html { redirect_back fallback_location: classroom_student_path(@classroom, @receiver),
+            alert: message, status: :see_other }
+          f.turbo_stream do
+            flash.now[:alert] = message
+            render :create, layout: "application", status: :conflict
+          end
+          f.json { render json: { ok: false, error: "duplicate_request" }, status: :conflict }
+        end
+      end
+
+      ApplicationRecord.transaction(requires_new: true) do
+        @created_compliment = Compliment.create!(
+          classroom_id: @classroom.id,
+          giver_id:     current_user.id,
+          receiver_id:  @receiver.id,
+          given_at:     now,
+          compliment_preset: @compliment_preset,
+          reason: reason
+        )
+        @receiver.increment!(:points)
+      end
+    end
+
+    load_user_show_data!(
+      user: @receiver,
+      classroom: @classroom,
+      include_recent_issued: false,
+      recent_in_classroom: true
+    )
+    load_today_compliment_count_for_receiver
+    load_active_compliment_presets
+
+    respond_to do |f|
+      f.html { redirect_to classroom_student_path(@classroom, @receiver), status: :see_other }
+      f.turbo_stream { render :create, layout: "application" }
+      f.json { render json: { ok: true, receiver_id: @receiver.id }, status: :created }
+    end
+
+  rescue ActiveRecord::RecordInvalid => e
+    load_user_show_data!(
+      user: @receiver,
+      classroom: @classroom,
+      include_recent_issued: false,
+      recent_in_classroom: true
+    ) if defined?(@receiver) && @receiver.present?
+    message = t("compliments.create.failure", detail: e.message)
+    respond_to do |f|
+      f.html { redirect_back fallback_location: classroom_student_path(@classroom, @receiver),
+        alert: message, status: :see_other }
+      f.turbo_stream do
+        flash.now[:alert] = message
+        render layout: "application", status: :unprocessable_content
+      end
+      f.json { render json: { ok: false, error: e.message }, status: :unprocessable_content }
+    end
+
+  end
+
+  private
+
+  def set_classroom
+    @classroom = Classroom.find(params[:classroom_id])
+  end
+
+  def compliment_params
+    params.require(:compliment).permit(:receiver_id, :compliment_preset_id)
+  end
+
+  def active_compliment_presets
+    current_user.compliment_presets.active.ordered
+  end
+
+  def load_active_compliment_presets
+    @active_compliment_presets = active_compliment_presets
+  end
+
+  def find_compliment_preset
+    return nil if compliment_params[:compliment_preset_id].blank?
+
+    active_compliment_presets.find(compliment_params[:compliment_preset_id])
+  end
+
+  def load_today_compliment_count_for_receiver
+    @today_compliment_count_for_receiver = Compliment.where(
+      classroom_id: @classroom.id,
+      receiver_id: @receiver.id,
+      given_at: Time.zone.today.all_day
+    ).count
+  end
+end

@@ -1,0 +1,263 @@
+# Coupons Architecture
+
+이 문서는 **쑥쑥칭찬통장(SukSuk Praise)** 앱의 쿠폰 관련 기능 구조를 개발자 관점에서 정리한 문서다.
+
+---
+
+## 1. 주요 개념
+
+### User
+
+| 역할 | 설명 |
+|------|------|
+| `student` | 쿠폰 수령 및 사용 |
+| `teacher` | 쿠폰 발급 및 관리 |
+| `admin` | 전체 관리 (라이브러리 쿠폰 템플릿 포함) |
+
+**연관 관계**
+- `has_many :classroom_memberships`
+- `has_many :classrooms, through: :classroom_memberships`
+- `has_many :user_coupons`
+
+**권한**
+- `admin`: 전체 조회 가능
+- `teacher`: 자신의 교실 학생 조회 가능
+- `student`: 자기 자신만 조회 가능
+
+---
+
+## 2. 교실 (Classroom)
+
+- `has_many :classroom_memberships, dependent: :destroy`
+- `has_many :users, through: :classroom_memberships`
+- `has_many :user_coupons`
+
+**권한**
+- `show?`: 교실 멤버 or admin
+- `manage?`: admin 또는 해당 교실 teacher
+
+**기능**
+- 교실 학생 목록 및 최근 발급 쿠폰 조회
+- 최근 발급 쿠폰 5개 로드
+
+---
+
+## 3. 쿠폰 템플릿 (CouponTemplate)
+
+쿠폰의 “종류”를 정의하는 모델.  
+교사별 개인 세트(personal)와 관리자용 라이브러리(library)로 구분.
+
+```rb
+class CouponTemplate < ApplicationRecord
+  has_many :user_coupons, dependent: :restrict_with_exception
+  belongs_to :created_by, class_name: "User"
+
+  validates :title, presence: true
+  validates :weight, presence: true,
+    numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+  validates :bucket, inclusion: { in: %w[personal library] }
+
+  validates :title, uniqueness: {
+    scope: %i[created_by_id bucket],
+    case_sensitive: false,
+    message: :already_in_bucket
+  }
+
+  scope :active, -> { where(active: true) }
+  scope :personal_for, ->(user) { where(created_by_id: user.id, bucket: "personal") }
+end
+```
+
+### Personal 버킷 불변식
+
+| 규칙 | 설명 |
+|------|------|
+| 1 | active && weight <= 0 → 금지 |
+| 2 | inactive → weight는 0으로 고정 |
+| 3 | 가중치는 상대적인 추첨 비중이며 전체 active weight 합은 100일 필요가 없음 |
+
+각 쿠폰의 가중치는 다른 쿠폰과 독립적으로 조정한다. `WeightBalancer`를 통한 균등 분배는
+사용자가 명시적으로 실행할 때만 적용되는 선택적 편의 기능이다.
+
+### Library 버킷
+- admin이 생성, 교사는 읽기만 가능
+- 교사는 “가져오기(adopt)”로 자신의 personal로 복제 가능
+- 라이브러리 쿠폰은 personal 쿠폰 생성 시점의 복제 원본이며 이후에는 동기화하지 않는다.
+- `source_template_id`는 출처 기록과 중복 복제 방지에만 사용한다.
+- 추천 세트 적용은 아직 가져오지 않은 라이브러리 쿠폰만 추가한다.
+
+### Policy 요약
+| 액션 | 권한 |
+|-------|------|
+| index / library / create | teacher, admin |
+| update / toggle_active / destroy / bump_weight | admin 또는 owner |
+| adopt / rebalance_equal | teacher, admin |
+
+---
+
+## 4. 쿠폰 (UserCoupon) 및 로그 (CouponEvent)
+
+### UserCoupon
+
+```rb
+class UserCoupon < ApplicationRecord
+  belongs_to :classroom
+  belongs_to :user
+  belongs_to :coupon_template
+  belongs_to :issued_by, class_name: "User", optional: true
+
+  enum status: { issued: 0, used: 1 }
+  enum issuance_basis: {
+    daily: "daily",
+    weekly: "weekly",
+    monthly: "monthly",
+    manual: "manual",
+    hybrid: "hybrid"
+  }
+
+  validates :issued_at, :status, :issuance_basis, :period_start_on, presence: true
+end
+```
+
+- `issue!` 헬퍼로 basis, period_start_on 자동 설정
+- `use!` → `issued` → `used` 전이만 허용
+- 일간·주간·월간 칭찬왕 쿠폰은 issuance basis, basis tag, period 정보로 구분한다.
+- 같은 학생에게 같은 기간의 동일 칭찬왕 쿠폰을 중복 발급하지 않는다.
+- 사용 처리된 쿠폰도 같은 기간에 다시 발급하지 않는다.
+- 교실에서 비활성화한 기간의 칭찬왕 쿠폰은 실제 생성 전에 서버측에서 차단한다.
+- `manual`·custom 발급은 칭찬왕 기간 활성 설정과 무관하다.
+
+칭찬왕 집계와 향후 학교 운영일 연동 정책은
+[`weekly_monthly_compliment_king.md`](../specs/weekly_monthly_compliment_king.md)를 참고한다.
+
+### CouponUseRequest
+
+학생은 보유 쿠폰을 직접 사용 처리하지 않고 쿠폰 사용 요청을 생성한다.
+
+- 학생은 자기 `issued` 쿠폰에 대해서만 사용 요청을 만들 수 있다.
+- 같은 쿠폰에 pending 요청은 하나만 유지한다.
+- inactive 학생의 기존 쿠폰과 사용 요청 기록은 보존한다.
+- 현재 active student membership이 있는 학생의 쿠폰만 직접 사용하거나 pending 요청을 승인할 수 있다.
+- pending 사용 요청이 있는 쿠폰은 직접 사용하지 않고 기존 승인 흐름으로 처리한다.
+- direct use는 pending 사용 요청이 없는 active 학생 쿠폰에만 허용한다.
+- 승인 시 기존 `UserCoupon#use!` 흐름을 재사용해 쿠폰을 `used`로 전이하고 `CouponEvent`를 기록한다.
+- teacher/admin은 요청 승인과 별개로 학생 쿠폰을 직접 사용 처리할 수 있다.
+- 사용 요청 생성/승인/직접 사용 처리 후 학생 화면과 관리 화면의 쿠폰 목록은 Turbo Streams로 갱신한다.
+
+### CouponEvent
+
+```rb
+class CouponEvent < ApplicationRecord
+  belongs_to :actor, class_name: 'User'
+  belongs_to :user_coupon
+  belongs_to :classroom
+  belongs_to :coupon_template
+
+  validates :action, inclusion: { in: %w[issued used] }
+end
+```
+
+- `action`: `issued` or `used`
+- `metadata`: 발급 기준, 학생 정보 등 포함
+- Admin/Teacher 로그 조회 페이지 `/coupon_events#index`
+
+---
+
+## 5. WeightBalancer
+
+`CouponTemplates::WeightBalancer.normalize!(user)`  
+→ 사용자가 균등 분배를 요청했을 때 personal 세트의 active weight를 100 안에서 분배.
+
+**규칙**
+- inactive 템플릿은 weight = 0 고정
+- active만 균등 분배 (가중치 합 100)
+- 남는 100-합 값은 소수점 기준으로 보정 (largest remainder)
+
+---
+
+## 6. Controller 핵심 동작 요약
+
+### CouponTemplatesController
+
+| 액션 | 설명 |
+|------|------|
+| index | 내 쿠폰(@personal) + 라이브러리(@library) 프레임 렌더 |
+| rebalance_equal | WeightBalancer로 균등 분배 |
+| create / update / toggle_active / destroy | personal 관리용 |
+| adopt | library 템플릿을 personal로 복제 |
+| bump_weight | 개별 쿠폰을 10단위로 증감, 0 → 비활성화 |
+
+### Coupon image
+
+- 쿠폰 썸네일은 `CouponTemplate#image` Active Storage 첨부를 우선 사용한다.
+- 첨부 이미지가 없으면 `default_image_key`가 가리키는 asset을 사용한다.
+- `default_image_key`가 비어 있거나 실제 asset이 없으면 범용 기본 이미지를 표시한다.
+- 라이브러리 이미지는 personal 생성 시 독립 blob으로 복제하며 생성 이후 원본과 동기화하지 않는다.
+
+### Draw coupon / animation
+
+- 칭찬왕 쿠폰 발급은 `CouponDraw::Issue`가 담당한다.
+- teacher/admin이 쿠폰을 뽑으면 서버에서는 `draw_coupon` 요청 시점에 쿠폰을 즉시 발급한다.
+- Turbo 응답에는 쿠폰 뽑기 overlay와 delayed reveal용 stream이 포함된다.
+- overlay가 열려 있는 동안 teacher/admin 화면 뒤의 쿠폰 목록, 최근 발급, KPI는 즉시 갱신하지 않는다.
+- overlay close 후 delayed reveal이 teacher/admin 화면을 갱신한다.
+- 발급 transaction과 classroom lock이 끝나면 서버가 `student_coupons` stream으로 새 쿠폰 목록 갱신을 시도한다.
+- overlay 종료는 교사 화면의 deferred UI 갱신만 수행하며 별도 서버 요청을 보내지 않는다.
+
+### 안전장치
+- `DUP_WINDOW` (1~2초) 중복 요청 방지
+- `with_lock` + DB 트랜잭션 기반 병행 제어
+- Stimulus `disable_on_submit`로 UI 중복 요청 차단
+
+---
+
+## 7. Rails Console 헬스체크 스니펫
+
+### 7.1 전체 불변식 검사
+
+```rb
+ct_health!
+```
+
+출력:
+- personal active weight <= 0 → NG
+- personal inactive weight != 0 → NG
+- 각 교사별 weight 합 (100 아니면 WARN)
+
+### 7.2 특정 교사 personal 세트 확인
+
+```rb
+u = User.find_by(email: "teacher@example.com")
+ct_personal_for(u)
+```
+
+- 활성/비활성 목록 및 weight 합 출력
+
+### 7.3 bump_weight 시뮬레이션
+
+```rb
+ct_try_bump(user, tpl_id, 10)     # +10
+ct_try_bump(user, tpl_id, -10)    # -10
+ct_try_bump(user, tpl_id, -100)   # 0으로 떨어질 때 auto 비활성화
+```
+
+- 컨트롤러 로직과 동일하게 동작
+- before/after, 합계, 자동 비활성화 여부 출력
+
+---
+
+## 8. I18n 구조 요약
+
+| 파일 | 역할 |
+|------|------|
+| `ko.yml` | 전역 UI, 교실/학생/쿠폰발급, 리포트 등 |
+| `ko.coupon_templates.yml` | 쿠폰 템플릿 관리 화면 전용 |
+| `en.yml`, `devise.en.yml` | 기본 영문/Devise 번역 |
+
+---
+
+## 9. 문서 유지 원칙
+
+- 현재 시스템 전체 요약은 `docs/architecture/current_system.md`에 둔다.
+- 이 문서는 쿠폰 템플릿, 발급, 사용 요청, 사용 처리, 이벤트, weight 관련 상세 규칙을 유지한다.
+- 아직 확정되지 않은 notification 확장 후보는 `docs/planning/backlog.md`에서 관리한다.

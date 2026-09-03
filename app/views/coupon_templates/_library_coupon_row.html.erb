@@ -1,0 +1,32 @@
+<%# locals: tpl:, adopted_source_ids:, title_conflict_source_ids: [] %>
+<% adopted = adopted_source_ids.include?(tpl.id) %>
+<% title_conflict = local_assigns.fetch(:title_conflict_source_ids, []).include?(tpl.id) %>
+
+<article id="<%= dom_id(tpl, :library) %>" class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-4 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:gap-x-6">
+  <div class="col-span-2 lg:col-span-1">
+    <%= render "coupon_templates/coupon_identity", tpl: tpl %>
+  </div>
+
+  <div class="flex items-center gap-2 text-sm text-slate-600">
+    <span class="font-medium"><%= t("coupon_templates.columns.weight") %></span>
+    <span class="min-w-10 text-center font-mono font-semibold tabular-nums text-slate-900"><%= tpl.weight %></span>
+  </div>
+
+  <div class="flex justify-end">
+    <% if adopted %>
+      <span class="inline-flex min-h-9 items-center rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700">
+        <%= t("coupon_templates.status.added") %>
+      </span>
+    <% elsif title_conflict %>
+      <span class="inline-flex min-h-9 items-center rounded-full bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700">
+        <%= t("coupon_templates.status.title_conflict") %>
+      </span>
+    <% else %>
+      <%= button_to t("coupon_templates.actions.adopt"),
+            adopt_coupon_template_path(tpl),
+            method: :post,
+            form: { data: { controller: "disable-on-submit" } },
+            class: "inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2" %>
+    <% end %>
+  </div>
+</article>

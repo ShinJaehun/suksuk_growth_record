@@ -1,0 +1,113 @@
+# Student Membership Lifecycle
+
+## 목적
+
+학생의 교실 활동 상태는 `User`가 아니라 `ClassroomMembership`으로 관리한다.
+운영 화면에서는 학생 계정을 기본적으로 삭제하지 않고, 교실 membership을 비활성화하거나 복구한다.
+
+## Membership 역할별 정책
+
+`ClassroomMembership`에 `status`를 둔다.
+
+### 학생 membership
+
+- 허용값: `active`, `inactive`
+- 기본값: `active`
+- `active`는 학생의 현재 교실 소속을 의미한다.
+- `inactive`는 과거 소속 기록이며 삭제하지 않는다.
+- student `User`는 전체 시스템에서 active student membership을 최대 하나만 가진다.
+- 한 교실의 active student membership은 최대 30개까지 허용한다.
+- inactive student membership은 교실 active 학생 수 계산에서 제외한다.
+- inactive student membership은 과거 학급 이력으로 여러 개 보존할 수 있다.
+- inactive 학생은 자기 권한으로 현재 교실 기능에 접근하거나 새 메시지, 쿠폰 사용 요청 등 새로운 활동을 만들 수 없다.
+- 담당 teacher는 inactive 학생의 과거 칭찬·쿠폰·메시지 기록을 조회하고 계정 관리와 복구를 수행할 수 있다.
+- 현재 단계에서는 `transferred`, `graduated`, `archived` 같은 상태를 추가하지 않는다.
+
+### 교사 membership
+
+- teacher membership은 존재 여부로 현재 담당 여부를 나타낸다.
+- membership이 존재하면 현재 담당 teacher이며, 담당 해제는 membership 삭제로 처리한다.
+- active/inactive lifecycle을 사용하지 않고 항상 `active` 상태로 저장한다.
+- inactive teacher membership은 모델 validation에서 허용하지 않는다.
+
+`Classroom#students`는 일반 교실 운영에서 사용하는 active 학생 목록을 의미한다.
+inactive 학생은 교사 일반 운영 화면, 칭찬 대상, 쿠폰 추첨 대상, 학생 PIN 로그인 선택 목록,
+새 메시지 대상에서 제외한다.
+
+teacher/admin 구성원 관리 화면에서는 active/inactive 학생을 한 목록에서 확인한다.
+inactive 학생은 흐린 스타일과 복구 action으로 active 학생과 구분한다.
+
+## 비활성화/복구 정책
+
+teacher/admin이 학생을 더 이상 운영 대상으로 쓰지 않으려면 현재 교실의
+`ClassroomMembership`을 `inactive`로 변경한다.
+
+- `User`는 삭제하지 않는다.
+- 직접 삭제 요청도 현재 교실의 student membership을 비활성화하며 `User`를 hard delete하지 않는다.
+- 칭찬, 쿠폰, 메시지, 쿠폰 사용 요청 등 과거 기록은 삭제하지 않는다.
+- 비활성화할 때 출석번호를 유지한다. inactive 학생끼리 또는 inactive와 active 학생은 같은 출석번호를 가질 수 있다.
+- inactive 학생도 teacher/admin은 과거 기록 확인을 위해 상세, 한눈에 보기, 활동 기록,
+  메시지 기록 페이지에 접근할 수 있다.
+- inactive 학생 상세에서는 칭찬하기, 쿠폰 지급, 새 메시지 작성/답글 작성 같은 운영 action을 숨긴다.
+- inactive 학생은 구성원 관리 화면에서 `active`로 복구할 수 있다.
+- 다른 학급에 active student membership이 이미 있으면 복구를 거부하고 두 membership 상태를 모두 유지한다.
+- 현재 학급의 active 학생 수가 이미 30명이면 복구를 거부하고 membership은 inactive로 유지한다.
+- 복구 시 active 출석번호 유일성을 다시 검증한다. 같은 번호를 현재 교실의 active 학생이 사용 중이면 복구하지 않고 기존 상태를 유지한다.
+- 복구 과정에서 다른 학급 membership을 자동으로 inactive 처리하지 않는다.
+- 복구 최종 검증과 저장은 classroom lock과 student lock 안에서 다시 수행한다.
+
+학생 학급 이동은 별도의 명시적 관리 기능으로 다룬다. 현재 단계에서는 이동 버튼이나
+transfer service를 만들지 않으며, 기존 active membership과 대상 학급 membership을 자동으로
+변경하지 않는다.
+
+### 직접 삭제 요청
+
+`DELETE /classrooms/:classroom_id/students/:id` 요청이 직접 들어와도 `User` hard delete를 수행하지 않는다.
+현재 교실의 student membership을 `inactive`로 변경하는 안전한 동작으로 처리한다.
+
+## 권한 불변식
+
+- 비활성화/복구는 `ClassroomPolicy#manage_members?`를 기준으로 한다.
+- admin은 가능하다.
+- teacher는 해당 classroom의 teacher membership이 있을 때만 가능하다.
+- student는 불가하다.
+- 접근 주체가 학생이면 해당 교실의 active student membership이 필요하다.
+- 관리 대상이 학생이면 inactive membership도 과거 기록 조회·계정 관리·복구 대상으로 허용한다.
+- 접근 주체가 teacher이면 해당 교실의 teacher membership 존재가 필요하다.
+
+학생 상세, 한눈에 보기, 활동 기록과 메시지 기록은 URL에 지정된 classroom을 기준으로 권한을 확인한다.
+global admin은 모든 학급에 접근할 수 있고, teacher는 해당 classroom의 teacher membership이 있을 때만
+접근할 수 있다. 학교 manager도 실제 담당 teacher가 아니면 학생 데이터에 접근할 수 없다. student는
+본인이면서 해당 classroom의 membership이 active일 때만 접근할 수 있다.
+
+## 사용자 안내
+
+- 비활성화한 경우: 학생을 운영 대상에서 제외했고 과거 기록은 보존된다는 취지로 안내한다.
+- 복구한 경우: 학생을 다시 운영 대상으로 복구했다는 취지로 안내한다.
+- active 학생 PIN을 일괄 재설정하는 경우: 현재 교실의 활성 학생 PIN만 변경하며 inactive 학생은 변경하지 않는다는 취지로 안내한다.
+
+## 학생 session
+
+inactive 학생은 PIN 로그인 목록과 로그인 검증에서 제외한다.
+
+특정 교실 PIN 로그인 session이 설정된 학생은 해당 session 교실의 membership이 inactive로
+바뀌면 다음 요청에서 로그아웃하고 그 교실의 학생 로그인 화면으로 redirect한다.
+일반 학생 요청 전체를 active membership 부재만으로 전역 로그아웃시키지는 않으며,
+각 controller와 policy가 요청별 접근 권한을 판단한다.
+
+## 구현 원칙
+
+- controller에서는 `authorize`, `policy_scope`와 흐름 제어를 담당한다.
+- view에서 `policy(...)`를 직접 호출하지 않는다.
+- per-item 권한이나 상태 판단은 controller에서 계산해서 view에 전달한다.
+- 일반 운영 화면은 active 학생만 조회한다.
+- 학생 개별 생성과 여러 학생 등록, inactive 학생 복구는 저장 직전 classroom lock 안에서 active 학생 수를 다시 확인한다.
+- 학생 신규 생성에는 4자리 숫자 PIN이 필수이며, student `User`에는 Devise email/password를 저장하지 않는다.
+- 학생 gender가 `boy`이면 boy avatar만, `girl`이면 girl avatar만 허용한다. legacy 학생의 관련 없는 수정은 gender/avatar 호환성 때문에 차단하지 않는다.
+- `/classrooms` 교실 카드의 학생 수와 학생 avatar preview는 active student membership만 기준으로 한다.
+- 구성원 관리 화면은 active/inactive 학생 membership을 한 목록으로 조회한다.
+- 구성원 관리 화면의 PIN 일괄 재설정은 현재 교실 active student membership만 대상으로 한다.
+- hard delete 허용 여부, 일괄 비활성화, inactive reason/memo는 후속 작업으로 다룬다.
+- `current_system.md`와 backlog 문서는 구현 및 targeted spec 완료 후 갱신한다.
+
+출석번호와 명단 정렬·편집의 상세 정책은 [`student_roster.md`](student_roster.md)를 기준으로 한다.

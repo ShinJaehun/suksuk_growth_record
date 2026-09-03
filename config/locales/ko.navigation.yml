@@ -1,0 +1,21 @@
+ko:
+  navigation:
+    dashboard: "한눈에 보기"
+    school_management: "학교"
+    school_operations: "학교 운영"
+    classrooms: "교실"
+    teacher_management: "선생님"
+    coupon_management: "쿠폰 관리"
+    coupon_log: "쿠폰 로그"
+    compliment_phrase_management: "칭찬 관리"
+    compliment_log: "칭찬 로그"
+    coupon_group: "쿠폰"
+    compliment_group: "칭찬"
+    my_praise_book: "내 칭찬통장"
+    brand: "쑥쑥칭찬통장"
+    avatar_alt: "%{name} avatar"
+    account:
+      edit: "내 정보 수정"
+      finish: "사용 끝내기"
+      sign_in: "Sign in"
+      sign_out: "Sign out"
