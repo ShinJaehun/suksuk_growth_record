@@ -61,7 +61,6 @@ RSpec.describe 'Admin schools', type: :request do
   it 'deactivates and reactivates a school without removing related data' do
     classroom = create(:classroom, school: school)
     membership = create(:school_membership, school: school)
-    closure = create(:school_closure, school: school)
     sign_in admin
 
     patch deactivate_admin_school_path(school)
@@ -69,7 +68,6 @@ RSpec.describe 'Admin schools', type: :request do
     expect(school.reload).to be_inactive
     expect(classroom.reload.school).to eq(school)
     expect(membership.reload.school).to eq(school)
-    expect(closure.reload.school).to eq(school)
 
     patch reactivate_admin_school_path(school, status: 'inactive')
     expect(school.reload).to be_active

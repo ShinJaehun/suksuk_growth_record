@@ -283,8 +283,6 @@ RSpec.describe 'School teachers', type: :request do
 
   describe 'POST /schools/:school_id/teachers' do
     it 'creates a member teacher without classroom assignments for the URL school' do
-      create(:coupon_template, created_by: admin, bucket: 'library', active: true, title: '기본 쿠폰')
-
       sign_in manager
       post school_teachers_path(school), params: {
         user: valid_teacher_params(email: 'school-teacher@example.com'),
@@ -298,7 +296,6 @@ RSpec.describe 'School teachers', type: :request do
       expect(created_teacher.role).to eq('teacher')
       expect(created_teacher.school_membership).to have_attributes(school: school, role: 'member')
       expect(created_teacher.classroom_memberships.teacher).to be_empty
-      expect(CouponTemplate.personal_for(created_teacher)).to be_empty
     end
 
     it 'creates assignments for multiple selected classrooms in the URL school' do
@@ -332,7 +329,7 @@ RSpec.describe 'School teachers', type: :request do
                classroom_ids: [classroom.id]
              },
              headers: { 'Accept' => Mime[:turbo_stream].to_s }
-      end.not_to(change { [User.count, SchoolMembership.count, CouponTemplate.count] })
+      end.not_to(change { [User.count, SchoolMembership.count] })
 
       document = Nokogiri::HTML(response.body)
       expect(response).to have_http_status(:unprocessable_content)

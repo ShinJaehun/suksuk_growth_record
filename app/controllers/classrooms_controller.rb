@@ -55,24 +55,10 @@ class ClassroomsController < ApplicationController
     authorize @classroom
     @can_manage_classroom = policy(@classroom).update?
     @can_manage_classroom_members = policy(@classroom).manage_members?
-    @can_refresh_compliment_king = policy(@classroom).refresh_compliment_king?
-    can_create_compliment = policy(@classroom).create_compliment?
-    context = Classrooms::ShowContext.new(
-      classroom: @classroom,
-      current_user: current_user,
-      include_student_alerts: @can_manage_classroom,
-      include_compliment_presets: can_create_compliment
-    )
+    context = Classrooms::ShowContext.new(classroom: @classroom)
     @student_memberships = context.student_memberships
     @students = context.students
     @homeroom_teachers = context.homeroom_teachers
-    @enabled_compliment_king_periods = context.enabled_compliment_king_periods
-    @refreshable_compliment_king_periods = context.refreshable_compliment_king_periods
-    @compliment_king_period_cards = context.compliment_king_period_cards
-    @student_ids_with_pending_coupon_use_requests = context.pending_coupon_use_request_student_ids
-    @student_ids_with_unread_student_messages = context.unread_student_message_student_ids
-    @active_compliment_presets = context.active_compliment_presets
-    @today_compliment_counts_by_student_id = context.today_compliment_counts_by_student_id
   end
 
   def new
@@ -131,25 +117,9 @@ class ClassroomsController < ApplicationController
   def classroom_params
     permitted = []
     permitted.concat(%i[name grade]) if structure_settings_allowed?
-    permitted.concat(operation_setting_attributes) if operation_settings_allowed?
     permitted << :school_id if current_user.admin?
 
     params.require(:classroom).permit(*permitted.uniq)
-  end
-
-  def operation_setting_attributes
-    %i[
-      daily_compliment_king_enabled
-      weekly_compliment_king_enabled
-      monthly_compliment_king_enabled
-      message_policy
-    ]
-  end
-
-  def operation_settings_allowed?
-    return false unless defined?(@classroom) && @classroom.present?
-
-    policy(@classroom).manage_operations?
   end
 
   def structure_settings_allowed?

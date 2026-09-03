@@ -46,35 +46,6 @@ class User < ApplicationRecord
   has_one :school_membership, dependent: :destroy
   has_one :school, through: :school_membership
 
-  # 받았던 칭찬도 유저 삭제 시 함께 삭제
-  has_many :given_compliments,
-           class_name: "Compliment",
-           foreign_key: :giver_id,
-           dependent: :destroy,
-           inverse_of: :giver
-
-  has_many :received_compliments,
-           class_name: "Compliment",
-           foreign_key: :receiver_id,
-           dependent: :destroy,
-           inverse_of: :receiver
-
-  has_many :compliment_presets, dependent: :destroy
-  has_many :user_coupons, dependent: :destroy
-  has_many :coupon_templates, through: :user_coupons
-
-  has_many :sent_messages,
-           class_name: "UserMessage",
-           foreign_key: :sender_id,
-           dependent: :destroy,
-           inverse_of: :sender
-
-  has_many :received_messages,
-           class_name: "UserMessage",
-           foreign_key: :recipient_id,
-           dependent: :destroy,
-           inverse_of: :recipient
-
   def self.avatar_keys_for(gender)
     AVATAR_KEYS_BY_GENDER.fetch(gender.to_s, [])
   end

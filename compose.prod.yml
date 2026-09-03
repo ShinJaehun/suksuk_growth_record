@@ -1,23 +1,23 @@
 services:
   db:
     image: postgres:16
-    container_name: suksuk_praise_db
+    container_name: suksuk_school_starter_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${SUKSUK_PRAISE_DATABASE_NAME}
-      POSTGRES_USER: ${SUKSUK_PRAISE_DATABASE_USER}
-      POSTGRES_PASSWORD: ${SUKSUK_PRAISE_DATABASE_PASSWORD}
+      POSTGRES_DB: ${SUKSUK_SCHOOL_DATABASE_NAME:-suksuk_school_starter_production}
+      POSTGRES_USER: ${SUKSUK_SCHOOL_DATABASE_USER:-suksuk_school_starter}
+      POSTGRES_PASSWORD: ${SUKSUK_SCHOOL_DATABASE_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SUKSUK_PRAISE_DATABASE_USER} -d ${SUKSUK_PRAISE_DATABASE_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${SUKSUK_SCHOOL_DATABASE_USER:-suksuk_school_starter} -d ${SUKSUK_SCHOOL_DATABASE_NAME:-suksuk_school_starter_production}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   web:
-    image: ghcr.io/shinjaehun/suksuk_praise:latest
-    container_name: suksuk_praise_web
+    image: ghcr.io/shinjaehun/suksuk_school_starter:latest
+    container_name: suksuk_school_starter_web
     restart: unless-stopped
     depends_on:
       db:
@@ -31,11 +31,11 @@ services:
       RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-3}
       RAILS_MIN_THREADS: ${RAILS_MIN_THREADS:-3}
       PORT: ${PORT:-3000}
-      SUKSUK_PRAISE_DATABASE_NAME: ${SUKSUK_PRAISE_DATABASE_NAME}
-      SUKSUK_PRAISE_DATABASE_USER: ${SUKSUK_PRAISE_DATABASE_USER}
-      SUKSUK_PRAISE_DATABASE_PASSWORD: ${SUKSUK_PRAISE_DATABASE_PASSWORD}
-      SUKSUK_PRAISE_DATABASE_HOST: ${SUKSUK_PRAISE_DATABASE_HOST:-db}
-      SUKSUK_PRAISE_DATABASE_PORT: ${SUKSUK_PRAISE_DATABASE_PORT:-5432}
+      SUKSUK_SCHOOL_DATABASE_NAME: ${SUKSUK_SCHOOL_DATABASE_NAME:-suksuk_school_starter_production}
+      SUKSUK_SCHOOL_DATABASE_USER: ${SUKSUK_SCHOOL_DATABASE_USER:-suksuk_school_starter}
+      SUKSUK_SCHOOL_DATABASE_PASSWORD: ${SUKSUK_SCHOOL_DATABASE_PASSWORD}
+      SUKSUK_SCHOOL_DATABASE_HOST: ${SUKSUK_SCHOOL_DATABASE_HOST:-db}
+      SUKSUK_SCHOOL_DATABASE_PORT: ${SUKSUK_SCHOOL_DATABASE_PORT:-5432}
     ports:
       - "127.0.0.1:${PORT:-3000}:3000"
     command: ["bundle", "exec", "puma", "-C", "config/puma.rb"]

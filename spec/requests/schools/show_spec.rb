@@ -28,7 +28,6 @@ RSpec.describe 'School overview', type: :request do
     settings_link = overview.at_css(%(a[href="#{edit_school_path(school)}"]))
     expect(settings_link).to be_present
     expect(settings_link['data-turbo-frame']).to be_nil
-    expect(response.body).to include('학교 휴일')
     expect(response.body).not_to include(classroom.name, teacher.name)
     expect(overview.at_css(%(a[href="#{new_classroom_path}"]))).to be_nil
     expect(overview.at_css(%(a[href="#{new_school_teacher_path(school)}"]))).to be_nil
@@ -86,8 +85,6 @@ RSpec.describe 'School overview', type: :request do
     get school_path(school)
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(school.name, '비활성')
-    expect(response.body).not_to include('data-controller="school-closure-picker"')
-    expect(response.body).not_to include(school_school_closures_path(school))
 
     sign_in school_manager
     get school_path(school)

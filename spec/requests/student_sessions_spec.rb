@@ -62,6 +62,11 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     get public_student_login_path(student_login_token: classroom.student_login_token)
 
+    expected_avatar_path = ActionController::Base.helpers.asset_path('avatars/boy01.png')
+    document = Nokogiri::HTML(response.body)
+    student_option = document.at_css(%(option[data-student-name="#{student.name}"]))
+    avatar_image = document.at_css('img[data-student-login-preview-target="image"]')
+
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(student.name)
     expect(response.body).to include('data-controller="student-login-preview"')
@@ -69,7 +74,8 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response.body).to include('로그인할 학생을 선택하세요')
     expect(response.body).to include('<option value="">선택하세요</option>')
     expect(response.body).to include('PIN을 입력하세요')
-    expect(response.body).to include('suksuk_logo')
+    expect(student_option['data-avatar-url']).to eq(expected_avatar_path)
+    expect(avatar_image['src']).to eq(expected_avatar_path)
     expect(response.body).not_to include('alt="선택하세요"')
     expect(response.body).to include('data-avatar-url=')
     expect(response.body).to include("data-student-name=\"#{student.name}\"")
@@ -95,6 +101,11 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     get public_student_login_path(student_login_token: classroom.student_login_token)
 
+    expected_avatar_path = ActionController::Base.helpers.asset_path('avatars/boy01.png')
+    document = Nokogiri::HTML(response.body)
+    student_option = document.at_css(%(option[data-student-name="#{student.name}"]))
+    avatar_image = document.at_css('img[data-student-login-preview-target="image"]')
+
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(student.name)
     expect(response.body).to include(public_student_login_path(student_login_token: classroom.student_login_token))
@@ -103,7 +114,8 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response.body).to include('로그인할 학생을 선택하세요')
     expect(response.body).to include('<option value="">선택하세요</option>')
     expect(response.body).to include('PIN을 입력하세요')
-    expect(response.body).to include('suksuk_logo')
+    expect(student_option['data-avatar-url']).to eq(expected_avatar_path)
+    expect(avatar_image['src']).to eq(expected_avatar_path)
     expect(response.body).not_to include('alt="선택하세요"')
     expect(response.body).to include('data-avatar-url=')
     expect(response.body).to include("data-student-name=\"#{student.name}\"")

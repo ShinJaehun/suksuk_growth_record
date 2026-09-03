@@ -80,18 +80,6 @@ class ClassroomPolicy < ApplicationPolicy
     false
   end
 
-  def create_compliment?
-    active_school? && (admin? || teacher_of?(record))
-  end
-
-  def refresh_compliment_king?
-    active_school? && (admin? || teacher_of?(record))
-  end
-
-  def draw_coupon?
-    active_school? && (admin? || teacher_of?(record))
-  end
-
   private
 
   def active_school?

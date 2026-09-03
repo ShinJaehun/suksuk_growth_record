@@ -1,7 +1,4 @@
 class UsersController < ApplicationController
-  include UserShowDataLoader
-  include ActionView::RecordIdentifier
-
   before_action :authenticate_user!
   before_action :set_user, only: [:show]
 
@@ -11,21 +8,7 @@ class UsersController < ApplicationController
     redirect_student_self_to_classroom_context! and return if @user.student? && current_user == @user
     redirect_to_managed_student_page! and return if @user.student? && current_user != @user
 
-    @can_create_compliment = false
-    @can_draw_coupon = false
     @visible_classrooms = @user.classrooms.order(created_at: :asc)
-
-    load_user_show_data!(
-      user: @user,
-      classroom: nil,
-      include_recent_issued: true,
-      recent_in_classroom: false
-    )
-
-    @reply_message = UserMessage.new
-    @new_message = UserMessage.new
-    @message_teacher_options = message_teacher_options
-    @message_section_dom_id = dom_id(@user, :message_section)
   end
 
   private
@@ -94,17 +77,4 @@ class UsersController < ApplicationController
       .first
   end
 
-  def message_teacher_options
-    return User.none unless @user.student?
-
-    classroom_ids = @user.classroom_memberships.where(role: "student", status: "active").select(:classroom_id)
-    User.teacher.active
-      .joins(classroom_memberships: :classroom)
-      .where(
-        classrooms: { message_policy: "student_initiated" },
-        classroom_memberships: { classroom_id: classroom_ids, role: "teacher" }
-      )
-      .distinct
-      .order(:name, :id)
-  end
 end

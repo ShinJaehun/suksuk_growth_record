@@ -1,8 +1,4 @@
 ko:
-  user_messages:
-    errors:
-      inactive_teacher_participant: "비활성 교사가 포함된 메시지는 보낼 수 없습니다."
-
   students:
     roster:
       student_number_value: "%{number}번"
@@ -42,34 +38,9 @@ ko:
           confirmation: "새 PIN 확인이 일치하지 않습니다."
     show:
       actions:
-        navigation: "학생 페이지"
-        coupon_management: "쿠폰 관리"
-        dashboard: "한눈에 보기"
         edit_pin: "PIN 수정"
         edit_profile_and_pin: "학생 정보·PIN 수정"
-        check_messages: "학생 메시지"
-        check_activity: "활동 기록"
         back_to_classroom: "교실로 돌아가기"
-      pending:
-        title: "처리할 일"
-        coupon_use_requests: "쿠폰 사용 요청 %{count}건"
-      coupons:
-        title: "쿠폰 관리"
-        status_hint: "현재 보유 쿠폰"
-      coupon_assignment:
-        title: "쿠폰 지급"
-        random_title: "쿠폰 뽑기"
-        random_description: "활성 쿠폰 중 하나를 가중치에 따라 랜덤으로 지급합니다."
-        selected_title: "선택한 쿠폰 지급"
-        template_label: "쿠폰 선택"
-        empty: "지급 가능한 활성 쿠폰 템플릿이 없습니다."
-      messages:
-        title: "학생 메시지"
-        description: "새 메시지를 보내거나 지난 대화를 확인할 수 있습니다."
-      activity:
-        title: "최근 기록"
-        recent_coupons: "최근 발급 쿠폰"
-        compliments: "칭찬 타임라인"
     create:
       success: "학생이 추가되었습니다."
       failure_fallback: "학생 정보를 확인해 주세요."

@@ -72,7 +72,6 @@
 #    role: 'student',
 #    gender: gender,
 #    avatar_key: avatar_key,
-#    points: 0
 #  }
 #  attrs[:student_pin] = demo_student_pin if demo_student_pin.present?
 #  student.assign_attributes(attrs)
@@ -184,7 +183,6 @@ def seed_student!(
     role: "student",
     gender: gender,
     avatar_key: avatar_key,
-    points: 0,
     student_pin: student_pin
   )
 
@@ -259,17 +257,13 @@ end
 
 puts "== 관리자 계정 생성 =="
 
-admin = seed_account!(
+seed_account!(
   email: "a@a",
   name: "개발 관리자",
   role: "admin",
   password: demo_password,
   avatar_key: "admin"
 )
-
-puts "== 관리자 쿠폰 라이브러리 생성 =="
-
-CouponTemplates::DefaultLibrarySeeder.call!(admin: admin)
 
 puts "== 교사 계정 생성 =="
 
@@ -339,26 +333,12 @@ classroom = Classroom.find_or_initialize_by(
   name: "1반"
 )
 
-classroom.assign_attributes(
-  daily_compliment_king_enabled: true,
-  weekly_compliment_king_enabled: true,
-  monthly_compliment_king_enabled: true,
-  message_policy: "student_initiated"
-)
-
 classroom.save!
 
 empty_classroom = Classroom.find_or_initialize_by(
   school: school,
   grade: 4,
   name: "2반"
-)
-
-empty_classroom.assign_attributes(
-  daily_compliment_king_enabled: true,
-  weekly_compliment_king_enabled: false,
-  monthly_compliment_king_enabled: false,
-  message_policy: "replies_only"
 )
 
 empty_classroom.save!
@@ -391,41 +371,6 @@ students = seed_students!(
   name_prefix: "4-1",
   student_pin: demo_student_pin
 )
-
-puts "== 교사 개인 쿠폰 생성 =="
-
-# 교사 계정 생성 시점에는 관리자 라이브러리 쿠폰이 없었을 수 있다.
-# 라이브러리 쿠폰 생성 후 자동 채택을 다시 실행한다.
-[school_manager, classroom_teacher].each do |teacher|
-  CouponTemplates::AutoAdopter.setup_for_teacher!(teacher)
-end
-
-puts "== 교사 맞춤 칭찬 생성 =="
-
-compliment_preset_titles = [
-  "친구를 도와주었어요",
-  "수업에 적극적으로 참여했어요",
-  "약속을 잘 지켰어요",
-  "끝까지 노력했어요",
-  "바른 말과 행동을 실천했어요"
-]
-
-[school_manager, classroom_teacher].each do |teacher|
-  compliment_preset_titles.each_with_index do |title, index|
-    preset = ComplimentPreset
-      .where(user: teacher)
-      .where("lower(title) = ?", title.downcase)
-      .first_or_initialize
-
-    preset.assign_attributes(
-      title: title,
-      position: index,
-      active: true
-    )
-
-    preset.save!
-  end
-end
 
 puts
 puts "========================================"

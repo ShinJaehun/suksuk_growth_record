@@ -1,8 +1,4 @@
 class ClassroomStudentsController < ApplicationController
-  include UserShowDataLoader
-  include StudentWeeklyDashboardLoader
-  include ActionView::RecordIdentifier
-
   helper_method :return_to_context,
     :member_status_context,
     :members_return_to?,
@@ -12,9 +8,9 @@ class ClassroomStudentsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_classroom
   before_action :authorize_manage!, only: [:new, :create]
-  before_action :set_student, only: [:show, :dashboard, :activity, :coupon_assignment, :edit, :update, :destroy, :deactivate, :reactivate]
-  before_action :ensure_active_self_student!, only: [:show, :dashboard, :activity, :edit, :update]
-  before_action :authorize_student_data!, only: [:show, :dashboard, :activity]
+  before_action :set_student, only: [:show, :edit, :update, :destroy, :deactivate, :reactivate]
+  before_action :ensure_active_self_student!, only: [:show, :edit, :update]
+  before_action :authorize_student_data!, only: [:show]
 
   def new
     @user = User.new
@@ -28,10 +24,7 @@ class ClassroomStudentsController < ApplicationController
 
   def create
     used_avatar_keys = used_avatar_keys_in_classroom
-    attrs = user_params.merge(
-      role: "student",
-      points: 0
-    )
+    attrs = user_params.merge(role: "student")
     attrs[:avatar_key] = pick_avatar_key(attrs[:gender], used_avatar_keys)
     @user = User.new(attrs)
     @student_membership = @classroom.classroom_memberships.build(
@@ -81,59 +74,7 @@ class ClassroomStudentsController < ApplicationController
   def show
     @user = @student
     load_student_profile_permissions!
-    @open_coupon_assignment = @can_issue_coupon && params[:open_coupon_assignment] == "1"
-    read_count = @student_messages_enabled ? mark_managed_student_messages_read : 0
-
-    load_user_show_data!(
-      user: @student,
-      classroom: @classroom,
-      include_recent_issued: false,
-      recent_in_classroom: true
-    )
-    @pending_coupon_use_request_count = @pending_coupon_use_requests_by_coupon_id.size
-
-    broadcast_student_card_alerts_for(@classroom, @student) if read_count.positive?
-
     render "classroom_students/show"
-  end
-
-  def activity
-    @user = @student
-    load_student_profile_permissions!
-    load_user_show_data!(
-      user: @student,
-      classroom: @classroom,
-      include_recent_issued: true,
-      recent_in_classroom: true
-    )
-  end
-
-  def dashboard
-    @user = @student
-    load_student_profile_permissions!
-    load_user_show_data!(
-      user: @student,
-      classroom: @classroom,
-      include_recent_issued: false,
-      recent_in_classroom: true
-    )
-    load_student_weekly_dashboard!(student: @student, classroom: @classroom)
-  end
-
-  def coupon_assignment
-    authorize @student, :show?
-    authorize @classroom, :draw_coupon?
-    raise ActiveRecord::RecordNotFound unless active_student_in_classroom?
-
-    @user = @student
-    @available_coupon_templates = policy_scope(CouponTemplate).active.ordered_by_title
-
-    render partial: "classroom_students/coupon_assignment_card",
-      locals: {
-        classroom: @classroom,
-        user: @user,
-        available_coupon_templates: @available_coupon_templates
-      }
   end
 
   def edit
@@ -549,21 +490,11 @@ class ClassroomStudentsController < ApplicationController
       .exists?
   end
 
-  def mark_managed_student_messages_read
-    return 0 unless current_user.admin? || current_user.active_teacher?
-
-    mark_unread_student_messages_read_for(@classroom, @student)
-  end
-
   def load_student_profile_permissions!
     @can_manage_student = policy(@classroom).manage_members?
     @student_active_in_classroom = active_student_in_classroom?
     @can_manage_own_student_pin =
       policy(@student).manage_own_student_pin? && @student_active_in_classroom
-    @can_create_compliment = policy(@classroom).create_compliment? && @student_active_in_classroom
-    @can_draw_coupon = policy(@classroom).draw_coupon?
-    @can_issue_coupon = @can_draw_coupon && @student_active_in_classroom
-    @student_messages_enabled = @classroom.student_messages_enabled?
   end
 
   def active_student_in_classroom?

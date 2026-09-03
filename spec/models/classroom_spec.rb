@@ -1,29 +1,6 @@
 require "rails_helper"
 
 RSpec.describe Classroom, type: :model do
-  it "uses replies only messages by default" do
-    classroom = create(:classroom, name: "기본 교실")
-
-    expect(classroom.message_policy).to eq("replies_only")
-    expect(classroom.student_messages_enabled?).to eq(true)
-    expect(classroom.student_can_start_messages?).to eq(false)
-  end
-
-  it "supports disabled message policy" do
-    classroom = create(:classroom, name: "비활성 교실", message_policy: "disabled")
-
-    expect(classroom.messages_disabled?).to eq(true)
-    expect(classroom.student_messages_enabled?).to eq(false)
-    expect(classroom.student_can_start_messages?).to eq(false)
-  end
-
-  it "supports student initiated message policy" do
-    classroom = create(:classroom, name: "학생 시작 교실", message_policy: "student_initiated")
-
-    expect(classroom.student_messages_enabled?).to eq(true)
-    expect(classroom.student_can_start_messages?).to eq(true)
-  end
-
   it "generates a student login token" do
     classroom = create(:classroom, name: "토큰 교실")
 
@@ -72,26 +49,12 @@ RSpec.describe Classroom, type: :model do
 
     expect(classroom.update(
       name: "변경 교실",
-      grade: 6,
-      daily_compliment_king_enabled: false,
-      message_policy: "student_initiated"
+      grade: 6
     )).to eq(true)
     expect(classroom.reload).to have_attributes(
       name: "변경 교실",
-      grade: 6,
-      daily_compliment_king_enabled: false,
-      message_policy: "student_initiated"
+      grade: 6
     )
-  end
-
-  it "uses its school calendar to determine weekly compliment king refresh availability" do
-    school = create(:school)
-    classroom = create(:classroom, school: school)
-    date = Date.new(2026, 7, 31)
-    calendar = instance_double(SchoolCalendar, last_school_day_of_week: date)
-    allow(SchoolCalendar).to receive(:new).with(school).and_return(calendar)
-
-    expect(classroom.compliment_king_refresh_available_for?(:weekly, date: date)).to eq(true)
   end
 
   it "allows grades 1 and 6" do
@@ -154,7 +117,7 @@ RSpec.describe Classroom, type: :model do
       expect(classroom.destroy).to eq(false)
       expect(Classroom.exists?(classroom.id)).to eq(true)
       expect(ClassroomMembership.exists?(membership.id)).to eq(true)
-      expect(classroom.errors.details[:base]).to include(error: :students_or_history_present)
+      expect(classroom.errors.details[:base]).to include(error: :students_present)
     end
 
     it "rejects deletion when an inactive student membership exists" do
@@ -166,52 +129,5 @@ RSpec.describe Classroom, type: :model do
       expect(ClassroomMembership.exists?(membership.id)).to eq(true)
     end
 
-    it "preserves the classroom and compliment when a compliment exists" do
-      classroom = create(:classroom)
-      compliment = create(:compliment, classroom: classroom)
-
-      expect(classroom.destroy).to eq(false)
-      expect(Classroom.exists?(classroom.id)).to eq(true)
-      expect(Compliment.exists?(compliment.id)).to eq(true)
-    end
-
-    it "preserves the classroom and coupon when an issued coupon exists" do
-      classroom = create(:classroom)
-      coupon_owner = create(:user, :teacher)
-      create(:classroom_membership, classroom: classroom, user: coupon_owner, role: "teacher")
-      coupon = create(:user_coupon, classroom: classroom, user: coupon_owner)
-
-      expect(classroom.destroy).to eq(false)
-      expect(Classroom.exists?(classroom.id)).to eq(true)
-      expect(UserCoupon.exists?(coupon.id)).to eq(true)
-      expect(ClassroomMembership.where(classroom: classroom).count).to eq(1)
-    end
-
-    it "preserves the classroom and message when a student message exists" do
-      classroom = create(:classroom)
-      teacher = create(:user, :teacher)
-      student = create(:user, :student)
-      create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
-      create(:classroom_membership, classroom: classroom, user: student, role: "student")
-      message = create(:user_message, classroom: classroom, sender: teacher, recipient: student)
-      membership_count = classroom.classroom_memberships.count
-
-      expect(classroom.destroy).to eq(false)
-      expect(Classroom.exists?(classroom.id)).to eq(true)
-      expect(UserMessage.exists?(message.id)).to eq(true)
-      expect(classroom.classroom_memberships.count).to eq(membership_count)
-    end
-
-    it "preserves the classroom and coupon event when a coupon event exists" do
-      event = create(:coupon_event)
-      classroom = event.classroom
-      membership_count = classroom.classroom_memberships.count
-
-      expect(classroom.destroy).to eq(false)
-      expect(Classroom.exists?(classroom.id)).to eq(true)
-      expect(CouponEvent.exists?(event.id)).to eq(true)
-      expect(UserCoupon.exists?(event.user_coupon_id)).to eq(true)
-      expect(classroom.classroom_memberships.count).to eq(membership_count)
-    end
   end
 end

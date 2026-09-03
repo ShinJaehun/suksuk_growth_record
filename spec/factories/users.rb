@@ -4,8 +4,6 @@ FactoryBot.define do
     password { "password123" }
     name { "Test User" }
     role { "student" }
-    points { 0 }
-
     trait :student do
       role { "student" }
       email { nil }

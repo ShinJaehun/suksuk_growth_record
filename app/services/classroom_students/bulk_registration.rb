@@ -57,7 +57,6 @@ module ClassroomStudents
           user = User.create!(
             name: row[:name],
             role: "student",
-            points: 0,
             gender: row[:gender],
             avatar_key: row[:avatar_key],
             student_pin: @student_pin

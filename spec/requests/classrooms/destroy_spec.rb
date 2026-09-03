@@ -80,24 +80,7 @@ RSpec.describe 'Classroom deletion', type: :request do
     expect(response).to redirect_to(edit_classroom_path(classroom))
     expect(response).to have_http_status(:see_other)
     expect(ClassroomMembership.exists?(membership.id)).to eq(true)
-    expect(flash[:alert]).to include(I18n.t('activerecord.errors.models.classroom.attributes.base.students_or_history_present'))
-    expect(flash[:notice]).to be_nil
-  end
-
-  it 'preserves an admin classroom and its activity records' do
-    admin = create(:user, :admin)
-    classroom = create(:classroom, school: school)
-    compliment = create(:compliment, classroom: classroom)
-    sign_in admin
-
-    expect do
-      delete classroom_path(classroom)
-    end.not_to change(Classroom, :count)
-
-    expect(response).to redirect_to(edit_classroom_path(classroom))
-    expect(response).to have_http_status(:see_other)
-    expect(Compliment.exists?(compliment.id)).to eq(true)
-    expect(flash[:alert]).to include(I18n.t('activerecord.errors.models.classroom.attributes.base.students_or_history_present'))
+    expect(flash[:alert]).to include(I18n.t('activerecord.errors.models.classroom.attributes.base.students_present'))
     expect(flash[:notice]).to be_nil
   end
 

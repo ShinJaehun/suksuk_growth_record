@@ -3,7 +3,7 @@
 require "io/console"
 
 namespace :app do
-  desc "Create the initial administrator account and default coupon library"
+  desc "Create the initial administrator account"
   task bootstrap: :environment do
     if User.admin.exists?
       puts "An administrator account already exists."
@@ -41,7 +41,6 @@ namespace :app do
     AdminAccounts::Bootstrap.call!(name: name, email: email, password: password)
 
     puts "Initial administrator account created."
-    puts "Default coupon library created with 4 coupons."
   rescue EOFError
     warn "Input ended before bootstrap was complete."
     exit 1
@@ -53,9 +52,6 @@ namespace :app do
     puts "Bootstrap was not run."
   rescue ActiveRecord::RecordInvalid => error
     warn "Administrator account could not be created: #{error.record.errors.full_messages.to_sentence}"
-    exit 1
-  rescue AdminAccounts::Bootstrap::CouponLibraryCreationError
-    warn "Default coupon library could not be created."
     exit 1
   rescue StandardError
     warn "Bootstrap failed."

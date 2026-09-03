@@ -28,22 +28,7 @@ class Classrooms::SettingsController < ApplicationController
   def classroom_params
     permitted = []
     permitted.concat(%i[name grade]) if structure_settings_allowed?
-    permitted.concat(operation_setting_attributes) if operation_settings_allowed?
-
     params.require(:classroom).permit(*permitted.uniq)
-  end
-
-  def operation_setting_attributes
-    %i[
-      daily_compliment_king_enabled
-      weekly_compliment_king_enabled
-      monthly_compliment_king_enabled
-      message_policy
-    ]
-  end
-
-  def operation_settings_allowed?
-    policy(@classroom).manage_operations?
   end
 
   def structure_settings_allowed?

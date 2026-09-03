@@ -42,12 +42,9 @@ RSpec.describe 'locale structure' do
 
   it 'loads representative Korean translations' do
     keys = %w[
-      activerecord.errors.models.classroom.attributes.base.students_or_history_present
-      navigation.dashboard
+      activerecord.errors.models.classroom.attributes.base.students_present
       classrooms.create.success
       students.bulk_create.success
-      coupons.draw.success
-      compliments.create.success
       schools.index.title
     ]
 

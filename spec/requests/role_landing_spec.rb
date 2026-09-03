@@ -13,7 +13,7 @@ RSpec.describe "Role landing pages", type: :request do
     expect(response).to redirect_to(schools_path)
   end
 
-  it "routes a single-school manager to the school dashboard" do
+  it "routes a single-school manager to the school page" do
     manager = create(:user, :teacher)
     membership = create(:school_membership, :manager, user: manager)
     sign_in manager

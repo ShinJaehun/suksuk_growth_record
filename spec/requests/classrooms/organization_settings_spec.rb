@@ -446,65 +446,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(classroom.reload).to have_attributes(name: '변경 학급', grade: 5, school: school)
   end
 
-  it 'ignores operation setting params submitted by a manager' do
-    manager = create(:user, :teacher)
-    classroom = create(:classroom, school: school, name: '기존 학급', grade: 1, daily_compliment_king_enabled: true,
-                                   weekly_compliment_king_enabled: false, monthly_compliment_king_enabled: false, message_policy: 'replies_only')
-    create(:school_membership, :manager, school: school, user: manager)
-    sign_in manager
-
-    patch classroom_path(classroom), params: {
-      classroom: classroom_update_params(classroom).merge(
-        name: '변경 학급',
-        grade: 4,
-        daily_compliment_king_enabled: '0',
-        weekly_compliment_king_enabled: '1',
-        monthly_compliment_king_enabled: '1',
-        message_policy: 'student_initiated'
-      )
-    }
-
-    expect(response).to redirect_to(classroom_path(classroom))
-    expect(classroom.reload).to have_attributes(
-      name: '변경 학급',
-      grade: 4,
-      daily_compliment_king_enabled: true,
-      weekly_compliment_king_enabled: false,
-      monthly_compliment_king_enabled: false,
-      message_policy: 'replies_only'
-    )
-  end
-
-  it 'allows an assigned manager to update basic fields and operation settings' do
-    manager = create(:user, :teacher)
-    classroom = create(:classroom, school: school, name: '기존 학급', grade: 1, daily_compliment_king_enabled: true,
-                                   weekly_compliment_king_enabled: false, monthly_compliment_king_enabled: false, message_policy: 'replies_only')
-    create(:school_membership, :manager, school: school, user: manager)
-    create(:classroom_membership, classroom: classroom, user: manager, role: :teacher)
-    sign_in manager
-
-    patch classroom_path(classroom), params: {
-      classroom: classroom_update_params(classroom).merge(
-        name: '담당 관리자 학급',
-        grade: 6,
-        daily_compliment_king_enabled: '0',
-        weekly_compliment_king_enabled: '1',
-        monthly_compliment_king_enabled: '1',
-        message_policy: 'student_initiated'
-      )
-    }
-
-    expect(response).to redirect_to(classroom_path(classroom))
-    expect(classroom.reload).to have_attributes(
-      name: '담당 관리자 학급',
-      grade: 6,
-      daily_compliment_king_enabled: false,
-      weekly_compliment_king_enabled: true,
-      monthly_compliment_king_enabled: true,
-      message_policy: 'student_initiated'
-    )
-  end
-
   it 'prevents a manager from deleting a classroom in their school' do
     manager = create(:user, :teacher)
     classroom = create(:classroom, school: school)
@@ -576,40 +517,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
     expect(response).to redirect_to(root_path)
     expect(classroom.reload.name).to eq('다른 학교 학급')
-  end
-
-  it 'ignores structure params and applies operation params submitted by an assigned teacher' do
-    original_school = create(:school)
-    other_school = create(:school)
-    classroom = create(
-      :classroom,
-      name: '기존 학급',
-      school: original_school,
-      grade: 3,
-      daily_compliment_king_enabled: true,
-      message_policy: 'replies_only'
-    )
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
-    sign_in teacher
-
-    patch classroom_path(classroom), params: {
-      classroom: classroom_update_params(classroom).merge(
-        name: '변경되면 안 되는 학급',
-        school_id: other_school.id,
-        grade: 5,
-        daily_compliment_king_enabled: '0',
-        message_policy: 'student_initiated'
-      )
-    }
-
-    expect(response).to redirect_to(classroom_path(classroom))
-    expect(classroom.reload).to have_attributes(
-      name: '기존 학급',
-      school: original_school,
-      grade: 3,
-      daily_compliment_king_enabled: false,
-      message_policy: 'student_initiated'
-    )
   end
 
   it 'keeps classroom identification while removing school and teacher management sections' do
@@ -699,12 +606,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   def classroom_update_params(classroom)
-    {
-      name: classroom.name,
-      daily_compliment_king_enabled: classroom.daily_compliment_king_enabled ? '1' : '0',
-      weekly_compliment_king_enabled: classroom.weekly_compliment_king_enabled ? '1' : '0',
-      monthly_compliment_king_enabled: classroom.monthly_compliment_king_enabled ? '1' : '0',
-      message_policy: classroom.message_policy
-    }
+    { name: classroom.name }
   end
 end

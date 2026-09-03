@@ -119,9 +119,6 @@ RSpec.describe ClassroomPolicy do
 
       expect(policy.update?).to eq(true)
       expect(policy.manage_members?).to eq(false)
-      expect(policy.create_compliment?).to eq(false)
-      expect(policy.refresh_compliment_king?).to eq(false)
-      expect(policy.draw_coupon?).to eq(false)
       expect(policy.destroy?).to eq(false)
     end
 
@@ -131,9 +128,6 @@ RSpec.describe ClassroomPolicy do
 
       expect(policy.update?).to eq(true)
       expect(policy.manage_members?).to eq(true)
-      expect(policy.create_compliment?).to eq(true)
-      expect(policy.refresh_compliment_king?).to eq(true)
-      expect(policy.draw_coupon?).to eq(true)
       expect(policy.destroy?).to eq(false)
     end
 
@@ -249,33 +243,4 @@ RSpec.describe ClassroomPolicy do
     end
   end
 
-  describe "#draw_coupon?" do
-    let(:classroom) { create(:classroom) }
-
-    it "permits admin" do
-      admin = create(:user, :admin)
-
-      expect(described_class.new(admin, classroom).draw_coupon?).to eq(true)
-    end
-
-    it "permits a teacher member of the classroom" do
-      teacher = create(:user, :teacher)
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
-
-      expect(described_class.new(teacher, classroom).draw_coupon?).to eq(true)
-    end
-
-    it "rejects a non-member teacher" do
-      teacher = create(:user, :teacher)
-
-      expect(described_class.new(teacher, classroom).draw_coupon?).to eq(false)
-    end
-
-    it "rejects a student member" do
-      student = create(:user, :student)
-      create(:classroom_membership, user: student, classroom: classroom, role: "student")
-
-      expect(described_class.new(student, classroom).draw_coupon?).to eq(false)
-    end
-  end
 end

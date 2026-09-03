@@ -87,12 +87,10 @@ RSpec.describe School, type: :model do
     school = create(:school)
     classroom = create(:classroom, school: school)
     membership = create(:school_membership, school: school)
-    closure = create(:school_closure, school: school)
 
     school.update!(active: false)
 
     expect(classroom.reload.school).to eq(school)
     expect(membership.reload.school).to eq(school)
-    expect(closure.reload.school).to eq(school)
   end
 end

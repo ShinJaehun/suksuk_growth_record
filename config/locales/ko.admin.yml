@@ -1,17 +1,5 @@
 ko:
   admin:
-    public_holidays:
-      card:
-        title: "공휴일 동기화"
-        description: "공휴일 데이터를 동기화합니다."
-      sync:
-        button: "%{year}년 동기화"
-        syncing: "동기화 중..."
-        synced_aria_label: "%{year}년 공식 공휴일 동기화, 동기화된 데이터 있음"
-        unsynced_aria_label: "%{year}년 공식 공휴일 동기화, 동기화된 데이터 없음"
-        success: "%{year}년 공식 공휴일을 동기화했습니다."
-        failure: "공식 공휴일 동기화에 실패했습니다. 기존 데이터는 유지되었습니다."
-        invalid_year: "동기화할 연도를 확인해 주세요."
     school_managers:
       create:
         success: "학교 관리자를 지정했습니다."
@@ -93,4 +81,3 @@ ko:
         title: "계정 상태"
         deactivate: "비활성화"
         reactivate: "재활성화"
-

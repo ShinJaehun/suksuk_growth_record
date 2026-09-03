@@ -66,9 +66,8 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     expect(created_teacher.classroom_memberships.teacher).to be_empty
   end
 
-  it 'creates a teacher with a school and classrooms without personal coupons' do
+  it 'creates a teacher with a school and classrooms' do
     classrooms = create_list(:classroom, 2, school: school)
-    create(:coupon_template, created_by: admin, bucket: 'library', active: true, title: '칭찬 쿠폰')
     sign_in admin
 
     post admin_teachers_path, params: {
@@ -81,7 +80,6 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     expect(response).to redirect_to(admin_teachers_path)
     expect(created_teacher.school_membership).to have_attributes(school: school, role: 'member')
     expect(created_teacher.classroom_memberships.teacher.pluck(:classroom_id)).to match_array(classrooms.map(&:id))
-    expect(CouponTemplate.personal_for(created_teacher)).to be_empty
   end
 
   it 'rejects a classroom from another school and rolls back teacher creation' do
@@ -96,7 +94,7 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
              classroom_ids: [other_classroom.id]
            },
            headers: { 'Accept' => Mime[:turbo_stream].to_s }
-    end.not_to(change { [User.count, SchoolMembership.count, ClassroomMembership.count, CouponTemplate.count] })
+    end.not_to(change { [User.count, SchoolMembership.count, ClassroomMembership.count] })
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(response.body).to include('선택한 학교에 속하지 않은 학급이 포함되어 있습니다.')
@@ -115,7 +113,7 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
         post admin_teachers_path,
              params: { user: valid_teacher_params }.merge(invalid_params.except(:message)),
              headers: { 'Accept' => Mime[:turbo_stream].to_s }
-      end.not_to(change { [User.count, SchoolMembership.count, ClassroomMembership.count, CouponTemplate.count] })
+      end.not_to(change { [User.count, SchoolMembership.count, ClassroomMembership.count] })
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include(invalid_params[:message])
@@ -138,7 +136,7 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
              classroom_ids: [classroom.id]
            },
            headers: { 'Accept' => Mime[:turbo_stream].to_s }
-    end.not_to(change { [User.count, SchoolMembership.count, ClassroomMembership.count, CouponTemplate.count] })
+    end.not_to(change { [User.count, SchoolMembership.count, ClassroomMembership.count] })
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(response.body).to include('담당 학급을 저장하지 못했습니다.')

@@ -28,16 +28,13 @@ RSpec.describe 'Navigation', type: :request do
     get classroom_student_path(classroom, student)
 
     expect(navbar_links).to include(
-      dashboard_path,
       user_path(student),
       destroy_student_session_path
     )
-    expect(navbar.text).to include(I18n.t('navigation.my_praise_book'))
+    expect(navbar.text).to include(I18n.t('navigation.my_page'))
     expect(navbar_links).not_to include(
       edit_user_registration_path,
-      destroy_user_session_path,
-      coupon_templates_path,
-      compliment_templates_path
+      destroy_user_session_path
     )
   end
 
