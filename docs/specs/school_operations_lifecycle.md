@@ -93,7 +93,7 @@ manager lifecycle은 manager 수나 다른 active manager 존재 여부와 관�
 - 관계의 canonical source of truth는 `ClassroomMembership(role: "teacher")`다.
 - `/teachers`는 teacher 관점에서 복수 담당 classroom을 관리한다.
 - `/classrooms`는 classroom 관점에서 복수 담당 teacher를 관리한다.
-- 단일 `Classroom.teacher_id` 구조로 변경하지 않으며 `SchoolMembership`에 teacher의 단일 grade를 추가하지 않는다.
+- 단일 `Classroom.teacher_id` 구조로 변경하지 않는다. `SchoolMembership.grade`는 teacher의 school-context 학년 정보이며 복수 classroom assignment 관계를 대체하지 않는다.
 
 ## Teacher lifecycle
 
@@ -199,9 +199,31 @@ global admin과 학교 대표 선생님은 권한 범위에서 classroom 추가,
 - 한 번에 한 학교를 선택해 관리
 - policy 또는 scope 밖 record 수정 금지
 - starter의 복수 teacher·복수 classroom membership 모델 유지
-- 투표 앱의 `login_id`, 단일 `teacher_id`, `SchoolMembership.grade`, `class_label`, `school_year` 구조를 복제하지 않음
+- 투표 앱의 `login_id`, 단일 `teacher_id`, `class_label`, `school_year` 구조를 복제하지 않음
 
 bulk update의 atomic transaction, row validation, rollback, dirty tracking은 별도 canonical spec에서 정의한다.
+
+## Teacher의 school-context 학년 정책
+
+### Teacher 학년
+
+teacher의 school-context 학년은 `SchoolMembership.grade`다. 현재 school 운영에서 teacher가 속한 학년이며 classroom assignment 없이도 독립적으로 저장할 수 있다.
+
+학년은 teacher 개인의 전역 속성이 아니므로 `User.grade`를 만들지 않는다. 같은 teacher라도 school context에 속한 운영 정보이며 canonical source는 `SchoolMembership.grade`다.
+
+`SchoolMembership.grade`는 nullable integer로 두고 `nil` 또는 정수 1부터 6까지만 허용한다. 이 정책은 teacher membership의 학년에 적용하며 student membership의 학년 의미를 이번 범위에서 확장하지 않는다. 기존 membership role과 lifecycle 정책을 유지한다.
+
+teacher form의 신규 classroom assignment 후보는 teacher와 같은 school, `SchoolMembership.grade`와 같은 grade, active classroom으로 제한한다. 기존 active teacher, teacher school membership 존재와 same-school 불변식도 유지한다. 다른 grade classroom을 새로 배정하는 기능은 제공하지 않는다.
+
+teacher 생성 시 school은 기존 정책대로 필요하고 학년은 `nil` 또는 1부터 6 중 하나이며 classroom assignment는 0개 이상이다. 따라서 classroom이 아직 없어도 school과 학년만으로 teacher를 생성할 수 있다.
+
+기존 데이터에는 현재 teacher 학년과 다른 grade의 classroom assignment가 있을 수 있다. 학년을 변경해도 기존 `ClassroomMembership`을 자동 변경하거나 삭제하지 않으며, candidate에 보이지 않는 다른 grade 또는 inactive classroom assignment도 historical 관계로 보존한다. 실제 담당 classroom과 그 grade는 이 보존 관계를 설명하는 별도 표시 정보이며 신규 assignment 범위를 넓히는 근거가 아니다.
+
+global admin은 관리 가능한 teacher의 `SchoolMembership.grade`를 설정·수정할 수 있다. 학교 대표 선생님은 자기 school의 ordinary member teacher에 대해 설정·수정할 수 있고, 자신의 일반 profile·운영 정보는 기존 canonical 권한 범위 안에서 수정할 수 있다. ordinary teacher는 `/teachers`에서 학년을 관리할 수 없으며 다른 school의 membership grade는 URL 또는 parameter 조작으로도 변경할 수 없다. 이 권한은 lifecycle이나 manager role 변경 권한을 확대하지 않는다.
+
+teacher 운영 목록에서 기본 학년 표시는 `SchoolMembership.grade`를 사용하고 값이 없으면 미배정 또는 기존 locale의 동일 의미를 표시한다. 담당 classroom은 별도 정보로 표시한다.
+
+`school_memberships.grade` column은 nullable integer로 유지한다. 별도 Grade model이나 table은 만들지 않는다.
 
 ## 운영 후보 선택 UI의 확장성
 
@@ -214,40 +236,40 @@ bulk update의 atomic transaction, row validation, rollback, dirty tracking은 �
 - 필요하면 GET query parameter, Turbo Frame 부분 갱신 또는 server-side pagination으로 필요한 범위만 조회한다.
 - 구체적인 전송 방식은 구현 시점의 starter 구조와 데이터 규모에 맞는 가장 단순한 방식을 선택하며 autocomplete나 외부 검색 library 도입을 요구하지 않는다.
 - 후보 조회에서 N+1 query를 만들지 않는다.
-- 필터 편의를 위한 `teacher.grade`, `SchoolMembership.grade` 등의 중복 속성이나 별도 Grade 모델을 추가하지 않는다.
+- 필터 편의를 위한 `teacher.grade` 등의 중복 속성이나 별도 Grade 모델을 추가하지 않는다. teacher 학년에는 canonical `SchoolMembership.grade`를 사용한다.
 
-### Teacher의 학년 파생 의미
+### Teacher 학년 filter의 의미
 
-teacher의 학년은 별도 저장 값이 아니라 `ClassroomMembership(role: teacher)`과 연결된 `Classroom.grade`에서 파생한다.
+teacher의 기본 학년 filter는 `SchoolMembership.grade`를 사용한다.
 
-- `1학년`부터 `6학년`: 해당 grade의 classroom에 teacher membership이 하나라도 있는 teacher
-- `미배정`: teacher 역할의 `ClassroomMembership`이 하나도 없는 teacher
+- `1학년`부터 `6학년`: `SchoolMembership.grade`가 해당 값인 teacher
+- `미배정`: `SchoolMembership.grade`가 `nil`인 teacher
 - `전체`: 현재 허용된 school scope의 모든 대상 teacher
 
-한 teacher가 여러 학년의 classroom을 담당하면 해당하는 각 학년 필터 결과에 모두 포함한다.
+기존 담당 classroom의 grade는 `ClassroomMembership(role: teacher)`과 연결된 `Classroom.grade`로 확인할 수 있지만 teacher 학년 filter는 하나의 `SchoolMembership.grade`만 기준으로 한다. 담당 classroom 요약은 historical assignment를 포함한 보조 표시로 사용할 수 있다.
 
 ### `/teachers/new`, `/teachers/:id/edit` classroom picker
 
-teacher assignment picker는 school, grade, classroom의 단계형 구조를 사용한다. 필요한 상위 조건이 모두 선택되기 전에는 하위 classroom 후보를 조회하거나 표시하지 않는다. 이 picker의 grade 옵션은 학년 선택 안내와 1학년부터 6학년으로 한정하며 `전체 학년`을 제공하지 않는다. 이는 `/classrooms` 목록의 전체 학년 filter 정책을 변경하지 않는다.
+teacher form은 school, 학년, 담당 classroom의 단일 단계형 흐름을 사용한다. 학년 select는 하나만 제공하며 그 값은 `SchoolMembership.grade`에 저장되는 동시에 classroom candidate를 좁히는 기준으로 사용한다.
 
 global admin은 다음 순서로 선택한다.
 
 1. school 선택
-2. grade 선택
-3. 선택한 school과 grade에 속한 active classroom 조회·표시
-4. classroom 복수 선택
+2. 학년 선택 또는 미배정
+3. 선택한 school과 학년에 속한 active classroom 조회·표시
+4. classroom 0개 이상 선택
 
-school이 없거나 grade가 정확한 1부터 6의 값이 아니면 classroom 후보를 empty scope로 처리하며 candidate query와 rendering을 하지 않는다. edit에서는 teacher의 현재 school을 기본값으로 사용할 수 있지만 grade를 선택하기 전에는 classroom 후보를 표시하지 않는다. 선택하지 않은 다른 school이나 grade의 classroom은 HTML 후보 목록에 포함하지 않는다.
+학교 대표 선생님에게는 고정된 school 이름, 학년, 담당 classroom 순서로 제공하고 다른 school 선택 UI는 제공하지 않는다.
 
-학교 대표 선생님의 school은 자신의 membership이 속한 학교로 고정하며 school 선택 UI를 제공하지 않는다. 고정된 school 이름 다음에 grade를 선택하고, grade를 선택한 뒤에만 자기 school과 해당 grade에 속한 active classroom을 조회·표시하여 복수 선택할 수 있다. grade가 없거나 유효하지 않으면 classroom 후보를 조회하거나 표시하지 않는다.
+학년 옵션은 미배정과 1학년부터 6학년으로 한정하며 `전체 학년`을 제공하지 않는다. school이 없거나 학년이 정확한 1부터 6의 값이 아니면 classroom 후보를 empty scope로 처리하며 candidate query와 rendering을 하지 않는다. edit에서는 teacher의 현재 school과 persisted `SchoolMembership.grade`를 기본값으로 사용한다.
 
-`학교 및 담당 학급` 영역의 시각적 순서는 school, grade, classroom을 유지한다. 하위 후보를 아직 표시할 수 없는 상태에는 기존 locale과 UI style에 맞는 간단한 선택 안내를 표시할 수 있다.
+valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상태를 모두 만족하는 classroom만 신규 assignment 후보로 조회·표시한다. 다른 school, 다른 grade 또는 inactive classroom ID를 직접 제출해도 서버에서 거부한다.
 
-edit의 기존 assignment와 현재 candidate picker는 별개로 취급한다. 현재 teacher의 persisted assignment는 grade 선택 전에도 compact summary로 알릴 수 있으며, candidate가 화면에 없다는 이유로 해제하지 않는다. 여러 grade의 기존 active assignment와 기존 inactive classroom membership을 모두 보존한다.
+`학교 및 담당 학급` 영역의 시각적 순서는 school, 학년, 담당 classroom으로 유지한다. 하위 후보를 아직 표시할 수 없는 상태에는 기존 locale과 UI style에 맞는 간단한 선택 안내를 표시할 수 있다.
 
-grade 전환은 화면에 표시하는 candidate subset만 변경한다. 한 grade에서 사용자가 선택한 classroom ID는 다른 grade로 전환해도 유지하여 여러 grade의 classroom을 함께 저장할 수 있어야 한다. global admin이 school 자체를 변경하면 이전 school에서 새로 선택한 candidate 상태는 초기화할 수 있으며, persisted assignment와 school 변경 정책은 기존 canonical policy를 따른다.
+edit의 기존 assignment와 현재 candidate picker는 별개로 취급한다. 현재 teacher의 persisted assignment는 compact summary로 알리고 candidate에 없다는 이유로 해제하지 않는다. 학년 변경 전의 다른 grade active assignment와 기존 inactive classroom membership을 모두 보존한다. global admin이 school 자체를 변경하면 이전 school에서 새로 선택한 candidate 상태는 초기화할 수 있으며 persisted assignment와 school 변경 정책은 기존 canonical policy를 따른다.
 
-두 역할 모두 inactive classroom을 신규 assignment 후보로 받지 않는다. 기존 teacher에게 이미 연결된 inactive classroom membership은 picker 필터링이나 update 때문에 우발적으로 삭제하지 않는다. 다른 school 또는 inactive classroom ID를 직접 제출해도 서버에서 거부한다. 버튼, tab 또는 select 중 구체적인 grade filter UI는 기존 starter UI와의 일관성을 기준으로 구현 단계에서 결정한다.
+기존 teacher에게 이미 연결된 inactive 또는 현재 학년과 다른 classroom membership은 picker filtering이나 update 때문에 우발적으로 삭제하지 않는다.
 
 ### `/schools/:id/edit` 대표 선생님 picker
 
@@ -256,7 +278,7 @@ grade 전환은 화면에 표시하는 candidate subset만 변경한다. 한 gra
 - 검색: 이름 또는 이메일
 - 학년: 전체, 1학년부터 6학년, 미배정
 
-학년과 미배정의 의미는 이 문서의 teacher 학년 파생 정의를 따른다. 후보에는 동명이인을 구별할 수 있도록 이름, 이메일과 현재 담당 classroom 요약을 함께 표시한다. 담당 classroom이 없는 teacher는 미배정 상태를 명확히 표시한다.
+학년 filter는 `SchoolMembership.grade`를 기준으로 하고 미배정은 그 값이 `nil`인 상태를 의미한다. 후보에는 동명이인을 구별할 수 있도록 이름, 이메일과 현재 담당 classroom 요약을 함께 표시한다. 실제 담당 classroom이 없어도 teacher 학년이 있으면 해당 학년 filter에 포함하며, 담당 classroom 요약은 별도의 보조 정보다.
 
 이 picker는 manager role의 승격·강등 권한을 변경하지 않는다. 대표 선생님 선택과 role 변경은 기존 정책대로 global admin만 수행한다.
 
@@ -282,6 +304,7 @@ grade 전환은 화면에 표시하는 candidate subset만 변경한다. 한 gra
 7. 현재 `ClassroomPolicy::Scope`와 `/classrooms` controller는 classroom lifecycle을 구분하지 않는다. manager/admin 관리 조회와 일반 teacher 운영 조회를 역할에 맞게 분리해야 한다.
 8. `Teachers::SaveWithAssignments`와 assignment 입력 경로는 inactive teacher와 inactive classroom의 신규 배정을 명시적으로 차단하도록 보강해야 한다.
 9. 현재 `Classroom` delete protection은 student membership을 중심으로 한다. 기존 보호를 약화하지 않고 teacher membership 및 서비스 기록이 있는 classroom의 보존 정책을 충족해야 한다.
+10. `SchoolMembership.grade`가 없다. 후속 migration에서 nullable integer column을 추가하고 `nil` 또는 1부터 6 validation, teacher form, 목록 표시와 manager candidate filter에 반영해야 한다.
 
 ## Acceptance criteria
 
@@ -307,26 +330,34 @@ grade 전환은 화면에 표시하는 candidate subset만 변경한다. 한 gra
 20. 학교 대표 선생님은 자기 자신이나 같은 학교의 다른 manager 계정을 비활성화·재활성화할 수 없다.
 21. manager 계정의 활성/비활성 및 manager role 승격·강등은 global admin만 수행할 수 있다.
 22. teacher와 classroom의 lifecycle 전환은 기존 membership과 과거 기록을 삭제하지 않는다.
-23. 신규 teacher assignment는 active teacher, active classroom과 동일 학교 조건을 모두 만족해야 한다.
+23. 신규 teacher assignment는 active teacher, active classroom, 동일 school과 `SchoolMembership.grade`와 동일 grade 조건을 모두 만족해야 한다.
 24. `/admin/teachers`와 `/admin/classrooms` school operations 화면은 global admin만 접근할 수 있다.
 25. classroom 학년 동작은 `classroom_grade_foundation.md`의 데이터·표시·필터·정렬 정책을 유지한다.
-26. global admin의 teacher form은 valid school과 grade가 모두 선택된 뒤에만 해당 범위의 classroom 후보를 조회·표시하며 모든 학교의 classroom을 한 번에 렌더링하지 않는다.
-27. 학교 대표 선생님의 teacher form은 grade가 선택된 뒤에만 자기 학교의 classroom 후보를 조회·표시한다.
-28. teacher classroom picker의 grade 옵션은 선택 안내와 1학년부터 6학년만 제공하고 `전체 학년`은 제공하지 않는다.
-29. teacher form의 classroom 후보는 선택된 school, 선택된 grade와 active 상태를 모두 만족하는 classroom으로 제한한다.
-30. 다른 school 또는 inactive classroom의 신규 assignment는 직접 parameter를 제출해도 서버에서 차단된다.
+26. teacher form에는 `SchoolMembership.grade` 저장과 classroom 후보 filtering을 함께 담당하는 학년 select가 하나만 존재한다.
+27. global admin은 valid school과 학년을 모두 선택한 뒤에만 해당 범위의 classroom 후보를 조회·표시하며, 학교 대표 선생님은 학년 선택 후 자기 school 범위에서만 후보를 조회·표시한다.
+28. teacher form의 학년 옵션은 미배정과 1학년부터 6학년만 제공하고 `전체 학년`은 제공하지 않는다.
+29. teacher form의 classroom 후보는 선택된 school, persisted 학년과 active 상태를 모두 만족하는 classroom으로 제한한다.
+30. 다른 school, 다른 grade 또는 inactive classroom의 신규 assignment는 직접 parameter를 제출해도 서버에서 차단된다.
 31. 기존 inactive classroom assignment는 form의 후보 filtering이나 update 때문에 우발적으로 삭제되지 않는다.
-32. teacher의 학년은 별도 저장하지 않고 teacher `ClassroomMembership`과 `Classroom.grade`에서 파생한다.
-33. 여러 학년을 담당하는 teacher는 해당하는 각 학년 filter 결과에 모두 포함된다.
-34. teacher membership이 없는 teacher는 미배정 filter로 조회할 수 있다.
+32. teacher 학년의 canonical source는 `SchoolMembership.grade`이며 `User.grade`는 추가하지 않는다. classroom assignment가 없어도 school과 학년을 저장할 수 있다.
+33. `SchoolMembership.grade`는 `nil` 또는 정수 1부터 6만 허용한다.
+34. 기존 `ClassroomMembership`의 실제 grade는 연결된 `Classroom.grade`로 확인하며, 현재 teacher 학년과 다른 historical assignment도 자동 삭제하지 않는다.
 35. school manager 후보 검색은 현재 school에 소속된 active teacher만 대상으로 한다.
 36. school manager 후보는 이름 또는 이메일로 검색할 수 있다.
-37. 동명이인 후보는 이메일과 현재 담당 classroom 정보로 구별할 수 있고, 담당 classroom이 없으면 미배정 상태를 표시한다.
+37. 동명이인 후보는 이메일과 현재 담당 classroom 정보로 구별할 수 있고, 담당 classroom이 없으면 담당 학급 없음 상태를 표시한다.
 38. teacher와 classroom 후보 선택 UI는 scope 전체 데이터를 무제한으로 사전 loading하거나 숨겨서 rendering하지 않는다.
 39. 후보 검색, grade filtering과 직접 parameter 조작은 policy scope 또는 authorization 범위를 넓히지 않는다.
-40. grade가 없거나 유효하지 않으면 teacher form은 classroom candidate query와 rendering을 하지 않는다.
-41. edit에서 candidate가 아직 없더라도 여러 grade에 걸친 기존 assignment를 보존하여 안전하게 수정할 수 있다.
-42. grade를 전환해도 사용자가 다른 grade에서 이미 선택한 classroom을 잃지 않으며 최종 저장에 함께 포함할 수 있다.
+40. 학년이 `nil`이거나 유효하지 않으면 teacher form은 classroom candidate query와 rendering을 하지 않으며 edit에서 미배정 상태를 복원한다.
+41. edit에서 현재 학년 candidate에 보이지 않는 다른 grade 또는 inactive historical assignment도 보존하여 안전하게 수정할 수 있다.
+42. edit 재진입 시 persisted `SchoolMembership.grade`가 하나의 학년 select에 선택되어 표시된다.
+43. 학년 변경은 기존 classroom assignment를 자동 변경하거나 삭제하지 않는다.
+44. 새 teacher를 school, 유효한 학년과 classroom assignment 0개 상태로 생성할 수 있으며 학년 `nil`과 assignment 0개도 허용한다.
+45. 학교 대표 선생님은 자기 school의 ordinary member teacher에 대해 학년을 관리할 수 있고 ordinary teacher는 이를 관리할 수 없다.
+46. 다른 school의 `SchoolMembership.grade`를 URL 또는 parameter 조작으로 변경할 수 없다.
+47. teacher 운영 목록의 기본 학년 표시는 `SchoolMembership.grade`를 사용하고 값이 없으면 미배정으로 표시한다.
+48. school manager 후보의 학년 filter는 `SchoolMembership.grade`를 사용하며 미배정은 그 값이 `nil`인 teacher를 의미한다.
+49. form의 하나의 학년 값은 `SchoolMembership.grade`에 저장되는 동시에 신규 classroom candidate filter로 사용된다.
+50. 별도 Grade model 또는 table을 추가하지 않고 `Classroom.grade`의 필수 1부터 6 데이터·표시·filter·정렬 정책을 유지한다.
 
 ## 제약
 
@@ -340,7 +371,7 @@ grade 전환은 화면에 표시하는 candidate subset만 변경한다. 한 gra
 - 쑥쑥교실투표 코드 직접 복사
 - `/admin` bulk management 실제 구현
 - teacher 또는 classroom 물리 삭제 기능 확대
-- `SchoolMembership.grade` 추가
+- `User.grade` 추가
 - `Classroom.teacher_id` 추가 또는 단일 담임 구조로 변경
 - 학년도 `school_year` 도입
 - `class_label` 도입
