@@ -228,9 +228,24 @@ teacher의 학년은 별도 저장 값이 아니라 `ClassroomMembership(role: t
 
 ### `/teachers/new`, `/teachers/:id/edit` classroom picker
 
-global admin은 teacher form에서 school을 먼저 선택하고, 선택한 school의 active classroom만 assignment 후보로 조회한다. 그 후보를 `Classroom.grade`의 전체 또는 1학년부터 6학년 기준으로 좁힌 뒤 복수 선택할 수 있다. 선택하지 않은 다른 school의 classroom은 HTML 후보 목록에 포함하지 않는다.
+teacher assignment picker는 school, grade, classroom의 단계형 구조를 사용한다. 필요한 상위 조건이 모두 선택되기 전에는 하위 classroom 후보를 조회하거나 표시하지 않는다. 이 picker의 grade 옵션은 학년 선택 안내와 1학년부터 6학년으로 한정하며 `전체 학년`을 제공하지 않는다. 이는 `/classrooms` 목록의 전체 학년 filter 정책을 변경하지 않는다.
 
-학교 대표 선생님의 school은 자신의 membership이 속한 학교로 고정한다. school 선택 UI를 제공하지 않으며 자기 학교의 active classroom만 전체 또는 1학년부터 6학년 기준으로 좁혀 복수 선택할 수 있다.
+global admin은 다음 순서로 선택한다.
+
+1. school 선택
+2. grade 선택
+3. 선택한 school과 grade에 속한 active classroom 조회·표시
+4. classroom 복수 선택
+
+school이 없거나 grade가 정확한 1부터 6의 값이 아니면 classroom 후보를 empty scope로 처리하며 candidate query와 rendering을 하지 않는다. edit에서는 teacher의 현재 school을 기본값으로 사용할 수 있지만 grade를 선택하기 전에는 classroom 후보를 표시하지 않는다. 선택하지 않은 다른 school이나 grade의 classroom은 HTML 후보 목록에 포함하지 않는다.
+
+학교 대표 선생님의 school은 자신의 membership이 속한 학교로 고정하며 school 선택 UI를 제공하지 않는다. 고정된 school 이름 다음에 grade를 선택하고, grade를 선택한 뒤에만 자기 school과 해당 grade에 속한 active classroom을 조회·표시하여 복수 선택할 수 있다. grade가 없거나 유효하지 않으면 classroom 후보를 조회하거나 표시하지 않는다.
+
+`학교 및 담당 학급` 영역의 시각적 순서는 school, grade, classroom을 유지한다. 하위 후보를 아직 표시할 수 없는 상태에는 기존 locale과 UI style에 맞는 간단한 선택 안내를 표시할 수 있다.
+
+edit의 기존 assignment와 현재 candidate picker는 별개로 취급한다. 현재 teacher의 persisted assignment는 grade 선택 전에도 compact summary로 알릴 수 있으며, candidate가 화면에 없다는 이유로 해제하지 않는다. 여러 grade의 기존 active assignment와 기존 inactive classroom membership을 모두 보존한다.
+
+grade 전환은 화면에 표시하는 candidate subset만 변경한다. 한 grade에서 사용자가 선택한 classroom ID는 다른 grade로 전환해도 유지하여 여러 grade의 classroom을 함께 저장할 수 있어야 한다. global admin이 school 자체를 변경하면 이전 school에서 새로 선택한 candidate 상태는 초기화할 수 있으며, persisted assignment와 school 변경 정책은 기존 canonical policy를 따른다.
 
 두 역할 모두 inactive classroom을 신규 assignment 후보로 받지 않는다. 기존 teacher에게 이미 연결된 inactive classroom membership은 picker 필터링이나 update 때문에 우발적으로 삭제하지 않는다. 다른 school 또는 inactive classroom ID를 직접 제출해도 서버에서 거부한다. 버튼, tab 또는 select 중 구체적인 grade filter UI는 기존 starter UI와의 일관성을 기준으로 구현 단계에서 결정한다.
 
@@ -295,10 +310,10 @@ global admin은 teacher form에서 school을 먼저 선택하고, 선택한 scho
 23. 신규 teacher assignment는 active teacher, active classroom과 동일 학교 조건을 모두 만족해야 한다.
 24. `/admin/teachers`와 `/admin/classrooms` school operations 화면은 global admin만 접근할 수 있다.
 25. classroom 학년 동작은 `classroom_grade_foundation.md`의 데이터·표시·필터·정렬 정책을 유지한다.
-26. global admin의 teacher form은 모든 학교의 classroom을 한 번에 렌더링하지 않는다.
-27. global admin은 school을 먼저 선택하고 해당 school의 active classroom만 assignment 후보로 조회한다.
-28. 학교 대표 선생님의 teacher form은 자기 학교의 classroom만 후보로 조회한다.
-29. teacher form의 classroom 후보는 `Classroom.grade`의 전체 또는 1학년부터 6학년 기준으로 좁힐 수 있다.
+26. global admin의 teacher form은 valid school과 grade가 모두 선택된 뒤에만 해당 범위의 classroom 후보를 조회·표시하며 모든 학교의 classroom을 한 번에 렌더링하지 않는다.
+27. 학교 대표 선생님의 teacher form은 grade가 선택된 뒤에만 자기 학교의 classroom 후보를 조회·표시한다.
+28. teacher classroom picker의 grade 옵션은 선택 안내와 1학년부터 6학년만 제공하고 `전체 학년`은 제공하지 않는다.
+29. teacher form의 classroom 후보는 선택된 school, 선택된 grade와 active 상태를 모두 만족하는 classroom으로 제한한다.
 30. 다른 school 또는 inactive classroom의 신규 assignment는 직접 parameter를 제출해도 서버에서 차단된다.
 31. 기존 inactive classroom assignment는 form의 후보 filtering이나 update 때문에 우발적으로 삭제되지 않는다.
 32. teacher의 학년은 별도 저장하지 않고 teacher `ClassroomMembership`과 `Classroom.grade`에서 파생한다.
@@ -309,6 +324,9 @@ global admin은 teacher form에서 school을 먼저 선택하고, 선택한 scho
 37. 동명이인 후보는 이메일과 현재 담당 classroom 정보로 구별할 수 있고, 담당 classroom이 없으면 미배정 상태를 표시한다.
 38. teacher와 classroom 후보 선택 UI는 scope 전체 데이터를 무제한으로 사전 loading하거나 숨겨서 rendering하지 않는다.
 39. 후보 검색, grade filtering과 직접 parameter 조작은 policy scope 또는 authorization 범위를 넓히지 않는다.
+40. grade가 없거나 유효하지 않으면 teacher form은 classroom candidate query와 rendering을 하지 않는다.
+41. edit에서 candidate가 아직 없더라도 여러 grade에 걸친 기존 assignment를 보존하여 안전하게 수정할 수 있다.
+42. grade를 전환해도 사용자가 다른 grade에서 이미 선택한 classroom을 잃지 않으며 최종 저장에 함께 포함할 수 있다.
 
 ## 제약
 
