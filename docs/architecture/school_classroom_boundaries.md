@@ -9,10 +9,8 @@ School 1 ─ N Classroom
 
 School
 └── Classroom
-    ├── ClassroomMembership
-    ├── Compliment
-    ├── Coupon / UserCoupon
-    ├── UserMessage
+    ├── teacher_id (optional, unique when present)
+    ├── student ClassroomMembership
     └── 운영 기록
 ```
 
@@ -21,23 +19,27 @@ School
 - 모든 `Classroom`은 생성 시 하나의 `School`을 가져야 한다.
 - 저장된 `Classroom.school_id`는 운영 기록이나 구성원의 유무와 관계없이 변경할 수 없다.
 - 학교를 잘못 선택한 빈 교실은 다른 학교로 이동하지 않고 삭제한 뒤 다시 만든다.
-- 칭찬, 쿠폰, 메시지와 활동 기록은 생성된 교실에 계속 귀속되며 다른 학교로 옮기거나 재해석하지 않는다.
+- 교실에 귀속된 학생 소속과 공통 운영 기록은 다른 학교로 옮기거나 재해석하지 않는다.
 
 ## 교사 소속과 담당 교실
 
 ```text
 Teacher 1 ─ 0..1 SchoolMembership
+Teacher 0..1 ─ 0..1 Classroom
 ```
 
-teacher 역할의 `ClassroomMembership`은 다음을 모두 만족해야 한다.
+현재 담당 교사는 nullable `Classroom.teacher_id`로 표현하며 다음을 모두 만족해야 한다.
 
 - 연결된 `User.role`이 `teacher`다.
 - 교사에게 `SchoolMembership`이 있다.
 - 교사의 학교와 `Classroom.school_id`가 같다.
-- `student_number`가 없다.
-- 상태는 `active`다.
+- 교사의 `SchoolMembership.grade`와 `Classroom.grade`가 같다.
+- 교사와 교실이 모두 active다.
+- 한 교사는 최대 한 교실, 한 교실은 최대 한 교사와 연결된다.
 
-교사는 같은 학교의 여러 교실을 담당할 수 있지만 다른 학교의 교실에는 배정할 수 없다. 학교 소속이 없는 teacher 계정 자체는 허용하지만 교실 담당자로 배정할 수 없다.
+학교 소속이 없는 teacher 계정 자체는 허용하지만 교실 담당자로 배정할 수 없다. 신규 teacher `ClassroomMembership`은 만들지 않으며 `ClassroomMembership`은 학생의 교실 소속에 사용한다.
+
+현재 구현은 teacher assignment에 `ClassroomMembership(role: "teacher")`를 사용한다. canonical migration은 nullable `Classroom.teacher_id`, `users` foreign key와 null이 아닌 `teacher_id` unique index를 추가한 뒤 1:1 호환 데이터만 이전한다. 다중 배정 충돌은 임의 선택하지 않고 migration 전에 명시적으로 정리한다.
 
 ## 학생의 학교
 

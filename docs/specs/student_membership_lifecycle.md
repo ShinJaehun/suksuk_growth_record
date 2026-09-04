@@ -19,20 +19,16 @@
 - 한 교실의 active student membership은 최대 30개까지 허용한다.
 - inactive student membership은 교실 active 학생 수 계산에서 제외한다.
 - inactive student membership은 과거 학급 이력으로 여러 개 보존할 수 있다.
-- inactive 학생은 자기 권한으로 현재 교실 기능에 접근하거나 새 메시지, 쿠폰 사용 요청 등 새로운 활동을 만들 수 없다.
-- 담당 teacher는 inactive 학생의 과거 칭찬·쿠폰·메시지 기록을 조회하고 계정 관리와 복구를 수행할 수 있다.
+- inactive 학생은 자기 권한으로 현재 교실 기능에 접근하거나 새로운 활동을 만들 수 없다.
+- 담당 teacher는 inactive 학생의 계정 관리와 복구를 수행할 수 있다.
 - 현재 단계에서는 `transferred`, `graduated`, `archived` 같은 상태를 추가하지 않는다.
 
-### 교사 membership
+### 교사 assignment 경계
 
-- teacher membership은 존재 여부로 현재 담당 여부를 나타낸다.
-- membership이 존재하면 현재 담당 teacher이며, 담당 해제는 membership 삭제로 처리한다.
-- active/inactive lifecycle을 사용하지 않고 항상 `active` 상태로 저장한다.
-- inactive teacher membership은 모델 validation에서 허용하지 않는다.
+teacher의 현재 담당 관계는 이 student membership lifecycle의 책임이 아니다. canonical target은 nullable `Classroom.teacher_id`이며 신규 teacher `ClassroomMembership`을 만들지 않는다. teacher 또는 classroom 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
 
 `Classroom#students`는 일반 교실 운영에서 사용하는 active 학생 목록을 의미한다.
-inactive 학생은 교사 일반 운영 화면, 칭찬 대상, 쿠폰 추첨 대상, 학생 PIN 로그인 선택 목록,
-새 메시지 대상에서 제외한다.
+inactive 학생은 교사 일반 운영 화면과 학생 PIN 로그인 선택 목록에서 제외한다.
 
 teacher/admin 구성원 관리 화면에서는 active/inactive 학생을 한 목록에서 확인한다.
 inactive 학생은 흐린 스타일과 복구 action으로 active 학생과 구분한다.
@@ -44,11 +40,10 @@ teacher/admin이 학생을 더 이상 운영 대상으로 쓰지 않으려면 �
 
 - `User`는 삭제하지 않는다.
 - 직접 삭제 요청도 현재 교실의 student membership을 비활성화하며 `User`를 hard delete하지 않는다.
-- 칭찬, 쿠폰, 메시지, 쿠폰 사용 요청 등 과거 기록은 삭제하지 않는다.
+- 기존 학생 소속과 공통 운영 기록은 삭제하지 않는다.
 - 비활성화할 때 출석번호를 유지한다. inactive 학생끼리 또는 inactive와 active 학생은 같은 출석번호를 가질 수 있다.
-- inactive 학생도 teacher/admin은 과거 기록 확인을 위해 상세, 한눈에 보기, 활동 기록,
-  메시지 기록 페이지에 접근할 수 있다.
-- inactive 학생 상세에서는 칭찬하기, 쿠폰 지급, 새 메시지 작성/답글 작성 같은 운영 action을 숨긴다.
+- inactive 학생도 teacher/admin은 계정 관리와 복구를 위해 상세 화면에 접근할 수 있다.
+- inactive 학생 상세에서는 현재 소속이 필요한 운영 action을 숨긴다.
 - inactive 학생은 구성원 관리 화면에서 `active`로 복구할 수 있다.
 - 다른 학급에 active student membership이 이미 있으면 복구를 거부하고 두 membership 상태를 모두 유지한다.
 - 현재 학급의 active 학생 수가 이미 30명이면 복구를 거부하고 membership은 inactive로 유지한다.
@@ -69,14 +64,14 @@ transfer service를 만들지 않으며, 기존 active membership과 대상 학�
 
 - 비활성화/복구는 `ClassroomPolicy#manage_members?`를 기준으로 한다.
 - admin은 가능하다.
-- teacher는 해당 classroom의 teacher membership이 있을 때만 가능하다.
+- teacher는 해당 classroom의 `teacher_id`가 자신일 때만 가능하다.
 - student는 불가하다.
 - 접근 주체가 학생이면 해당 교실의 active student membership이 필요하다.
 - 관리 대상이 학생이면 inactive membership도 과거 기록 조회·계정 관리·복구 대상으로 허용한다.
-- 접근 주체가 teacher이면 해당 교실의 teacher membership 존재가 필요하다.
+- 접근 주체가 teacher이면 해당 교실의 `teacher_id`가 자신이어야 한다.
 
-학생 상세, 한눈에 보기, 활동 기록과 메시지 기록은 URL에 지정된 classroom을 기준으로 권한을 확인한다.
-global admin은 모든 학급에 접근할 수 있고, teacher는 해당 classroom의 teacher membership이 있을 때만
+학생 상세와 계정 관리 화면은 URL에 지정된 classroom을 기준으로 권한을 확인한다.
+global admin은 모든 학급에 접근할 수 있고, teacher는 해당 classroom의 `teacher_id`가 자신일 때만
 접근할 수 있다. 학교 manager도 실제 담당 teacher가 아니면 학생 데이터에 접근할 수 없다. student는
 본인이면서 해당 classroom의 membership이 active일 때만 접근할 수 있다.
 

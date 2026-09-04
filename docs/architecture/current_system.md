@@ -2,230 +2,104 @@
 
 ## 문서 목적
 
-이 문서는 `suksuk_praise`의 현재 구현 상태를 빠르게 파악하기 위한 요약 문서다.
-
-- 후속 작업은 `docs/planning/backlog.md`에 둔다.
-- 테스트 작성 원칙과 우선순위는 `docs/testing/rspec_strategy.md`에 둔다.
-- 기능별 상세 정책은 `docs/specs/*.md`와 관련 architecture 문서에 둔다.
+현재 starter에 실제로 존재하는 공통 학교·교실·사용자 구조와 확정된 teacher assignment migration target을 구분해 기록한다. 추출 과정에서 제거된 service-specific 도메인은 현재 시스템으로 설명하지 않는다.
 
 ## 핵심 역할
 
-- `admin`: 전역 관리 권한을 가진다.
-- `teacher`: 교실 teacher membership을 기준으로 학생, 칭찬, 쿠폰, 메시지 기능을 사용한다.
-- `student`: 본인과 본인이 속한 교실 맥락의 정보만 조회하고 일부 학생용 기능을 사용한다.
+- `admin`: 전체 학교 범위의 관리 권한을 가진다.
+- `teacher`: `SchoolMembership`으로 학교에 속하며 member 또는 manager 역할을 가진다.
+- `student`: student `ClassroomMembership`으로 교실에 속한다.
 
-## 인증/세션
+인증 주체는 `User` 하나를 유지한다. teacher, student와 admin을 별도 인증 모델로 분리하지 않는다.
 
-- root(`/`)는 교사/관리자 로그인 진입으로 사용하며, 비로그인 사용자를 Devise 로그인 화면으로 보낸다.
-- admin/teacher는 Devise 로그인을 사용한다.
-- 공개 self-sign-up은 제공하지 않는다. teacher/admin 계정은 관리 흐름에서 생성하고, student 계정은 교실 구성원 관리에서 생성한다.
-- Devise registration controller는 기존 계정 수정 기능 때문에 유지하되 공개 `new/create`는 로그인 화면으로 redirect해 차단한다.
-- student는 root나 `/users/sign_in`에서 로그인하지 않는다.
-- student는 일반 Devise 로그인 흐름에서 차단되며, 교실 범위 PIN 로그인으로 접근한다.
-- 학생 공개 로그인 URL은 교실별 token URL인 `GET /c/:student_login_token/login`을 사용한다.
-- 기존 숫자 id 기반 학생 로그인 route는 호환을 위해 유지되어 있다.
-- student PIN 로그인은 교실과 학생 membership, PIN을 확인한다.
-- PIN 로그인 성공 시 기존 세션을 reset하고 해당 student로 `sign_in`한다.
-- PIN 로그인 성공 후 교실 맥락이 있으면 `classroom_student_path(classroom, student)`로 이동한다.
-- student 세션은 `STUDENT_SESSION_TTL`과 `session[:student_last_seen_at]`으로 짧게 관리된다.
-- student가 `/users/:id`에 접근할 때 가능한 경우 교실 범위 학생 상세 경로로 redirect한다.
-- 잘못되었거나 재발급으로 만료된 학생 로그인 token URL은 학생용 안내 화면을 `404 Not Found`로 보여준다.
+## 인증과 학생 세션
 
-## 교실/학생 관리
+- teacher와 admin은 Devise 로그인 흐름을 사용한다.
+- inactive user는 로그인하거나 일반 운영 권한을 얻을 수 없다.
+- student는 교실 범위 PIN/token 로그인 흐름을 사용한다.
+- PIN 로그인은 classroom, active student membership과 PIN을 서버에서 확인한다.
+- 학생 로그인 성공 시 기존 session을 reset하고 student로 로그인한다.
+- student session은 짧은 TTL과 마지막 활동 시각으로 관리한다.
+- 만료되거나 재발급으로 무효화된 token은 사용할 수 없다.
 
-- 교사와 학생의 관계는 `ClassroomMembership`을 기준으로 한다.
-- `School`은 학교 조직의 기준 모델이며 모든 `Classroom`은 하나의 school과 1~6 범위의 grade를 반드시 가진다. application validation과 DB `NOT NULL` 제약으로 둘 다 보장하며 학교 없는 legacy classroom은 더 이상 허용하지 않는다.
-- 2026-07-18 개발 DB 감사에서는 school/grade 없는 classroom, 학교 소속 없는 teacher, 비-teacher SchoolMembership, 학교가 다른 teacher assignment가 모두 0건이었다. 이 결과는 개발 환경에 한정되며 각 운영 환경은 배포와 migration 전에 같은 감사를 별도로 수행해야 한다.
-- 전체 admin은 `/schools`에서 학교를 추가하고 이름을 수정할 수 있으며, 교실 생성 시 학교와 학년을 지정한다. 생성된 교실의 학교는 변경할 수 없다.
-- 학교 manager는 자기 학교의 모든 학급을 `ClassroomPolicy::Scope`로 조회하고 자기 학교 학급을 생성하며 이름과 학년을 수정할 수 있다. manager가 생성·수정하는 학급의 학교는 서버에서 자기 학교로 고정되며 다른 학교로 이동할 수 없다.
-- 학교 manager가 실제 담당 교사로도 배정된 학급에서는 manager 권한과 기존 담당 교사 권한을 함께 가진다.
-- 일반 teacher는 기존처럼 자신이 `ClassroomMembership(role: teacher)`로 담당하는 학급만 조회·관리한다. 같은 학교 소속이라는 이유만으로 다른 학급에 접근하거나 담당 교사를 변경할 수 없다.
-- teacher의 학교 소속은 `SchoolMembership`으로 관리하며, 현재 교사당 한 학교만 허용한다. 담당 teacher는 반드시 SchoolMembership을 가져야 하고 그 학교는 모든 담당 Classroom의 학교와 같아야 한다. 같은 학교의 여러 학급 담당은 가능하지만 학급 담당 교사 배정은 학급과 같은 학교의 SchoolMembership을 가진 teacher만 허용한다. 학교 manager의 학급 배정은 SchoolMembership을 자동 생성하거나 이동하지 않는다. 학교 manager는 `/schools/:school_id/teachers`에서 자기 학교의 새 teacher를 일반 구성원으로 생성하고 자기 학교 안의 담당 교실만 배정·해제할 수 있다. `bin/rails school_memberships:backfill`은 누락 소속을 멱등하게 보완하고 기존 다른 학교 충돌은 변경하지 않은 채 집계한다.
-- 담당 학급의 기준은 teacher 역할 `ClassroomMembership`의 존재 여부이며, 담당 해제는 membership 삭제로 처리한다. teacher membership은 항상 active이고, active/inactive lifecycle은 student membership에만 적용한다. 담당 학년은 연결된 Classroom의 `grade`를 통해 계산하고 별도로 저장하지 않는다.
-- teacher 생성 시 개인 쿠폰은 비어 있다. teacher는 쿠폰 라이브러리에서 개별 또는 전체 추가하거나 새 쿠폰을 만들어 personal 쿠폰을 구성한다. 전체 admin의 교사 생성에서는 User, 선택한 SchoolMembership과 teacher ClassroomMembership을 하나의 transaction으로 처리해 어느 하나라도 실패하면 전체 rollback한다.
-- global admin은 `/admin/teachers`에서 선생님 계정과 학교 소속·담당 교실을 통합 관리한다. 학교와 담당 교실의 최종 상태를 명시적으로 함께 선택하며 `Teachers::SaveWithAssignments`가 조합 검증과 저장 transaction을 담당한다. 같은 학교면 manager/member 역할을 유지하고, 학교가 바뀌면 새 학교의 member가 되며, 소속을 제거하면 teacher ClassroomMembership도 함께 제거한다. 이름·이메일·비밀번호·성별·아바타·전역 role은 수정하지 않는다.
-- 해당 학교 manager는 `/schools/:school_id/teachers`에서 자기 학교 소속 선생님을 조회·생성하고 담당 교실 설정 modal을 연다. 해당 학교 교실만 선택하며 다른 학교 담당 교실은 변경하지 않는다. global admin은 이 endpoint를 사용하지 않고 `/admin/teachers`를 사용한다. 학교 manager는 학교 이동·소속 해제·manager 지정/해제·다른 학교 교실 배정을 할 수 없다.
-- 학교 manager의 담당 교사 배정은 기존 같은 학교 SchoolMembership만 사용하며 새 소속을 만들거나 다른 학교 소속을 이동하지 않는다. manager의 담당 해제는 SchoolMembership을 삭제하지 않고, 교실의 학교 변경도 기존 SchoolMembership을 자동 이동하지 않는다.
-- 일반 담당 teacher가 보낸 교실 `name`, `school_id`, `grade` 변경값은 strong parameters에서 제외하고 운영 설정만 허용한다. manager가 보낸 `school_id` 변경값은 거부하고 자기 학교로 고정한다.
-- 기존 teacher의 SchoolMembership 누락을 보완하는 backfill task는 유지한다. 실행 여부는 환경별로 확인해야 하며, 현재 감사한 개발 DB에는 학교 소속 없는 teacher가 없다.
-- 학교 삭제와 school admin 권한은 아직 구현하지 않았다.
-- 교실 create/update는 `teacher_ids`를 허용하거나 담당 교사 배정을 처리하지 않는다. 교실은 담당 교사 없이 생성한 뒤 global admin은 `/admin/teachers`, 학교 manager는 학교별 선생님 관리에서 배정한다.
-- `SchoolClosure`는 학교별 휴일을 이름과 시작일·종료일 범위로 저장한다. 내부 모델명은 `SchoolClosure`를 유지하고 사용자 화면에서는 휴일이라는 용어를 사용한다.
-- `PublicHoliday`는 전국 공통 공휴일의 날짜, 이름과 출처를 로컬 DB에 저장한다.
-- 한국천문연구원 특일 정보 OpenAPI client와 연도별 동기화 service가 있으며, 성공한 응답만 transaction으로 교체하고 실패 시 기존 데이터를 유지한다. 명령행 task는 기본적으로 현재·다음 연도를 동기화한다.
-- global admin은 학교 목록 화면의 공식 공휴일 동기화 카드에서 이전·현재·다음 연도를 기존 sync service로 수동 동기화할 수 있다. 별도의 공식 공휴일 목록 관리 화면은 제공하지 않으며, 공휴일 적용 결과는 학교 휴일 달력에서 확인한다. 학교 manager와 일반 teacher는 공식 공휴일을 동기화할 수 없다.
-- `SchoolCalendar`는 주말, 전국 공통 공휴일과 해당 학교의 휴일을 기준으로 운영일과 주·월의 마지막 운영일을 계산한다.
-- `/classrooms`는 사용자가 접근할 수 있는 교실을 확인하고 진입하는 교실 전용 목록이다.
-- global admin은 `/classrooms`와 `/admin/teachers`에서 학교 필터를 사용해 전체 목록 또는 특정 학교의 교실·선생님 목록을 조회할 수 있다.
-- `/schools/:id`는 학교 이름, 교실·교사 수와 관리자 현황, 학교 휴일을 표시한다. 교실·교사 상세 목록은 표시하지 않으며 상단에는 `/classrooms` 이동과 global admin 전용 `/schools/:id/edit` 학교 설정 진입을 제공한다. 학교 이름, 표시 색상, manager 역할과 학교 활성 상태는 독립된 설정 페이지에서 관리한다.
-- `/admin/teachers`는 global admin 전용 전체 선생님 계정·학교 소속·담당 교실 통합 관리 화면이다.
-- `/schools/:school_id/teachers`는 해당 학교 manager 전용 선생님 관리 목록이며 manager navbar에서 진입한다. `new/create/edit/update`는 이 목록에서 여는 modal과 저장 endpoint다.
-- global admin은 학교 운영 정보에서 teacher를 학교 manager로 지정하거나 member로 해제할 수 있다. member는 자기 학교를 읽고, manager와 global admin은 SchoolClosure를 등록·수정·삭제할 수 있다.
-- 공식 공휴일 자동 정기 동기화 설정과 캘린더형 휴일 UI는 아직 구현되지 않았다. 학생 구성원 관리와 쿠폰·칭찬·메시지 등 수업 운영 기능 전체의 manager 권한 확장도 아직 구현되지 않았다.
-- 확정된 학교 운영 정책은 [`school_operations.md`](school_operations.md), 학교와 교실의 불변조건은 [`school_classroom_boundaries.md`](school_classroom_boundaries.md)에 정리한다.
-- `/classrooms/:id/edit`에서 admin과 해당 학교 manager는 이름·학년을 관리한다. 학교는 읽기 전용으로 표시되고 누구도 변경할 수 없다. 담당 teacher는 이 화면에서 칭찬왕 사용 여부와 메시지 정책만 관리하며 이름·학교·학년을 변경할 수 없다. manager는 실제 담당 teacher인 경우에만 운영 설정 권한도 함께 가진다.
-- 학교 manager는 담당 teacher가 아니라면 학생 구성원 관리와 운영 설정 권한을 얻지 않는다. `/classrooms/:id/members`는 기존 `manage_members?` 기준의 구성원 관리 화면이다.
-- 교실 hard delete는 global admin만 실행할 수 있다. 담당 teacher와 학교 manager는 담당 여부와 무관하게 삭제할 수 없다.
-- global admin도 active/inactive 학생 membership이나 칭찬, 발급 쿠폰, 쿠폰 요청·이벤트, 학생 메시지 등 운영 기록이 있는 교실은 삭제할 수 없다. teacher membership만 남은 미사용 교실은 삭제할 수 있으며 이때 teacher 계정은 유지되고 해당 교실 membership만 제거된다.
-- 교실 archive는 아직 구현되지 않았다.
-- teacher nav는 담당 교실이 1개이면 해당 교실로 직접 이동하고, 여러 개이면 dropdown으로 담당 교실 목록을 보여준다.
-- 교실 이름은 최대 50자로 제한한다.
-- teacher/admin은 교실 범위 학생 페이지에서 학생을 조회하고 관리한다.
-- 학생 canonical page는 `GET /classrooms/:classroom_id/students/:id`이다.
-- student membership은 active/inactive lifecycle을 사용하고, teacher membership은 존재 여부로 현재 담당을 나타내며 담당 해제 시 삭제한다.
-- inactive 학생은 자기 권한으로 현재 교실 활동을 만들 수 없지만, 담당 teacher/admin은 과거 기록 조회·계정 관리·복구를 수행할 수 있다.
-- 특정 교실 PIN session의 membership이 inactive가 되면 로그아웃하며, active membership 부재만으로 일반 학생 요청을 전역 로그아웃시키지는 않는다.
-- 상세 정책과 권한 불변식은 [`student_membership_lifecycle.md`](../specs/student_membership_lifecycle.md)를 기준으로 한다.
-- 학생 self-edit은 차단되어 있으며, 학생이 직접 변경 가능한 값은 PIN 중심이다.
-- 출석번호는 `User`가 아니라 교실별 `ClassroomMembership.student_number`에 저장한다. 값이 있는 학생은 번호순, 번호가 없는 학생은 그 뒤에서 이름·user id·membership id 순으로 표시한다.
-- teacher/admin은 학생의 출석번호, name, gender, avatar_key, PIN 등을 관리한다. 학생 `User`에는 email과 Devise password를 저장하지 않는다.
-- teacher/admin은 구성원 관리 화면에서 현재 교실의 active 학생 PIN을 한 번에 재설정할 수 있다. inactive 학생 PIN은 일괄 재설정 대상에서 제외하며 기존 PIN 값은 화면에 표시하지 않는다.
-- `/classrooms` 교실 카드의 학생 수와 학생 avatar preview는 active student membership 기준이다.
-- 여러 학생 등록은 학생 수와 공통 PIN으로 명단 draft를 만들고 각 행에서 출석번호, 이름, 성별, 기본 썸네일을 입력한다. 기존 active 학생과 새 draft를 합산해 최대 30명까지 허용한다.
-- 여러 학생 등록 제한을 초과하면 Turbo modal content-missing 없이 alert를 표시하고 modal을 닫는다.
-- 여러 학생 등록 submit 중에는 modal 입력과 버튼 조작을 잠그고, 응답 실패 시 잠금을 복구한다.
-- teacher/admin은 교실 화면에서 학생 로그인 modal을 열어 학생 로그인 URL을 확인할 수 있다.
-- 학생 로그인 modal에서는 학생 로그인 URL 복사, QR 코드 보기, QR 코드 다운로드, 학생 로그인 주소 재발급이 가능하다.
-- 구성원 관리 화면은 학생 관리 전용으로 사용하며 학생 로그인 URL/QR/재발급 UI와 담당 선생님 배정 form을 표시하지 않는다.
-- teacher/admin은 구성원 관리 화면에서 출석번호, 이름, 성별, 기본 썸네일을 학생 명단 일괄 편집으로 수정할 수 있다.
-- 학생 명단 일괄 편집은 현재 교실과 현재 필터의 student membership id로 대상을 제한한다. 저장 전 active 번호의 최종 상태를 검증하고, transaction 안에서 번호 교환·순환 변경을 처리하며, 한 행이라도 실패하거나 DB 경쟁 조건이 발생하면 전체 저장을 rollback한다.
-- 학생 로그인 QR은 현재 token URL 기준으로 요청 시 생성하며 서버 파일로 저장하지 않는다.
-- 학생 로그인 주소는 재발급할 수 있으며, 재발급 후 기존 URL과 기존 QR은 더 이상 사용할 수 없다.
-- 학생 avatar는 `avatar_key` 기반 기본 이미지를 사용한다.
-- 학생 PIN 로그인 화면에서 학생을 선택하면 해당 학생의 avatar와 이름을 preview로 표시한다.
-- 교실 내 학생 생성/수정 시 gender 기준 avatar_key 선택과 교실 내 중복 회피 흐름이 있다. 학생 gender가 `boy`이면 boy avatar만, `girl`이면 girl avatar만 허용한다.
-- 명단 편집에서 성별을 바꾸지 않은 legacy gender/avatar 불일치는 관련 없는 수정으로 정리하지 않는다. 성별 변경 시 새 성별에 유효한 기존 avatar는 유지하고, 그렇지 않으면 결정적인 기본 avatar를 선택하며 업로드 attachment는 제거하지 않는다.
-- avatar 선택 목록은 역할별로 제한한다: student는 boy/girl, teacher는 teacherM/teacherF, admin은 admin과 teacherM/teacherF 계열을 사용한다.
-- `avatar_key`가 현재 역할에서 허용되지 않거나 asset 파일이 없으면 역할별 기본 avatar로 fallback한다: student는 `boy01`, teacher는 `teacherM01`, admin은 `admin`.
-- 출석번호와 학생 명단의 상세 불변식은 [`student_roster.md`](../specs/student_roster.md)를 기준으로 한다.
+## 학교와 교실
 
-## 칭찬
+- 모든 `Classroom`은 하나의 active/inactive lifecycle과 변경 불가능한 `school_id`를 가진다.
+- `Classroom.grade`는 필수 정수 1부터 6이며 표시·filter·정렬 정책은 canonical grade spec을 따른다.
+- global admin은 모든 학교 범위, manager는 자기 학교 범위에서 school과 classroom을 관리한다.
+- 일반 teacher는 담당 active classroom만 운영한다.
+- school 또는 classroom 비활성화는 물리 삭제가 아니며 학생 membership과 과거 기록을 보존한다.
 
-- teacher/admin은 교실 맥락에서 학생에게 compliment를 생성할 수 있다.
-- student, guest, 담당 범위 밖 teacher는 compliment를 생성할 수 없다.
-- compliment 생성 시 receiver 학생의 points가 증가한다.
-- 맞춤 칭찬은 구체적인 칭찬 사유가 붙은 일반 `Compliment`이며, 일반 칭찬과 모든 칭찬 집계·칭찬왕·쿠폰 정책이 동일하다.
-- 맞춤 칭찬 preset은 교실 설정이 아니라 teacher/admin 사용자 개인의 자주 쓰는 칭찬 문구이며, 사용자별 active preset은 최대 5개다.
-- 같은 사용자는 자신이 담당하거나 admin 권한으로 접근 가능한 모든 교실에서 같은 preset을 사용하고, 같은 교실의 여러 담당 교사는 각자 자신의 preset만 사용한다.
-- 맞춤 칭찬 생성 시 `Compliment`에 preset 참조와 당시 문구 snapshot을 저장한다. preset 수정·비활성화는 과거 칭찬 로그 문구를 변경하지 않는다.
-- `/compliment_events`는 접근 가능한 교실의 일반 칭찬과 맞춤 칭찬을 같은 목록에서 조회하는 전역 칭찬 로그 화면이다.
-- 칭찬 로그는 일반 단일 교실 teacher에게 유일한 담당 교실을 자동 적용하고, admin·복수 교실 teacher·school manager는 교실 선택 UI를 사용한다.
-- school manager는 manager 권한만으로 학교 전체 칭찬 로그를 볼 수 없고, teacher membership이 있는 교실만 기존 teacher 범위로 조회한다.
-- 칭찬 로그는 교실, 교실 선택 또는 자동 선택 후 사용할 수 있는 학생, 기간, 일반/맞춤 칭찬 종류, 칭찬 시각 정렬 필터와 pagination을 제공하며, 맞춤 칭찬 구분은 `reason` snapshot 존재 여부를 기준으로 한다.
-- 칭찬 로그의 기본 기간은 최근 7일이며 기간 계산은 `Compliment#given_at`을 기준으로 한다. pagination은 유효한 filter parameter를 `/compliment_events` 경로에서 보존한다.
-- 각 `Compliment`는 계속 `classroom_id`에 소속되며, 실제 칭찬 생성은 교실 문맥이 필요한 nested `GET /classrooms/:classroom_id/compliments/new`, `POST /classrooms/:classroom_id/compliments`를 사용한다.
-- `/compliment_templates`는 로그인한 teacher/admin이 자신의 자주 쓰는 칭찬을 관리하는 전역 화면이며 교실 필터를 제공하지 않는다. 내부 모델과 테이블은 `ComplimentPreset`, `compliment_presets`를 유지한다.
-- navbar의 관리 링크 명칭은 `자주 쓰는 칭찬`이고, 학생 카드와 modal의 동작 명칭은 계속 `맞춤 칭찬`이다.
-- 칭찬 로그와 자주 쓰는 칭찬 관리는 현재 교실 문맥 없이 navbar의 전역 링크로 접근하며, `/classrooms/:id`는 학생에게 칭찬을 주는 교실 운영 화면에 집중한다.
-- 짧은 시간 안의 같은 giver/receiver/classroom 중복 요청은 차단된다.
-- 칭찬 목록과 타임라인은 학생 활동 기록 페이지에서 교실/권한 범위에 맞게 로드된다.
-- 일간·주간·월간 칭찬왕 집계는 `ComplimentKings::Pick`이 담당한다.
-- 일간은 해당 날짜, 주간은 월요일 시작 주, 월간은 달력 월을 Rails `Time.zone` 기준으로 집계한다.
-- 활성 학생만 집계하고 최고 횟수가 같은 학생은 모두 포함한다.
-- 교실별로 각 기간을 활성화하거나 비활성화할 수 있으며, 비활성 기간은 서버측 쿠폰 발급에서도 차단한다.
-- 칭찬왕 결과는 별도 record로 저장하지 않고 조회할 때마다 다시 계산한다.
-- 주간 칭찬왕 갱신 버튼은 해당 주의 마지막 학교 운영일에만 표시하고, 월간 칭찬왕 갱신 버튼은 해당 달의 마지막 학교 운영일에만 표시한다. 다른 날짜에는 주간·월간 갱신 버튼과 안내 문구를 모두 표시하지 않는다.
-- 주간·월간 칭찬왕 갱신 요청은 서버에서도 해당 school의 마지막 운영일인지 검증한다.
-- 휴일 정보는 일반 기능 제한에 사용하지 않는다. 칭찬 등록, 쿠폰 발급과 사용, 일일 칭찬왕 갱신, 학생 메시지, 학생 및 학급 관리는 휴일 여부와 관계없이 기존 동작을 유지한다.
-- 칭찬왕 결과 카드의 쿠폰 발급 버튼과 쿠폰 발급 요청은 학교 운영일 날짜 조건으로 제한하지 않는다. 상세 정책은 [`weekly_monthly_compliment_king.md`](../specs/weekly_monthly_compliment_king.md)를 참고한다.
+## Teacher의 학교와 학년
 
-## 쿠폰
+- teacher는 최대 하나의 `SchoolMembership`을 가진다.
+- `SchoolMembership.role`은 `member` 또는 `manager`다.
+- `SchoolMembership.grade`는 `nil` 또는 정수 1부터 6이다.
+- teacher는 classroom 없이 school과 grade만 가질 수 있다.
+- `User.grade`와 별도 Grade model은 사용하지 않는다.
+- 한 school의 manager는 없거나 한 명이며 canonical source는 `SchoolMembership.role == "manager"`다.
+- manager 지정·교체·해제는 global admin만 수행하고 `School.manager_id`는 추가하지 않는다.
 
-- coupon template은 teacher personal template과 admin library template으로 구분된다.
-- coupon template은 Active Storage `image`가 있으면 이를 우선 표시하고, 없으면 유효한 `default_image_key` asset을 표시한다.
-- `default_image_key`가 비어 있거나 실제 asset이 없으면 쿠폰 썸네일 placeholder를 표시한다.
-- teacher는 library template을 읽고 personal template으로 adopt할 수 있다.
-- personal template에는 active/weight 불변식과 weight normalization 흐름이 있다.
-- teacher/admin은 교실 맥락에서 학생에게 coupon draw/issue를 수행할 수 있다.
-- 기본 학생 상세 페이지의 공통 학생 정보 카드에는 쿠폰 관리 페이지에서만 teacher/admin용 `쿠폰 지급` 버튼이 표시된다. 한눈에 보기, 활동 기록, 학생 메시지 페이지에는 이 버튼이 반복 노출되지 않는다.
-- `쿠폰 지급` 버튼은 Turbo Frame으로 쿠폰 지급 카드를 로드하며, 학생 본인에게는 버튼과 카드가 표시되지 않는다.
-- 쿠폰 지급 카드의 `쿠폰 뽑기`는 `policy_scope(CouponTemplate).active` 범위에서 가중치에 따라 template 하나를 뽑아 `issuance_basis: manual`, `basis_tag: default`로 발급한다.
-- 쿠폰 지급 카드의 `쿠폰 지급`은 같은 active template 범위에서 선택한 template을 `issuance_basis: manual`, `basis_tag: selected`로 발급한다.
-- 담당 teacher는 자기 교실의 active 학생에게만 쿠폰을 지급할 수 있고, admin은 접근 가능한 학생에게 지급할 수 있다. 외부 teacher, student, inactive 학생, 접근할 수 없거나 inactive인 template은 차단된다.
-- 교실 페이지의 칭찬왕 쿠폰 발급은 기존처럼 가중치 기반 `쿠폰 뽑기`만 제공하며 선택 지급 UI는 제공하지 않는다.
-- 칭찬왕 발급은 issuance basis, basis tag, period 정보로 일간·주간·월간을 구분한다.
-- 같은 학생에게 같은 기간의 동일 칭찬왕 쿠폰을 중복 발급하지 않으며, 사용 처리된 쿠폰도 다시 발급하지 않는다.
-- 수동·custom 쿠폰 발급은 칭찬왕 기간 활성 설정과 무관하다.
-- 학생은 본인의 보유 coupon을 확인할 수 있다.
-- `UserCouponPolicy::Scope`는 global admin에게 전체 쿠폰을, teacher에게 teacher membership이 있는 classroom의 쿠폰만, student에게 본인 쿠폰만 반환한다. 학교 manager 권한만으로 자기 학교 전체 쿠폰을 조회할 수는 없다.
-- `UserCoupon`은 issued/used 상태 전이를 가진다.
-- coupon 발급/사용 이벤트는 `CouponEvent`로 기록된다.
-- 보유 쿠폰은 기본 학생 상세 페이지인 쿠폰 관리 화면에 표시되고, 최근 발급 쿠폰은 학생 활동 기록 페이지에 표시된다.
-- 학생은 쿠폰을 직접 사용 처리하지 않고 쿠폰 사용 요청을 보낸다.
-- teacher/admin은 학생의 쿠폰 사용 요청을 승인하거나 학생 쿠폰을 직접 사용 처리할 수 있다.
-- 쿠폰 사용 요청 또는 직접 사용 처리 성공 시 학생 화면과 관리 화면의 쿠폰 목록을 Turbo Streams로 갱신한다.
-- 학생의 쿠폰 사용 요청은 교실 학생 카드의 쿠폰 요청 badge로 표시된다.
-- teacher/admin은 쿠폰 요청 badge를 확인하고 학생 상세에서 승인한다.
-- 교실 학생 카드의 쿠폰 요청 badge는 학생 상세의 쿠폰 영역으로 이동한다.
-- teacher/admin이 쿠폰을 뽑으면 서버에서는 `draw_coupon` 시점에 쿠폰을 즉시 발급한다.
-- teacher/admin 화면의 쿠폰 목록, 최근 발급, KPI는 쿠폰 뽑기 overlay를 닫은 뒤 delayed reveal로 갱신한다.
-- 학생 화면의 쿠폰 목록은 teacher/admin이 overlay를 닫은 뒤 `reveal_issue` endpoint가 `student_coupons` stream으로 갱신한다.
-- 쿠폰 뽑기 overlay 중에는 teacher/admin 화면 뒤에 새 쿠폰 카드가 먼저 보이지 않아야 한다.
+## Teacher assignment: 현재 구현
 
-## 메시지
+현재 checkout의 teacher assignment는 아직 `ClassroomMembership(role: "teacher")`를 사용한다. 관련 controller, service, policy, scope와 UI도 이 구현에 의존하는 부분이 남아 있다.
 
-- 교실에는 `message_policy` 설정이 있으며 기본값은 `replies_only`다.
-- 과거 boolean 설정은 `message_policy`로 이관 완료되었고, 기존 boolean 컬럼은 제거되었다.
-- `disabled`이면 학생/교사/admin 모두 해당 교실의 학생 메시지를 새로 작성하거나 답장할 수 없고, 공통 학생 정보 카드의 학생 메시지 버튼과 교실 학생 카드의 새 메시지 badge를 표시하지 않는다.
-- `disabled`인 교실의 학생 메시지 페이지에 직접 접근하는 것도 차단한다.
-- `replies_only`이면 teacher/admin은 학생에게 새 root message를 보낼 수 있고, student는 기존 root thread에만 답장할 수 있다.
-- `student_initiated`이면 `replies_only` 흐름에 더해 student가 자기 소속 교실 teacher 전원에게 새 root message를 시작할 수 있다.
-- student root message는 전송 1회당 단일 root thread로 생성된다. 필수 recipient에는 교실 teacher 중 정렬상 첫 teacher를 사용하며 admin에게 자동 발송하지 않는다.
-- 같은 교실의 teacher와 admin은 root message의 recipient 여부와 관계없이 학생의 단일 thread를 공동 조회하고 답변할 수 있다.
-- 기존 root thread reply는 `disabled`가 아닌 교실에서 thread 참여/관리 권한 기준으로 허용된다.
-- 답글의 답글은 허용하지 않는다.
-- teacher/admin은 관리 가능한 학생의 메시지 전용 페이지에서 thread별 reply를 작성할 수 있다.
-- 메시지 UI는 root/reply form과 compact thread display 구조를 사용한다.
-- 일반 SNS식 navbar notification/count/list는 제공하지 않는다.
-- 학생 발신 미확인 메시지가 있으면 teacher/admin이 보는 교실 학생 카드에 새 메시지 badge를 표시한다.
-- 새 메시지 badge/read 처리는 teacher별 개인 inbox가 아니라 교실 단위 공동 처리 상태다.
-- teacher/admin 중 누군가 학생 상세나 메시지 전용 페이지를 열거나 메시지에 답변하면 학생 발신 unread 메시지를 read 처리해 badge가 사라진다.
-- 학생 본인이 자기 화면을 여는 것은 학생 발신 unread 메시지를 read 처리하지 않는다.
-- 쿠폰 요청 badge와 메시지 badge는 `users/_student_card_alerts.html.erb` alert 영역을 공유한다.
-- 실시간 갱신은 Turbo Streams broadcast로 해당 학생의 alert 영역만 replace한다.
-- 학생 카드 alert 관리 stream은 admin, 현재 active 담당 교사, 현재 active school manager별 recipient stream으로 전송한다.
-- 관리용 학생 쿠폰 stream은 admin과 현재 active 담당 교사별 recipient stream으로 전송하며 학생 자신의 stream은 기존 방식을 유지한다.
-- 과거 signed stream을 구독 중이어도 현재 recipient가 아니면 새 관리 broadcast를 받지 않는다.
-- Action Cable은 primary realtime transport이며 recipient 권한 처리를 위한 polling은 추가하지 않는다.
-- 교실 관리 화면은 연결 직후, 화면 복귀, online 전환, visible 상태의 60초 간격에 alert ID만 다시 조회해 놓친 broadcast를 보완한다.
-- 새 메시지 badge는 해당 학생의 메시지 전용 페이지로 이동한다.
-- 현재 학생 카드 알림은 pending 쿠폰 사용 요청과 학생 발신 unread 메시지만 다룬다.
-- 별도 Notification 모델, 알림 목록, teacher별 개인 inbox, navbar 알림은 구현되어 있지 않다.
-- 특정 쿠폰 요청이나 특정 메시지 item으로 이동하는 deep link는 아직 MVP 범위 밖이다.
+이 구조를 최종 1:1 모델로 완료된 것처럼 해석하지 않는다.
 
-## 학생 상세 화면
+## Teacher assignment: canonical migration target
 
-- 교실 범위 학생 화면은 하나의 긴 화면이 아니라 별도 route/page 구조로 나뉜다.
-- 기본 학생 상세 페이지 `GET /classrooms/:classroom_id/students/:id`는 쿠폰 관리 화면이다. 학생 정보 카드와 KPI, 보유 쿠폰, pending 쿠폰 사용 요청 및 teacher/admin의 승인 흐름을 보여준다.
-- 특정 학생 한눈에 보기 `GET /classrooms/:classroom_id/students/:id/dashboard`는 URL의 classroom과 student를 기준으로 선택한 주의 활동을 보여준다.
-- 학생 활동 기록 `GET /classrooms/:classroom_id/students/:id/activity`는 최근 발급 쿠폰과 칭찬 타임라인을 보여준다.
-- 학생 메시지 `GET /classrooms/:classroom_id/students/:student_id/messages`는 메시지 작성 폼과 기존 thread를 보여주며 기존 POST 메시지 흐름을 유지한다.
-- 네 페이지는 학생 avatar, 이름, 반 이름, KPI badge와 하위 페이지 이동 nav pills를 포함한 공통 학생 정보 카드를 사용한다.
-- nav pills는 쿠폰 관리, 한눈에 보기, 활동 기록, 학생 메시지 순서이며 현재 페이지를 active 상태로 표시한다.
-- 학생도 하위 페이지 이동 nav pills를 사용할 수 있다. `message_policy`가 `disabled`이면 학생 메시지 버튼은 표시하지 않는다.
-- teacher/admin에게는 학생 정보·PIN 수정, 칭찬하기, 교실로 돌아가기 관리 버튼이 추가로 노출된다. 쿠폰 지급 버튼은 쿠폰 관리 페이지에서 권한이 있을 때만 표시된다.
-- student에게는 teacher/admin 관리 버튼이 노출되지 않는다.
-- 담당 범위 밖 teacher의 접근은 차단하고 admin은 전역 범위에서 접근할 수 있다.
+확정된 target은 다음과 같다.
 
-## dashboard
+```text
+Classroom.teacher_id nullable
+foreign key: users
+unique index: teacher_id where teacher_id is not null
 
-- `GET /dashboard`는 admin, 학교 manager, 일반 teacher가 공통으로 사용하는 한 학급 분석 화면이다.
-- 역할별 차이는 `ClassroomPolicy::Scope`에 따라 선택 가능한 학교·학급 범위뿐이다. global admin은 학교와 학급을 순서대로 선택하고, 학교 manager는 자기 학교 전체 학급을, 일반 teacher는 담당 학급만 선택한다.
-- 선택한 학급의 이번 주(월요일부터 오늘) 또는 이번 달(1일부터 오늘) 받은 칭찬, 쿠폰 발급, 쿠폰 사용 현황을 요약 카드와 학생별 썸네일·가로 막대그래프로 표시한다.
-- 분석 대상은 현재 active student membership이며 구성원 관리 순서인 membership 생성 시각과 id 순서를 유지한다. 칭찬은 `Compliment.given_at`, 쿠폰 발급·사용은 `CouponEvent.created_at`을 기준으로 집계한다.
-- 대화, unread 메시지와 메시지 알림은 dashboard 범위에 포함하지 않는다.
-- student dashboard는 PIN 로그인 세션의 active classroom membership을 기준으로 현재 교실의 활동을 표시한다.
-- student dashboard는 `week_offset` query parameter로 이전 주와 다음 주를 이동하며, 선택한 주의 월요일부터 금요일까지를 집계 범위로 사용한다.
-- student dashboard 상단에는 현재 교실에서 지금까지 받은 칭찬, 선택한 주에 받은 칭찬, 현재 보유 쿠폰, 선택한 주에 발급받은 쿠폰과 사용한 쿠폰 수를 5칸 summary panel로 표시한다.
-- 선택한 주의 날짜별 칭찬 수는 자동 조정되는 y축 눈금과 곡선형 SVG 그래프로 표시한다.
-- 선택한 주에 쿠폰을 발급받은 날은 `🎁`, 쿠폰을 사용한 날은 `✅` marker를 해당 날짜의 그래프 점 근처에 표시한다.
-- 선택한 주에 칭찬과 쿠폰 발급/사용 활동이 모두 없으면 데이터 선, 점, marker, y축 숫자를 표시하지 않고 요일과 날짜가 있는 빈 그래프 배경을 유지한다.
-- student dashboard의 주간 집계에서는 다른 교실, 다른 학생, 주말 활동을 제외한다.
-- 기존 학생 로그인용 `GET /dashboard`는 유지된다.
-- 특정 학생 한눈에 보기 `GET /classrooms/:classroom_id/students/:id/dashboard`는 기존 student dashboard와 같은 주간 집계와 화면을 재사용하되, `current_user`가 아니라 URL의 classroom과 student를 집계 대상으로 사용한다.
-- 특정 학생 한눈에 보기도 `week_offset`, 월요일부터 금요일까지의 집계, 5칸 summary panel, 자동 y축 눈금, 곡선형 SVG 그래프, 쿠폰 발급/사용 marker와 활동 없는 주 표시를 지원한다.
+Teacher 0..1 ↔ 0..1 Classroom
+```
 
-## 테스트 상태
+- teacher는 담당 classroom이 없거나 하나다.
+- classroom은 담당 teacher가 없거나 한 명이다.
+- 연결된 teacher와 classroom은 같은 school과 grade를 가지며 둘 다 active여야 한다.
+- 신규 teacher `ClassroomMembership`은 만들지 않는다.
+- migration 이후 `ClassroomMembership`은 학생 classroom 소속에 사용한다.
+- teacher 또는 classroom 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
+- classroom grade 변경이 teacher의 membership grade와 충돌하면 먼저 assignment를 해제해야 한다.
 
-- student PIN/auth, student portal, classroom student management, message, coupon, compliment, policy/scope, Turbo/HTML 핵심 흐름에 대한 RSpec 파일이 존재한다.
-- 테스트 작성 원칙과 우선순위는 `docs/testing/rspec_strategy.md`를 기준으로 한다.
+기존 teacher membership 데이터는 migration 전에 감사한다. 1:1 호환 관계만 자동 이전하고 다중 assignment 충돌은 임의 선택하지 않으며 명시적으로 정리한 뒤 이전한다.
+
+## Teacher 운영 영역
+
+- `/teachers`는 global admin과 manager의 canonical 개별 teacher 관리 영역이다.
+- global admin은 모든 학교, manager는 자기 학교 teacher만 관리한다.
+- 일반 teacher는 접근할 수 없다.
+- teacher form은 학교, 학년, 단일 학급 순서로 구성한다.
+- 학교와 학년이 유효할 때만 같은 school·grade의 active 미배정 classroom을 후보로 조회한다.
+- teacher 생성 시 최초 password를 입력할 수 있지만 기존 teacher update에서는 manager가 password를 변경할 수 없다.
+- teacher 목록은 school, `SchoolMembership.grade`, 단일 classroom과 lifecycle 상태를 표시한다.
+
+## 학생 관리
+
+- 학생의 classroom 소속 source는 `ClassroomMembership(role: "student")`다.
+- active student membership은 현재 소속이고 inactive membership은 과거 소속 기록이다.
+- 한 student는 active classroom membership을 최대 하나만 가진다.
+- 학생은 classroom별 출석번호, name, gender, avatar와 PIN을 기존 운영 정책에 따라 관리한다.
+- 담당 teacher와 admin은 학생 명부, 학생 정보와 PIN을 관리할 수 있다.
+- 학생 자신은 허용된 자기 정보와 PIN 중심 흐름만 사용한다.
+- 학생 avatar는 role과 gender에 맞는 `avatar_key` pool과 fallback 정책을 유지한다.
+
+## 권한 원칙
+
+- Pundit policy와 `policy_scope`가 서버측 권한의 기본 경계다.
+- controller와 domain validation은 school, grade, lifecycle과 assignment cardinality를 다시 확인한다.
+- `school_id`, `teacher_id`, `classroom_id`와 membership id parameter 조작으로 scope를 넓힐 수 없다.
+- manager 권한은 자기 school로 제한하고 일반 teacher는 담당 classroom 밖으로 확장하지 않는다.
+- UI 숨김만으로 권한을 보장하지 않는다.
+
+## 관련 canonical 문서
+
+- 학교 운영 lifecycle과 1:1 teacher assignment: [`school_operations_lifecycle.md`](../specs/school_operations_lifecycle.md)
+- 학교와 교실 경계: [`school_classroom_boundaries.md`](school_classroom_boundaries.md)
+- classroom grade: [`classroom_grade_foundation.md`](../specs/classroom_grade_foundation.md)
+- 학생 membership lifecycle: [`student_membership_lifecycle.md`](../specs/student_membership_lifecycle.md)
+- 학생 명부: [`student_roster.md`](../specs/student_roster.md)
