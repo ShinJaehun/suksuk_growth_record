@@ -393,15 +393,17 @@ RSpec.describe 'Admin teachers', type: :request do
     end.to raise_error(ActionController::RoutingError)
   end
 
-  it 'shows the teacher management navigation link only to admins' do
+  it 'shows the canonical teacher management navigation link to admins and managers' do
     manager_membership = create(:school_membership, :manager)
     regular_teacher = create(:user, :teacher)
     student = create(:user, :student)
 
     sign_in admin
     get schools_path
-    expect(response.body).to include(admin_teachers_path)
+
+    expect(response.body).to include(teachers_path)
     expect(response.body).to include(schools_path, classrooms_path)
+    expect(response.body).not_to include(admin_teachers_path)
     expect(response.body).not_to include(school_teachers_path(manager_membership.school))
 
     sign_in manager_membership.user
@@ -412,13 +414,14 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).not_to include(admin_teachers_path)
     expect(response.body).to include(school_path(manager_membership.school))
     expect(response.body).to include(classrooms_path)
-    expect(response.body).to include(school_teachers_path(manager_membership.school))
-    expect(document.css(%(a[href="#{school_teachers_path(manager_membership.school)}"])).size).to eq(2)
+    expect(response.body).to include(teachers_path)
+    expect(document.css(%(a[href="#{teachers_path}"])).size).to eq(2)
     expect(response.body).not_to include(school_path(manager_membership.school, anchor: 'school-teachers'))
 
     sign_in regular_teacher
     get classrooms_path
     expect(response.body).not_to include(admin_teachers_path)
+    expect(response.body).not_to include(teachers_path)
     expect(response.body).not_to include(school_teachers_path(manager_membership.school))
     expect(response.body).not_to include(school_path(manager_membership.school))
 

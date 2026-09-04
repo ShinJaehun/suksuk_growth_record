@@ -82,17 +82,17 @@ RSpec.describe 'School workspaces', type: :request do
 
     get classrooms_path
     expect(response.body.scan(%(href="#{school_path(school)}")).size).to eq(2)
-    expect(response.body.scan(%(href="#{school_teachers_path(school)}")).size).to eq(2)
+    expect(response.body.scan(%(href="#{teachers_path}")).size).to eq(2)
 
     school.update!(active: false)
     get classrooms_path
     expect(response.body).not_to include(%(href="#{school_path(school)}"))
-    expect(response.body).not_to include(%(href="#{school_teachers_path(school)}"))
+    expect(response.body).not_to include(%(href="#{teachers_path}"))
 
     school.update!(active: true)
     get classrooms_path
     expect(response.body.scan(%(href="#{school_path(school)}")).size).to eq(2)
-    expect(response.body.scan(%(href="#{school_teachers_path(school)}")).size).to eq(2)
+    expect(response.body.scan(%(href="#{teachers_path}")).size).to eq(2)
   end
 
   it 'does not show school navigation to a member of an inactive school' do
@@ -102,7 +102,7 @@ RSpec.describe 'School workspaces', type: :request do
     get classrooms_path
 
     expect(response.body).not_to include(%(href="#{school_path(school)}"))
-    expect(response.body).not_to include(%(href="#{school_teachers_path(school)}"))
+    expect(response.body).not_to include(%(href="#{teachers_path}"))
   end
 
   it 'allows members and managers to view only their school' do

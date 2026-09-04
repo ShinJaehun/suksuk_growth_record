@@ -1,0 +1,15 @@
+<section class="mx-auto max-w-3xl space-y-6 pt-4">
+  <header>
+    <h1 class="text-3xl font-extrabold"><%= t("admin.teachers.edit_title") %></h1>
+  </header>
+  <%= render "form" %>
+  <% if @teacher.active? && policy(@teacher).deactivate_teacher? %>
+    <%= button_to t("teacher_status.deactivate"), deactivate_teacher_path(@teacher),
+          method: :patch,
+          class: "rounded-lg border px-4 py-2 font-semibold" %>
+  <% elsif @teacher.inactive? && policy(@teacher).reactivate_teacher? %>
+    <%= button_to t("teacher_status.reactivate"), reactivate_teacher_path(@teacher),
+          method: :patch,
+          class: "rounded-lg border px-4 py-2 font-semibold" %>
+  <% end %>
+</section>

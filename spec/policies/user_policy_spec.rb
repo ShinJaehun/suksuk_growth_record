@@ -1,6 +1,23 @@
 require "rails_helper"
 
 RSpec.describe UserPolicy do
+  describe "generic user authorization" do
+    let(:school) { create(:school) }
+    let(:manager) { create(:school_membership, :manager, school: school).user }
+    let(:member) { create(:school_membership, school: school).user }
+
+    it "keeps index, create, update, and scope admin-only" do
+      admin = create(:user, :admin)
+
+      expect(described_class.new(admin, User).index?).to eq(true)
+      expect(described_class.new(admin, User.new(role: :teacher)).create?).to eq(true)
+      expect(described_class.new(manager, User).index?).to eq(false)
+      expect(described_class.new(manager, User.new(role: :teacher)).create?).to eq(false)
+      expect(described_class.new(manager, member).update?).to eq(false)
+      expect(described_class::Scope.new(manager, User).resolve).to contain_exactly(manager)
+    end
+  end
+
   describe "#show?" do
     let(:teacher) { create(:user, :teacher) }
     let(:student) { create(:user, :student) }

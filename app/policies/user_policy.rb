@@ -1,12 +1,7 @@
 class UserPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
-      if user.admin?
-        scope.all
-      else
-        # 안전한 기본값: 자기 자신만
-        scope.where(id: user.id)
-      end
+      user.admin? ? scope.all : scope.where(id: user.id)
     end
   end
 
@@ -40,7 +35,6 @@ class UserPolicy < ApplicationPolicy
   end
 
   def update?
-    # 관리자이면서, 대상이 교사 계정일 때만 허용
     user&.admin? && record.teacher?
   end
 

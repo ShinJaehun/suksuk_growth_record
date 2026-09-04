@@ -23,6 +23,11 @@ Rails.application.routes.draw do
 
   resources :users, only: [:show]
 
+  resources :teachers, only: %i[index new create edit update] do
+    patch :deactivate, on: :member
+    patch :reactivate, on: :member
+  end
+
   resources :classrooms, except: [:edit, :update] do
     resource :members, only: :show, module: :classrooms
     get "members/students/names/edit",

@@ -7,14 +7,13 @@ module NavigationHelper
       [
         navigation_item("navigation.school_management", schools_path),
         navigation_item("navigation.classrooms", classrooms_path),
-        (navigation_item("navigation.teacher_management", admin_teachers_path) if can_manage_teachers?)
+        (navigation_item("navigation.teacher_management", teachers_path) if can_manage_teachers?)
       ].compact
     elsif context[:manager_membership]
-      school = context[:manager_membership].school
       [
-        navigation_item("navigation.school_operations", school_path(school)),
+        navigation_item("navigation.school_operations", school_path(context[:manager_membership].school)),
         navigation_item("navigation.classrooms", classrooms_path),
-        navigation_item("navigation.teacher_management", school_teachers_path(school))
+        navigation_item("navigation.teacher_management", teachers_path)
       ]
     elsif user.teacher?
       []
@@ -52,12 +51,11 @@ module NavigationHelper
     }
   end
 
-  # 관리자만 교사 관리 화면 접근 가능
+  # global admin과 학교 대표 선생님만 교사 관리 화면 접근 가능
   def can_manage_teachers?
     return false unless current_user
-    Pundit.policy!(current_user, User).index?
-  rescue Pundit::NotDefinedError
-    false
+
+    TeacherManagementPolicy.new(current_user, User).access?
   end
 
   private

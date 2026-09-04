@@ -47,7 +47,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).not_to include(classroom_members_path(unassigned_classroom))
     expect(response.body).to include(school_path(school))
     expect(response.body).not_to include('다른 학교 학급')
-    expect(response.body).to include(school_teachers_path(school))
+    expect(response.body).to include(teachers_path)
     expect(response.body).not_to include('학교 운영 정보')
     expect(response.body).not_to include('선생님 목록')
     expect(response.body).to include(%(href="#{classrooms_path}"))
