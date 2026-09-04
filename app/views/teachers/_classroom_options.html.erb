@@ -1,0 +1,16 @@
+<% if selection_ready %>
+  <% if classrooms.any? %>
+    <%= select_tag :classroom_id,
+          options_for_select(
+            [[t("admin.teachers.index.unassigned_grade"), ""]] +
+              classrooms.map { |classroom| [classroom.name, classroom.id] },
+            selected_classroom_id
+          ),
+          class: "block w-full rounded border border-slate-300 px-3 py-2",
+          data: { teacher_classroom_picker_target: "classroom" } %>
+  <% else %>
+    <p class="text-sm text-slate-500"><%= t("admin.teachers.form.classrooms_empty") %></p>
+  <% end %>
+<% else %>
+  <p class="text-sm text-slate-500"><%= t(selection_prompt_key) %></p>
+<% end %>

@@ -1,150 +1,145 @@
-require 'rails_helper'
+require "rails_helper"
 
-RSpec.describe 'Teacher operations', type: :request do
+RSpec.describe "Teacher operations", type: :request do
   let(:school) { create(:school) }
-  let(:manager) { create(:school_membership, :manager, school: school).user }
+  let(:manager) { create(:school_membership, :manager, school: school, grade: 4).user }
 
-  it 'allows admins and managers but rejects regular teachers' do
+  it "allows admins and managers but rejects regular teachers" do
     sign_in create(:user, :admin)
     get teachers_path
     expect(response).to have_http_status(:ok)
+
     sign_in manager
     get teachers_path
     expect(response).to have_http_status(:ok)
+
     sign_in create(:school_membership, school: school).user
     get teachers_path
     expect(response).to redirect_to(root_path)
   end
 
-  it "limits a manager's index and direct lookup to their school" do
-    own_teacher = create(:school_membership, school: school).user
-    other_teacher = create(:school_membership, school: create(:school)).user
+  it "limits a manager to teachers and classrooms in their school" do
+    own_teacher = create(:school_membership, school: school, grade: 5).user
+    other_school = create(:school)
+    other_teacher = create(:school_membership, school: other_school).user
+    own_classroom = create(:classroom, school: school, grade: 5)
+    other_classroom = create(:classroom, school: other_school, grade: 5)
     sign_in manager
+
     get teachers_path
     expect(response.body).to include(own_teacher.email)
-    expect(response.body).not_to include(other_teacher.email, 'name="school_id"')
+    expect(response.body).not_to include(other_teacher.email)
+
     get edit_teacher_path(other_teacher)
     expect(response).to have_http_status(:not_found)
-  end
 
-  it "shows only the manager's school and active classrooms on the new form" do
-    own_classroom = create(:classroom, school: school, name: '우리 학교 학급')
-    other_school = create(:school, name: '다른 학교')
-    other_classroom = create(:classroom, school: other_school, name: '다른 학교 학급')
-
-    sign_in manager
-    get new_teacher_path
-
-    expect(response).to have_http_status(:ok)
-    expect(response.body).to include(school.name)
+    get classroom_options_teachers_path,
+      params: { school_id: other_school.id, membership_grade: 5 }
     expect(response.body).to include(own_classroom.name)
-
-    expect(response.body).not_to include(other_school.name)
     expect(response.body).not_to include(other_classroom.name)
-    expect(response.body).not_to include('name="school_id"')
   end
 
-  it 'creates a teacher with an initial password and multiple classrooms' do
-    classrooms = create_list(:classroom, 2, school: school)
+  it "renders one grade select and one classroom select without plural assignment inputs" do
+    classroom = create(:classroom, school: school, grade: 5)
+    sign_in manager
+
+    get new_teacher_path, params: { membership_grade: 5 }
+
+    document = Nokogiri::HTML(response.body)
+    expect(document.css('select[name="membership_grade"]').size).to eq(1)
+    expect(document.css('select[name="classroom_id"]').size).to eq(1)
+    expect(document.css('[name="classroom_ids[]"]')).to be_empty
+    expect(document.css('input[type="checkbox"]')).to be_empty
+    expect(response.body).to include(classroom.name)
+    expect(response.body).not_to include(I18n.t("admin.teachers.form.current_classrooms"))
+  end
+
+  it "does not query candidates until school and grade are selected" do
+    admin = create(:user, :admin)
+    classroom = create(:classroom, school: school, grade: 5)
+    sign_in admin
+
+    get new_teacher_path
+    expect(response.body).not_to include(classroom.name)
+
+    get new_teacher_path, params: { school_id: school.id }
+    expect(response.body).not_to include(classroom.name)
+
+    get new_teacher_path, params: { school_id: school.id, membership_grade: 5 }
+    expect(response.body).to include(classroom.name)
+  end
+
+  it "creates a teacher with grade and no classroom" do
     sign_in manager
     post teachers_path, params: {
-      user: { name: '새 선생님', email: 'new-teacher@example.com', password: 'password123',
-              password_confirmation: 'password123', gender: 'female', avatar_key: 'teacherF01' },
-      classroom_ids: classrooms.map(&:id)
+      membership_grade: 5,
+      classroom_id: "",
+      user: {
+        name: "학급 없는 선생님",
+        email: "grade-only@example.com",
+        password: "password123",
+        password_confirmation: "password123"
+      }
     }
-    teacher = User.find_by!(email: 'new-teacher@example.com')
-    expect(teacher.valid_password?('password123')).to eq(true)
-    expect(teacher.school).to eq(school)
-    expect(teacher.classroom_memberships.teacher.pluck(:classroom_id)).to match_array(classrooms.map(&:id))
-    expect(teacher.avatar_key).to eq('teacherF01')
+
+    teacher = User.teacher.find_by!(email: "grade-only@example.com")
+    expect(teacher.school_membership).to have_attributes(school: school, grade: 5)
+    expect(teacher.assigned_classroom).to be_nil
   end
 
-  it 'updates profiles without changing password, role, or school' do
-    teacher = create(:school_membership, school: school).user
-    teacher.update!(password: 'password123')
+  it "assigns one matching classroom and restores it on edit" do
+    classroom = create(:classroom, school: school, grade: 5)
     sign_in manager
-    patch teacher_path(teacher), params: {
-      user: { name: '수정 선생님', email: 'updated@example.com', gender: 'male', avatar_key: 'teacherM01',
-              password: 'changed-password', password_confirmation: 'changed-password', role: 'admin' },
-      school_id: create(:school).id,
-      classroom_ids: []
+    post teachers_path, params: {
+      membership_grade: 5,
+      classroom_id: classroom.id,
+      user: {
+        name: "담임 선생님",
+        email: "assigned@example.com",
+        password: "password123",
+        password_confirmation: "password123"
+      }
     }
-    expect(response).to redirect_to(teachers_path)
-    teacher.reload
-    expect(teacher).to have_attributes(name: '수정 선생님', email: 'updated@example.com', role: 'teacher', school: school)
-    expect(teacher.valid_password?('password123')).to eq(true)
-  end
+    teacher = User.find_by!(email: "assigned@example.com")
 
-  it 'reuses the avatar picker and normalizes avatar when gender changes' do
-    teacher = create(
-      :school_membership,
-      school: school,
-      user: create(:user, :teacher, gender: 'female', avatar_key: 'teacherF01')
-    ).user
-    sign_in manager
-
+    expect(classroom.reload.teacher).to eq(teacher)
     get edit_teacher_path(teacher)
-    expect(response.body).to include(
-      'data-controller="teacher-avatar-preview"',
-      'data-teacher-avatar-preview-target="avatarKey"',
-      'data-action="teacher-avatar-preview#select"'
-    )
-    expect(response.body).not_to include('name="user[password]"')
-
-    patch teacher_path(teacher), params: {
-      user: { name: teacher.name, email: teacher.email, gender: 'male' },
-      classroom_ids: []
-    }
-
-    expect(teacher.reload.avatar_key).to be_in(User::TEACHER_MALE_AVATAR_KEYS)
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css('select[name="membership_grade"] option[value="5"][selected]')).to be_present
+    expect(document.at_css(%(select[name="classroom_id"] option[value="#{classroom.id}"][selected]))).to be_present
   end
 
-  it 'lets a manager update their own profile' do
+  it "rejects direct assignment of a different-grade or occupied classroom" do
+    teacher = create(:school_membership, school: school, grade: 5).user
+    other_teacher = create(:school_membership, school: school, grade: 5).user
+    invalid_classrooms = [
+      create(:classroom, school: school, grade: 6),
+      create(:classroom, school: school, grade: 5, teacher: other_teacher)
+    ]
     sign_in manager
-    patch teacher_path(manager),
-          params: { user: { name: '대표 수정', email: 'manager-updated@example.com' }, classroom_ids: [] }
-    expect(manager.reload).to have_attributes(name: '대표 수정', email: 'manager-updated@example.com')
-  end
 
-  it 'rejects outside-school and inactive classroom assignments' do
-    teacher = create(:school_membership, school: school).user
-    sign_in manager
-    [create(:classroom, school: create(:school)), create(:classroom, school: school, active: false)].each do |classroom|
-      patch teacher_path(teacher),
-            params: { user: { name: teacher.name, email: teacher.email }, classroom_ids: [classroom.id] }
+    invalid_classrooms.each do |classroom|
+      patch teacher_path(teacher), params: {
+        membership_grade: 5,
+        classroom_id: classroom.id,
+        user: { name: teacher.name, email: teacher.email }
+      }
       expect(response).to have_http_status(:unprocessable_content)
-      expect(teacher.classroom_memberships.teacher).to be_empty
+      expect(teacher.reload.assigned_classroom).to be_nil
     end
   end
 
-  it 'preserves an existing inactive classroom assignment' do
-    teacher = create(:school_membership, school: school).user
-    classroom = create(:classroom, school: school)
-    assignment = create(:classroom_membership, user: teacher, classroom: classroom, role: :teacher)
-    classroom.update!(active: false)
+  it "releases the classroom when a teacher is deactivated and does not restore it" do
+    membership = create(:school_membership, school: school, grade: 5)
+    classroom = create(:classroom, school: school, grade: 5, teacher: membership.user)
     sign_in manager
-    patch teacher_path(teacher), params: { user: { name: '보존 선생님', email: teacher.email }, classroom_ids: [] }
-    expect(ClassroomMembership.exists?(assignment.id)).to eq(true)
-  end
 
-  it 'enforces lifecycle permissions and preserves memberships' do
-    member = create(:school_membership, school: school)
-    assignment = create(:classroom_membership, user: member.user, classroom: create(:classroom, school: school),
-                                               role: :teacher)
-    other_manager = create(:school_membership, :manager, school: school)
-    sign_in manager
-    patch deactivate_teacher_path(member.user)
-    expect(member.user.reload).to be_inactive
-    expect(SchoolMembership.exists?(member.id)).to eq(true)
-    expect(ClassroomMembership.exists?(assignment.id)).to eq(true)
-    patch reactivate_teacher_path(member.user)
-    expect(member.user.reload).to be_active
-    patch deactivate_teacher_path(manager)
-    expect(response).to redirect_to(root_path)
-    patch deactivate_teacher_path(other_manager.user)
-    expect(response).to redirect_to(root_path)
-    sign_in create(:user, :admin)
-    patch deactivate_teacher_path(other_manager.user)
-    expect(other_manager.user.reload).to be_inactive
+    patch deactivate_teacher_path(membership.user)
+    expect(membership.user.reload).to be_inactive
+    expect(classroom.reload.teacher).to be_nil
+
+    patch reactivate_teacher_path(membership.user)
+    expect(membership.user.reload).to be_active
+    expect(classroom.reload.teacher).to be_nil
   end
 end

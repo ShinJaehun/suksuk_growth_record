@@ -24,6 +24,7 @@ Rails.application.routes.draw do
   resources :users, only: [:show]
 
   resources :teachers, only: %i[index new create edit update] do
+    get :classroom_options, on: :collection
     patch :deactivate, on: :member
     patch :reactivate, on: :member
   end

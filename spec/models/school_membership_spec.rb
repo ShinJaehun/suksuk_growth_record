@@ -17,6 +17,20 @@ RSpec.describe SchoolMembership, type: :model do
     expect(membership).to be_member
   end
 
+  it 'allows a nil grade or an integer grade from 1 through 6' do
+    membership = build(:school_membership)
+
+    [nil, 1, 6].each do |grade|
+      membership.grade = grade
+      expect(membership).to be_valid
+    end
+
+    [0, 7, 1.5].each do |grade|
+      membership.grade = grade
+      expect(membership).not_to be_valid
+    end
+  end
+
   it 'allows a teacher to be a manager' do
     membership = create(:school_membership, :manager)
 
@@ -79,14 +93,15 @@ RSpec.describe SchoolMembership, type: :model do
     expect(create(:school_membership, school: school, user: create(:user, :teacher))).to be_persisted
   end
 
-  it 'allows multiple managers to belong to the same school' do
+  it 'allows at most one manager to belong to the same school' do
     school = create(:school)
 
     first_manager = create(:school_membership, :manager, school: school)
-    second_manager = create(:school_membership, :manager, school: school)
+    second_manager = build(:school_membership, :manager, school: school)
 
     expect(first_manager).to be_manager
-    expect(second_manager).to be_manager
+    expect(second_manager).not_to be_valid
+    expect(second_manager.errors[:school_id]).to be_present
   end
 
   it 'rejects a second school membership for the same teacher' do

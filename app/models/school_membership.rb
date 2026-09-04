@@ -5,6 +5,10 @@ class SchoolMembership < ApplicationRecord
   enum :role, { member: 0, manager: 10 }, default: :member
 
   validates :user_id, uniqueness: true
+  validates :school_id, uniqueness: { conditions: -> { manager } }, if: :manager?
+  validates :grade,
+            numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 6 },
+            allow_nil: true
   validate :user_must_be_teacher
   validate :manager_must_be_active, if: :new_manager_assignment?
 

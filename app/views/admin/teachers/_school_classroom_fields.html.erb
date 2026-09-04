@@ -12,9 +12,19 @@
           } %>
   </div>
 
+  <div class="mt-5">
+    <%= label_tag :membership_grade, t("filters.grade.label"), class: "block text-sm font-medium text-gray-700" %>
+    <%= select_tag :membership_grade,
+          options_for_select(
+            (1..6).map { |grade| [t("classrooms.index.grade", grade: grade), grade] },
+            params[:membership_grade].presence || @teacher.school_membership&.grade
+          ),
+          include_blank: t("admin.teachers.index.unassigned_grade"),
+          class: "mt-1 block w-full rounded border border-gray-300 px-3 py-2" %>
+  </div>
+
   <fieldset class="mt-5">
     <legend class="text-sm font-semibold text-slate-800"><%= t("admin.teachers.form.classrooms_label") %></legend>
-    <%= hidden_field_tag "classroom_ids[]", "" %>
     <p class="mt-1 text-sm text-slate-500"><%= t("admin.teachers.form.classrooms_help") %></p>
 
     <% @schools.each do |school| %>
@@ -24,17 +34,14 @@
            <%= "hidden" unless @selected_school_id == school.id %>>
         <% classrooms = @classrooms_by_school.fetch(school.id, []) %>
         <% if classrooms.any? %>
-          <% classrooms.each do |classroom| %>
-            <label class="flex cursor-pointer items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:checked]:text-blue-700 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-              <%= check_box_tag "classroom_ids[]",
-                    classroom.id,
-                    @selected_classroom_ids.include?(classroom.id),
-                    disabled: @selected_school_id != school.id,
-                    class: "peer sr-only" %>
-              <span aria-hidden="true" class="hidden text-blue-600 peer-checked:inline">✓</span>
-              <span><%= classroom_display_name(classroom) %></span>
-            </label>
-          <% end %>
+          <%= select_tag :classroom_id,
+                options_for_select(
+                  [[t("admin.teachers.index.unassigned_grade"), ""]] +
+                    classrooms.map { |classroom| [classroom_display_name(classroom), classroom.id] },
+                  @selected_classroom_id
+                ),
+                disabled: @selected_school_id != school.id,
+                class: "block w-full rounded border border-slate-300 px-3 py-2" %>
         <% else %>
           <p class="text-sm text-slate-500"><%= t("admin.teachers.form.classrooms_empty") %></p>
         <% end %>

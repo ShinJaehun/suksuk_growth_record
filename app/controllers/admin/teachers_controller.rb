@@ -22,14 +22,15 @@ class Admin::TeachersController < Admin::BaseController
     authorize @teacher
 
     school = selected_school
-    classroom_ids = selected_classroom_ids(school)
+    classroom_id = selected_classroom_id(school)
     result =
       unless school_assignment_invalid?
-        Teachers::SaveWithAssignments.call(
+        Teachers::SaveWithAssignment.call(
           teacher: @teacher,
           attributes: {},
           school: school,
-          classroom_ids: classroom_ids
+          membership_grade: selected_membership_grade,
+          classroom_id: classroom_id
         )
       end
 
@@ -67,14 +68,15 @@ class Admin::TeachersController < Admin::BaseController
     end
 
     school = selected_school
-    classroom_ids = selected_classroom_ids(school)
+    classroom_id = selected_classroom_id(school)
     result =
       unless school_assignment_invalid?
-        Teachers::SaveWithAssignments.call(
+        Teachers::SaveWithAssignment.call(
           teacher: @teacher,
           attributes: {},
           school: school,
-          classroom_ids: classroom_ids
+          membership_grade: selected_membership_grade,
+          classroom_id: classroom_id
         )
       end
 
@@ -104,7 +106,7 @@ class Admin::TeachersController < Admin::BaseController
     scope = policy_scope(User)
             .teacher
             .with_attached_avatar
-            .includes(school_membership: :school, classroom_memberships: :classroom)
+            .includes(school_membership: :school, assigned_classroom: :school)
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
 
     if @selected_school
@@ -115,11 +117,6 @@ class Admin::TeachersController < Admin::BaseController
     scope.order(:created_at)
          .map do |teacher|
            school = teacher.school_membership&.school
-           classrooms = teacher.classroom_memberships
-                               .select(&:teacher?)
-                               .map(&:classroom)
-                               .compact
-                               .sort_by { |classroom| [classroom.grade || Float::INFINITY, classroom.name.to_s, classroom.id] }
            membership = teacher.school_membership
 
            {
@@ -128,7 +125,7 @@ class Admin::TeachersController < Admin::BaseController
              school_color_key: school&.color_key,
              school_role: membership&.role,
              school_role_label: teacher_school_role_label(teacher),
-             classrooms: classrooms
+             classrooms: [teacher.assigned_classroom].compact
            }
     end
   end
@@ -207,32 +204,32 @@ class Admin::TeachersController < Admin::BaseController
     @school_selection_invalid == true
   end
 
-  def selected_classroom_ids(school)
-    return @selected_classroom_ids if defined?(@selected_classroom_ids)
+  def selected_classroom_id(school)
+    raw_id = teacher_assignment_params[:classroom_id].to_s
+    return nil if raw_id.blank?
 
-    raw_ids = Array(teacher_assignment_params[:classroom_ids]).reject(&:blank?)
-    valid_raw_ids = raw_ids.select { |value| value.to_s.match?(/\A[1-9]\d*\z/) }
-    requested_ids = valid_raw_ids.map(&:to_i).uniq
-    @selected_classroom_ids = requested_ids
-
-    if valid_raw_ids.size != raw_ids.size || Classroom.where(id: requested_ids).count != requested_ids.size
+    classroom = raw_id.match?(/\A[1-9]\d*\z/) ? Classroom.find_by(id: raw_id) : nil
+    if classroom.nil?
       @classroom_selection_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.classroom_not_found'))
-    elsif !school_selection_invalid? && school.nil? && requested_ids.any?
+    elsif !school_selection_invalid? && school.nil?
       @classroom_selection_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.school_required_for_classrooms'))
-    elsif school && Classroom.where(id: requested_ids).where.not(school_id: school.id).exists?
+    elsif school && classroom.school_id != school.id
       @classroom_selection_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.classroom_school_mismatch'))
-    elsif school&.inactive?
-      current_ids = @teacher.classroom_memberships.teacher.pluck(:classroom_id)
-      if (requested_ids - current_ids).any?
-        @classroom_selection_invalid = true
-        @teacher.errors.add(:base, t("school_status.inactive_school"))
-      end
     end
+    raw_id.to_i
+  end
 
-    @selected_classroom_ids
+  def selected_membership_grade
+    value = teacher_assignment_params[:membership_grade].to_s
+    return nil if value.blank?
+    return value.to_i if value.match?(/\A[1-6]\z/)
+
+    @classroom_selection_invalid = true
+    @teacher.errors.add(:base, t('admin.teachers.errors.membership_grade_invalid'))
+    nil
   end
 
   def school_assignment_invalid?
@@ -244,7 +241,7 @@ class Admin::TeachersController < Admin::BaseController
   end
 
   def classroom_selection_submitted?
-    teacher_assignment_params.key?(:classroom_ids)
+    teacher_assignment_params.key?(:classroom_id)
   end
 
   def load_edit_form
@@ -256,16 +253,8 @@ class Admin::TeachersController < Admin::BaseController
     @schools = School.active.or(School.where(id: current_school_id)).order(:name, :id).load
     @classrooms_by_school = Classroom.where(school_id: @schools.map(&:id)).order(:grade, :name, :id).group_by(&:school_id)
     load_selected_school
-    @selected_classroom_ids =
-      if teacher_assignment_params.key?(:classroom_ids)
-        Array(teacher_assignment_params[:classroom_ids]).filter_map do |value|
-          value.to_i if value.to_s.match?(/\A[1-9]\d*\z/)
-        end.uniq
-      elsif @teacher.persisted?
-        @teacher.classroom_memberships.teacher.pluck(:classroom_id)
-      else
-        []
-      end
+    @selected_classroom_id = teacher_assignment_params.key?(:classroom_id) ?
+      teacher_assignment_params[:classroom_id].presence&.to_i : @teacher.assigned_classroom&.id
   end
 
   def load_selected_school
@@ -278,7 +267,7 @@ class Admin::TeachersController < Admin::BaseController
   end
 
   def teacher_assignment_params
-    @teacher_assignment_params ||= params.permit(:school_id, classroom_ids: [])
+    @teacher_assignment_params ||= params.permit(:school_id, :membership_grade, :classroom_id)
   end
 
 end

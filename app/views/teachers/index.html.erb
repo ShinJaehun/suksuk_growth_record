@@ -35,7 +35,17 @@
               <p class="font-semibold text-slate-900"><%= display_name(teacher) %></p>
               <p class="text-xs text-slate-500"><%= teacher.email %></p>
               <p class="text-xs text-slate-500"><%= row[:school]&.name %> · <%= t(row[:role] == "manager" ? "admin.teachers.index.manager" : "admin.teachers.index.member") %></p>
-              <p class="text-xs text-slate-500"><%= row[:classrooms].map { |classroom| classroom_display_name(classroom) }.join(", ") %></p>
+              <p class="text-xs text-slate-500">
+                <%= t("admin.teachers.index.membership_grade") %>:
+                <% if row[:membership_grade] %>
+                  <%= t("classrooms.index.grade", grade: row[:membership_grade]) %>
+                <% else %>
+                  <%= t("admin.teachers.index.unassigned_grade") %>
+                <% end %>
+              </p>
+              <p class="text-xs text-slate-500">
+                <%= row[:classroom] ? classroom_display_name(row[:classroom]) : t("admin.teachers.index.unassigned_grade") %>
+              </p>
             </div>
           </div>
           <%= link_to t("admin.teachers.index.manage"), edit_teacher_path(teacher), class: "rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" %>

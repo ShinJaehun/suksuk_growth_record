@@ -4,19 +4,17 @@ class Classrooms::IndexContext
   end
 
   def classrooms
-    @classrooms ||= @classrooms_scope.includes(:school).order(:grade, created_at: :desc)
+    @classrooms ||= @classrooms_scope.includes(:school, teacher: { avatar_attachment: :blob }).order(:grade, created_at: :desc)
   end
 
   def teacher_counts
-    @teacher_counts ||= teacher_memberships.group(:classroom_id).count
+    @teacher_counts ||= classrooms.to_h { |classroom| [classroom.id, classroom.teacher&.active? ? 1 : 0] }
   end
 
   def teacher_previews
-    @teacher_previews ||= classroom_membership_previews(
-      role: "teacher",
-      user_role: "teacher",
-      limit_per_classroom: 3
-    )
+    @teacher_previews ||= classrooms.to_h do |classroom|
+      [classroom.id, classroom.teacher&.active? ? [classroom.teacher] : []]
+    end
   end
 
   def student_counts
@@ -38,12 +36,6 @@ class Classrooms::IndexContext
 
   def classroom_ids
     @classroom_ids ||= classrooms.map(&:id)
-  end
-
-  def teacher_memberships
-    ClassroomMembership
-      .joins(:user)
-      .where(classroom_id: classroom_ids, role: "teacher", users: { role: "teacher", active: true })
   end
 
   def classroom_membership_previews(role:, limit_per_classroom:, user_role: nil, status: nil)

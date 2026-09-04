@@ -26,6 +26,17 @@
     </div>
 
     <div>
+      <%= label_tag :membership_grade, t("filters.grade.label"), class: "block text-sm font-medium text-gray-700" %>
+      <%= select_tag :membership_grade,
+            options_for_select(
+              (1..6).map { |grade| [t("classrooms.index.grade", grade: grade), grade] },
+              params[:membership_grade]
+            ),
+            include_blank: t("admin.teachers.index.unassigned_grade"),
+            class: "mt-1 block w-full rounded border px-3 py-2" %>
+    </div>
+
+    <div>
       <%= f.label :name, t("ui.user_labels.name"), class: "block text-sm font-medium text-gray-700" %>
       <%= f.text_field :name, class: "mt-1 block w-full border rounded px-3 py-2" %>
     </div>
@@ -103,7 +114,7 @@
 
   <%= render "classroom_fields",
         classrooms: @classrooms,
-        selected_classroom_ids: @selected_classroom_ids %>
+        selected_classroom_id: @selected_classroom_id %>
 
   <div>
     <%= f.submit t("ui.save"),

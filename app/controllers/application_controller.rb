@@ -67,11 +67,8 @@ class ApplicationController < ActionController::Base
     return [] unless current_user&.active_teacher?
     return @teacher_nav_classrooms if defined?(@teacher_nav_classrooms)
 
-    @teacher_nav_classrooms = current_user.classroom_memberships.teacher
-      .joins(classroom: :school)
-      .merge(School.active)
-      .includes(:classroom)
-      .map(&:classroom)
+    classroom = current_user.assigned_classroom
+    @teacher_nav_classrooms = classroom&.active? && classroom.school.active? ? [classroom] : []
   end
 
   def expire_inactive_teacher_session
@@ -149,16 +146,8 @@ class ApplicationController < ActionController::Base
   end
 
   def regular_teacher_landing_path_for(user)
-    classrooms = Classroom
-      .joins(:school, :classroom_memberships)
-      .merge(School.active)
-      .where(classroom_memberships: { user_id: user.id, role: "teacher" })
-      .distinct
-      .order(:id)
-      .limit(2)
-      .to_a
-
-    classrooms.one? ? classroom_path(classrooms.first) : classrooms_path
+    classroom = user.assigned_classroom
+    classroom&.active? && classroom.school.active? ? classroom_path(classroom) : classrooms_path
   end
 
   # index가 아닌 액션에서는 authorize 검증, Devise 컨트롤러는 제외

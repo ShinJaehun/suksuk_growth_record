@@ -24,14 +24,15 @@ class ClassroomMembership < ApplicationRecord
     },
     if: :numbered_active_student_membership?
   validate :one_active_classroom_per_student, if: :active_student_membership?
+  validate :teacher_memberships_are_legacy, on: :create, if: :teacher?
   validate :membership_role_must_match_user_role
-  validate :teacher_must_belong_to_classroom_school, if: :teacher?
-  validate :teacher_must_be_active, if: :teacher_assignment_changed?
   validate :classroom_must_be_active, if: :active_classroom_required?
-  validate :teacher_must_not_have_student_number, if: :teacher?
-  validate :teacher_membership_must_be_active
 
   private
+
+  def teacher_memberships_are_legacy
+    errors.add(:role, :teacher_membership_forbidden)
+  end
 
   def numbered_active_student_membership?
     student? && active? && student_number.present?
@@ -41,13 +42,7 @@ class ClassroomMembership < ApplicationRecord
     student? && active?
   end
 
-  def teacher_assignment_changed?
-    teacher? && assignment_relationship_changed?
-  end
-
   def active_classroom_required?
-    return teacher_assignment_changed? if teacher?
-
     student? && (
       assignment_relationship_changed? ||
       will_save_change_to_status?(to: "active")
@@ -79,38 +74,10 @@ class ClassroomMembership < ApplicationRecord
     errors.add(:base, :role_mismatch)
   end
 
-  def teacher_must_belong_to_classroom_school
-    return if user.blank? || classroom.blank?
-
-    school_membership = user.school_membership
-    if school_membership.blank?
-      errors.add(:base, :teacher_school_required)
-    elsif school_membership.school_id != classroom.school_id
-      errors.add(:base, :teacher_school_mismatch)
-    end
-  end
-
-  def teacher_must_be_active
-    return if user&.active?
-
-    errors.add(:user, :inactive_teacher)
-  end
-
   def classroom_must_be_active
     return if classroom&.active?
 
     errors.add(:classroom, :inactive_classroom)
   end
 
-  def teacher_must_not_have_student_number
-    return if student_number.blank?
-
-    errors.add(:student_number, :teacher_student_number_forbidden)
-  end
-
-  def teacher_membership_must_be_active
-    return unless teacher? && inactive?
-
-    errors.add(:status, :teacher_must_be_active)
-  end
 end

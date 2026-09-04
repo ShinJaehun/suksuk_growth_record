@@ -39,12 +39,18 @@ class User < ApplicationRecord
   has_one_attached :avatar
 
   before_validation :clear_student_devise_credentials, if: :student?
+  before_update :release_assigned_classroom, if: :deactivating_teacher?
 
   # 교실 멤버십은 유저 삭제 시 같이 삭제(조인 테이블)
   has_many :classroom_memberships, dependent: :destroy
   has_many :classrooms, through: :classroom_memberships
   has_one :school_membership, dependent: :destroy
   has_one :school, through: :school_membership
+  has_one :assigned_classroom,
+    class_name: "Classroom",
+    foreign_key: :teacher_id,
+    inverse_of: :teacher,
+    dependent: :nullify
 
   def self.avatar_keys_for(gender)
     AVATAR_KEYS_BY_GENDER.fetch(gender.to_s, [])
@@ -95,6 +101,14 @@ class User < ApplicationRecord
     self.encrypted_password = ""
     self.reset_password_token = nil
     self.reset_password_sent_at = nil
+  end
+
+  def deactivating_teacher?
+    teacher? && will_save_change_to_active?(from: true, to: false)
+  end
+
+  def release_assigned_classroom
+    assigned_classroom&.update!(teacher: nil)
   end
 
   def avatar_key_allowed_for_role

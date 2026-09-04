@@ -17,8 +17,9 @@ class TeachersController < ApplicationController
     @teacher = User.new(normalized_profile_attributes(create_params).merge(role: :teacher))
     authorize @teacher, :create?, policy_class: TeacherManagementPolicy
     school = managed_school
-    classroom_ids = selected_active_classroom_ids(school)
-    result = save_teacher(school, classroom_ids, attributes: {}) unless assignment_invalid?
+    membership_grade = normalized_membership_grade
+    classroom_id = selected_classroom_id(school, membership_grade)
+    result = save_teacher(school, classroom_id, attributes: {}, membership_grade: membership_grade) unless assignment_invalid?
 
     if result&.success?
       redirect_to teachers_path, notice: t('admin.teachers.create.success'), status: :see_other
@@ -29,6 +30,11 @@ class TeachersController < ApplicationController
     end
   end
 
+  def classroom_options
+    school = managed_school
+    render partial: 'teachers/classroom_options', locals: classroom_option_locals(school)
+  end
+
   def edit
     authorize @teacher, :update_profile?, policy_class: TeacherManagementPolicy
     prepare_form
@@ -37,9 +43,15 @@ class TeachersController < ApplicationController
   def update
     authorize @teacher, :update_profile?, policy_class: TeacherManagementPolicy
     school = managed_school
-    classroom_ids = selected_active_classroom_ids(school) + preserved_inactive_classroom_ids
+    membership_grade = normalized_membership_grade
+    classroom_id = selected_classroom_id(school, membership_grade)
     attributes = normalized_profile_attributes(update_params, current_avatar_key: @teacher.avatar_key)
-    result = save_teacher(school, classroom_ids.uniq, attributes: attributes) unless assignment_invalid?
+    result = save_teacher(
+      school,
+      classroom_id,
+      attributes: attributes,
+      membership_grade: membership_grade
+    ) unless assignment_invalid?
 
     if result&.success?
       redirect_to teachers_path, notice: t('admin.teachers.update.success'), status: :see_other
@@ -79,8 +91,7 @@ class TeachersController < ApplicationController
                        else
                          manager_school
                        end
-    scope = teacher_management_scope.with_attached_avatar.includes(school_membership: :school,
-                                                                   classroom_memberships: :classroom)
+    scope = teacher_management_scope.with_attached_avatar.includes(school_membership: :school, assigned_classroom: :school)
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
     if @selected_school
       scope = scope.joins(:school_membership).where(school_memberships: { school_id: @selected_school.id })
@@ -91,8 +102,65 @@ class TeachersController < ApplicationController
   def prepare_form
     @schools = manageable_schools
     @selected_school_id = managed_school&.id
-    @classrooms_by_school = @schools.index_with { |school| school.classrooms.active.order(:grade, :name, :id).load }
-    @selected_classroom_ids ||= @teacher.persisted? ? @teacher.classroom_memberships.teacher.pluck(:classroom_id) : []
+    @membership_grade = membership_grade_for_form
+    @classroom_selection_ready = @selected_school_id.present? && selected_membership_grade.present?
+    @classroom_selection_prompt_key = classroom_selection_prompt_key
+    @classroom_candidates = classroom_candidates(managed_school)
+    @selected_classroom_id = selected_classroom_id_for_form
+  end
+
+  def classroom_candidates(school)
+    return Classroom.none unless school && selected_membership_grade
+
+    school.classrooms.active
+      .where(grade: selected_membership_grade)
+      .where(teacher_id: [nil, @teacher.id])
+      .order(:name, :id)
+      .load
+  end
+
+  def classroom_option_locals(school)
+    {
+      classrooms: classroom_candidates(school),
+      selected_classroom_id: selected_classroom_id_for_form,
+      selection_ready: school.present? && selected_membership_grade.present?,
+      selection_prompt_key: classroom_selection_prompt_key
+    }
+  end
+
+  def classroom_selection_prompt_key
+    return 'admin.teachers.form.select_school_and_grade' if current_user.admin?
+
+    'admin.teachers.form.select_grade'
+  end
+
+  def selected_membership_grade
+    value = if params.key?(:membership_grade)
+              params[:membership_grade]
+            else
+              @teacher&.school_membership&.grade
+            end
+
+    value = value.to_s
+    value.to_i if value.match?(/\A[1-6]\z/)
+  end
+
+  def normalized_membership_grade
+    return @normalized_membership_grade if defined?(@normalized_membership_grade)
+
+    value = params[:membership_grade].to_s
+    return @normalized_membership_grade = nil if value.blank?
+    return @normalized_membership_grade = value.to_i if value.match?(/\A[1-6]\z/)
+
+    @teacher.errors.add(:base, t('admin.teachers.errors.membership_grade_invalid'))
+    @assignment_invalid = true
+    @normalized_membership_grade = nil
+  end
+
+  def membership_grade_for_form
+    return params[:membership_grade] if params.key?(:membership_grade)
+
+    @teacher.school_membership&.grade
   end
 
   def manageable_schools
@@ -125,24 +193,24 @@ class TeachersController < ApplicationController
     @managed_school = manageable_schools.find { |school| school.id == id.to_i } if id.match?(/\A[1-9]\d*\z/)
   end
 
-  def selected_active_classroom_ids(school)
-    raw_ids = Array(params[:classroom_ids]).reject(&:blank?)
-    valid_ids = raw_ids.filter_map { |value| value.to_i if value.to_s.match?(/\A[1-9]\d*\z/) }.uniq
-    classrooms = school ? school.classrooms.active.where(id: valid_ids) : Classroom.none
-    @selected_classroom_ids = valid_ids
-    if valid_ids.size != raw_ids.size || classrooms.count != valid_ids.size
+  def selected_classroom_id(school, membership_grade)
+    raw_id = params[:classroom_id].to_s
+    return nil if raw_id.blank?
+
+    classroom = if raw_id.match?(/\A[1-9]\d*\z/) && school && membership_grade
+                  school.classrooms.active.find_by(id: raw_id, grade: membership_grade)
+                end
+    if classroom.nil? || (classroom.teacher_id.present? && classroom.teacher_id != @teacher.id)
       @assignment_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.classroom_not_found'))
     end
-    valid_ids
+    raw_id.to_i
   end
 
-  def preserved_inactive_classroom_ids
-    @teacher.classroom_memberships.teacher
-            .joins(:classroom)
-            .merge(Classroom.inactive)
-            .where(classrooms: { school_id: managed_school&.id })
-            .pluck(:classroom_id)
+  def selected_classroom_id_for_form
+    return params[:classroom_id].presence&.to_i if params.key?(:classroom_id)
+
+    @teacher.assigned_classroom&.id
   end
 
   def assignment_invalid?
@@ -153,13 +221,13 @@ class TeachersController < ApplicationController
     @assignment_invalid == true
   end
 
-  def save_teacher(school, classroom_ids, attributes:)
-    Teachers::SaveWithAssignments.call(
+  def save_teacher(school, classroom_id, attributes:, membership_grade:)
+    Teachers::SaveWithAssignment.call(
       teacher: @teacher,
       attributes: attributes,
       school: school,
-      classroom_ids: classroom_ids,
-      assignment_scope: current_user.admin? ? :all : :school
+      membership_grade: membership_grade,
+      classroom_id: classroom_id
     )
   end
 
@@ -201,9 +269,12 @@ class TeachersController < ApplicationController
 
   def teacher_row(teacher)
     membership = teacher.school_membership
-    classrooms = teacher.classroom_memberships.select(&:teacher?).filter_map(&:classroom).sort_by do |classroom|
-      [classroom.grade, classroom.name, classroom.id]
-    end
-    { teacher: teacher, school: membership&.school, role: membership&.role, classrooms: classrooms }
+    {
+      teacher: teacher,
+      school: membership&.school,
+      membership_grade: membership&.grade,
+      role: membership&.role,
+      classroom: teacher.assigned_classroom
+    }
   end
 end

@@ -18,12 +18,9 @@ class UserPolicy < ApplicationPolicy
 
     if user&.active_teacher?
       # 담임인 반 학생들 정보만 조회 가능
-      teacher_classroom_ids = user.classroom_memberships
-        .joins(classroom: :school)
-        .merge(School.active)
-        .where(role: "teacher")
-        .pluck(:classroom_id)
-      return ClassroomMembership.exists?(user_id: record.id, classroom_id: teacher_classroom_ids)
+      classroom = user.assigned_classroom
+      return classroom&.active? && classroom.school.active? &&
+        ClassroomMembership.exists?(user_id: record.id, classroom_id: classroom.id, role: "student")
     end
     # 학생은 본인만
     user&.student? && user.id == record.id
@@ -47,12 +44,9 @@ class UserPolicy < ApplicationPolicy
     return true if user&.admin?
     return false unless user&.active_teacher?
 
-    teacher_classroom_ids = user.classroom_memberships
-      .joins(classroom: :school)
-      .merge(School.active)
-      .where(role: "teacher")
-      .pluck(:classroom_id)
-    ClassroomMembership.exists?(user_id: record.id, classroom_id: teacher_classroom_ids)
+    classroom = user.assigned_classroom
+    classroom&.active? && classroom.school.active? &&
+      ClassroomMembership.exists?(user_id: record.id, classroom_id: classroom.id, role: "student")
   end
 
   def manage_student_account?

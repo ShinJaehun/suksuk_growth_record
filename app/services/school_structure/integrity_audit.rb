@@ -7,9 +7,9 @@ module SchoolStructure
       role_mismatch: 'role mismatch',
       teacher_without_school: 'teacher without school',
       teacher_classroom_school_mismatch: 'teacher/classroom school mismatch',
-      teacher_membership_with_student_number: 'teacher membership with student number',
+      teacher_classroom_grade_mismatch: 'teacher/classroom grade mismatch',
       invalid_school_membership_user_role: 'invalid school membership user role',
-      teacher_assigned_across_multiple_schools: 'teacher assigned across multiple schools'
+      inactive_teacher_assignment: 'inactive teacher assignment'
     }.freeze
 
     Issue = Data.define(:count, :samples)
@@ -47,12 +47,18 @@ module SchoolStructure
           role_mismatch: issue(role_mismatch_scope),
           teacher_without_school: issue(teacher_without_school_scope),
           teacher_classroom_school_mismatch: issue(teacher_school_mismatch_scope),
-          teacher_membership_with_student_number: issue(teacher_with_student_number_scope),
+          teacher_classroom_grade_mismatch: issue(
+            teacher_grade_mismatch_scope,
+            sample_scope: classroom_assignment_sample_scope(teacher_grade_mismatch_scope)
+          ),
           invalid_school_membership_user_role: issue(
             invalid_school_membership_scope,
             sample_scope: invalid_school_membership_sample_scope
           ),
-          teacher_assigned_across_multiple_schools: cross_school_assignment_issue
+          inactive_teacher_assignment: issue(
+            inactive_teacher_assignment_scope,
+            sample_scope: classroom_assignment_sample_scope(inactive_teacher_assignment_scope)
+          )
         }
       )
     end
@@ -80,6 +86,17 @@ module SchoolStructure
       )
     end
 
+    def classroom_assignment_sample_scope(scope)
+      scope.select(
+        'classrooms.id AS classroom_id',
+        'classrooms.teacher_id AS user_id',
+        'classrooms.school_id AS classroom_school_id',
+        'school_memberships.school_id AS teacher_school_id',
+        'school_memberships.grade AS teacher_grade',
+        'classrooms.grade AS classroom_grade'
+      )
+    end
+
     def role_mismatch_scope
       classroom_membership_scope.where(
         '(classroom_memberships.role = :teacher AND users.role <> :teacher) OR ' \
@@ -90,22 +107,24 @@ module SchoolStructure
     end
 
     def teacher_without_school_scope
-      classroom_membership_scope
-        .where(classroom_memberships: { role: 'teacher' })
+      Classroom
+        .joins(:teacher)
+        .left_joins(teacher: :school_membership)
+        .where.not(teacher_id: nil)
         .where(school_memberships: { id: nil })
     end
 
     def teacher_school_mismatch_scope
-      classroom_membership_scope
-        .where(classroom_memberships: { role: 'teacher' })
-        .where.not(school_memberships: { id: nil })
+      Classroom
+        .joins(teacher: :school_membership)
+        .where.not(teacher_id: nil)
         .where('school_memberships.school_id <> classrooms.school_id')
     end
 
-    def teacher_with_student_number_scope
-      classroom_membership_scope
-        .where(classroom_memberships: { role: 'teacher' })
-        .where.not(classroom_memberships: { student_number: nil })
+    def teacher_grade_mismatch_scope
+      Classroom.joins(teacher: :school_membership)
+        .where.not(teacher_id: nil)
+        .where('school_memberships.grade IS NULL OR school_memberships.grade <> classrooms.grade')
     end
 
     def invalid_school_membership_scope
@@ -123,12 +142,8 @@ module SchoolStructure
       )
     end
 
-    def cross_school_assignment_scope
-      ClassroomMembership
-        .teacher
-        .joins(:classroom)
-        .group(:user_id)
-        .having('COUNT(DISTINCT classrooms.school_id) > 1')
+    def inactive_teacher_assignment_scope
+      Classroom.joins(teacher: :school_membership).where(users: { active: false })
     end
 
     def issue(scope, sample_scope: classroom_sample_scope(scope))
@@ -136,20 +151,6 @@ module SchoolStructure
         count: scope.except(:select, :order).count,
         samples: sample_attributes(sample_scope)
       )
-    end
-
-    def cross_school_assignment_issue
-      scope = cross_school_assignment_scope
-      samples = scope
-                .order(:user_id)
-                .limit(sample_limit)
-                .pluck(
-                  :user_id,
-                  Arel.sql('ARRAY_AGG(DISTINCT classrooms.school_id ORDER BY classrooms.school_id)')
-                )
-                .map { |user_id, school_ids| { 'user_id' => user_id, 'classroom_school_ids' => school_ids } }
-
-      Issue.new(count: scope.count.size, samples: samples)
     end
 
     def sample_attributes(scope)

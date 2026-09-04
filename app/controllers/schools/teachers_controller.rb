@@ -21,16 +21,16 @@ class Schools::TeachersController < ApplicationController
     pool = avatar_keys_for_gender(@teacher.gender)
     @teacher.avatar_key = pool.sample unless pool.include?(@teacher.avatar_key)
 
-    assignment_ids = selected_classroom_ids
+    classroom_id = selected_classroom_id
     assignments_invalid = classroom_assignments_invalid?
     result =
       unless assignments_invalid
-        Teachers::SaveWithAssignments.call(
+        Teachers::SaveWithAssignment.call(
           teacher: @teacher,
           attributes: {},
           school: @school,
-          classroom_ids: assignment_ids,
-          assignment_scope: :school
+          membership_grade: selected_membership_grade,
+          classroom_id: classroom_id
         )
       end
 
@@ -50,16 +50,16 @@ class Schools::TeachersController < ApplicationController
   end
 
   def update
-    selected_classroom_ids
+    selected_classroom_id
 
     result =
       unless classroom_assignments_invalid?
-        Teachers::SaveWithAssignments.call(
+        Teachers::SaveWithAssignment.call(
           teacher: @teacher,
           attributes: {},
           school: @school,
-          classroom_ids: selected_classroom_ids,
-          assignment_scope: :school
+          membership_grade: selected_membership_grade,
+          classroom_id: selected_classroom_id
         )
       end
 
@@ -105,7 +105,7 @@ class Schools::TeachersController < ApplicationController
 
   def teacher_rows
     @school.school_memberships
-      .includes(user: [{ avatar_attachment: :blob }, { classroom_memberships: :classroom }])
+      .includes(user: [{ avatar_attachment: :blob }, :assigned_classroom])
       .order(:role, :id)
       .select { |membership| membership.user.teacher? }
       .select { |membership| @teacher_status == "all" || membership.user.active? == (@teacher_status == "active") }
@@ -124,12 +124,7 @@ class Schools::TeachersController < ApplicationController
   end
 
   def school_teacher_classrooms(teacher)
-    teacher.classroom_memberships
-      .select(&:teacher?)
-      .filter_map(&:classroom)
-      .select { |classroom| classroom.school_id == @school.id }
-      .uniq(&:id)
-      .sort_by { |classroom| [classroom.grade || Float::INFINITY, classroom.name.to_s, classroom.id] }
+    [teacher.assigned_classroom].compact.select { |classroom| classroom.school_id == @school.id }
   end
 
   def teacher_school_role_label(membership)
@@ -163,24 +158,31 @@ class Schools::TeachersController < ApplicationController
 
   def load_new_form
     @classrooms = @school.classrooms.order(:grade, :name, :id).load
-    @selected_classroom_ids = [] unless defined?(@selected_classroom_ids)
+    @selected_classroom_id = nil unless defined?(@selected_classroom_id)
   end
 
-  def selected_classroom_ids
-    return @selected_classroom_ids if defined?(@selected_classroom_ids)
+  def selected_classroom_id
+    return @selected_classroom_id if defined?(@selected_classroom_id)
 
-    raw_ids = Array(params[:classroom_ids]).reject(&:blank?)
-    valid_raw_ids = raw_ids.select { |value| value.to_s.match?(/\A[1-9]\d*\z/) }
-    requested_ids = valid_raw_ids.map(&:to_i).uniq
-    classrooms = @school.classrooms.where(id: requested_ids).to_a
-    @selected_classroom_ids = classrooms.map(&:id)
+    raw_id = params[:classroom_id].to_s
+    return @selected_classroom_id = nil if raw_id.blank?
 
-    if valid_raw_ids.size != raw_ids.size || @selected_classroom_ids.sort != requested_ids.sort
+    classroom = raw_id.match?(/\A[1-9]\d*\z/) ? @school.classrooms.find_by(id: raw_id) : nil
+    unless classroom
       @classroom_assignments_invalid = true
       @teacher.errors.add(:base, t("schools.teachers.errors.classroom_not_found"))
     end
+    @selected_classroom_id = raw_id.to_i
+  end
 
-    @selected_classroom_ids
+  def selected_membership_grade
+    value = params[:membership_grade].to_s
+    return nil if value.blank?
+    return value.to_i if value.match?(/\A[1-6]\z/)
+
+    @classroom_assignments_invalid = true
+    @teacher.errors.add(:base, t("admin.teachers.errors.membership_grade_invalid"))
+    nil
   end
 
   def classroom_assignments_invalid?
@@ -189,15 +191,7 @@ class Schools::TeachersController < ApplicationController
 
   def load_edit_form
     @classrooms = @school.classrooms.order(:grade, :name, :id).load
-    @teacher_classroom_ids =
-      if params.key?(:classroom_ids)
-        selected_classroom_ids
-      else
-        @teacher.classroom_memberships.teacher
-          .joins(:classroom)
-          .where(classrooms: { school_id: @school.id })
-          .pluck(:classroom_id)
-      end
+    @selected_classroom_id = params.key?(:classroom_id) ? selected_classroom_id : @teacher.assigned_classroom&.id
   end
 
 end

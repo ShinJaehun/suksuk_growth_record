@@ -69,12 +69,10 @@ class UsersController < ApplicationController
   end
 
   def teacher_managed_classroom_for(user)
-    Classroom
-      .joins(:classroom_memberships)
-      .where(classroom_memberships: { user_id: current_user.id, role: "teacher" })
-      .where(id: user.classroom_ids)
-      .order(created_at: :asc)
-      .first
+    classroom = current_user.assigned_classroom
+    return unless classroom
+
+    classroom if user.classroom_ids.include?(classroom.id)
   end
 
 end

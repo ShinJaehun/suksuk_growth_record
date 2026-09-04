@@ -13,6 +13,6 @@ class ClassroomStudentPolicy < ApplicationPolicy
   
   def teacher_of?(classroom)
     return false unless teacher?
-    classroom.classroom_memberships.exists?(user_id: user.id, role: "teacher")
+    classroom.teacher_id == user.id
   end
 end

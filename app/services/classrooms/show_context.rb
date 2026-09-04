@@ -16,11 +16,7 @@ class Classrooms::ShowContext
   end
 
   def homeroom_teachers
-    @homeroom_teachers ||= User.teacher.active
-      .joins(:classroom_memberships)
-      .where(classroom_memberships: { classroom_id: @classroom.id, role: "teacher" })
-      .with_attached_avatar
-      .order(:name, :id)
+    @homeroom_teachers ||= [@classroom.teacher].compact.select(&:active?)
   end
 
 end

@@ -7,10 +7,10 @@ module SchoolMemberships
       skipped = 0
       conflicts = 0
 
-      ClassroomMembership.teacher.includes(:user, classroom: :school).find_each do |classroom_membership|
+      Classroom.where.not(teacher_id: nil).includes(:teacher, :school).find_each do |classroom|
         result = EnsureForTeacher.call(
-          teacher: classroom_membership.user,
-          school: classroom_membership.classroom.school
+          teacher: classroom.teacher,
+          school: classroom.school
         )
         case result
         when :created then created += 1

@@ -25,10 +25,7 @@ class ClassroomsController < ApplicationController
     @classroom_student_previews = context.student_previews
     assigned_classroom_ids =
       if current_user.active_teacher?
-        current_user.classroom_memberships
-          .where(role: "teacher", classroom_id: classroom_ids)
-          .pluck(:classroom_id)
-          .to_set
+        classroom_ids.include?(current_user.assigned_classroom&.id) ? [current_user.assigned_classroom.id].to_set : Set.new
       else
         Set.new
       end

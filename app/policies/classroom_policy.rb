@@ -10,10 +10,9 @@ class ClassroomPolicy < ApplicationPolicy
 
       # Teachers can see only their classrooms
       if user&.active_teacher?
-        return scope.joins(:school, :classroom_memberships)
+        return scope.joins(:school)
                     .merge(School.active)
-                    .where(classroom_memberships: { user_id: user.id, role: 'teacher' })
-                    .distinct
+                    .where(teacher_id: user.id, active: true)
       end
 
       # Students can see only their classrooms
@@ -100,7 +99,7 @@ class ClassroomPolicy < ApplicationPolicy
   def teacher_of?(classroom)
     return false unless user&.active_teacher?
 
-    classroom.classroom_memberships.exists?(user_id: user.id, role: 'teacher')
+    classroom.teacher_id == user.id
   end
 
   def member_of?(classroom)

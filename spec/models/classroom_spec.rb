@@ -108,19 +108,16 @@ RSpec.describe Classroom, type: :model do
     classroom = create(:classroom)
     active_student = create(:user, :student)
     inactive_student = create(:user, :student)
-    teacher = create(:user, :teacher)
     create(:classroom_membership, classroom: classroom, user: active_student, role: "student")
     create(:classroom_membership, classroom: classroom, user: inactive_student, role: "student", status: "inactive")
-    create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
 
     expect(classroom.students).to contain_exactly(active_student)
   end
 
   describe "hard delete safety" do
-    it "allows deletion when only teacher memberships exist" do
-      classroom = create(:classroom)
-      teacher = create(:user, :teacher)
-      create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
+    it "allows deletion when a teacher is assigned and there are no students" do
+      membership = create(:school_membership, grade: 4)
+      classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
 
       expect(classroom.destroy).to be_truthy
       expect(Classroom.exists?(classroom.id)).to eq(false)
@@ -147,5 +144,44 @@ RSpec.describe Classroom, type: :model do
       expect(ClassroomMembership.exists?(membership.id)).to eq(true)
     end
 
+  end
+
+
+  describe "teacher assignment" do
+    it "allows one active teacher from the same school and grade" do
+      membership = create(:school_membership, grade: 4)
+      classroom = build(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+
+      expect(classroom).to be_valid
+    end
+
+    it "rejects assigning one teacher to two classrooms" do
+      membership = create(:school_membership, grade: 4)
+      create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+
+      duplicate = build(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      expect(duplicate).not_to be_valid
+    end
+
+    it "rejects school, grade, lifecycle, and role mismatches" do
+      membership = create(:school_membership, grade: 4)
+      invalid = [
+        build(:classroom, school: create(:school), grade: 4, teacher: membership.user),
+        build(:classroom, school: membership.school, grade: 5, teacher: membership.user),
+        build(:classroom, school: membership.school, grade: 4, active: false, teacher: membership.user),
+        build(:classroom, teacher: create(:user, :student))
+      ]
+
+      expect(invalid).to all(be_invalid)
+    end
+
+    it "releases its teacher when deactivated" do
+      membership = create(:school_membership, grade: 4)
+      classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+
+      classroom.update!(active: false)
+
+      expect(classroom.reload.teacher).to be_nil
+    end
   end
 end
