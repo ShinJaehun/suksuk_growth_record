@@ -203,6 +203,48 @@ global admin과 학교 대표 선생님은 권한 범위에서 classroom 추가,
 
 bulk update의 atomic transaction, row validation, rollback, dirty tracking은 별도 canonical spec에서 정의한다.
 
+## 운영 후보 선택 UI의 확장성
+
+### 공통 후보 선택 원칙
+
+학교 운영 UI에서 teacher 또는 classroom 후보를 선택할 때 전체 후보를 무제한으로 한 번에 렌더링하지 않는다. 먼저 사용자가 관리할 수 있는 school scope를 확정한 뒤 그 school 안에서만 후보를 조회하고, 현재 모델에 존재하거나 기존 관계에서 파생할 수 있는 기준으로 후보를 좁힌다.
+
+- server-side policy scope와 validation을 최종 권한 경계로 사용하며 검색과 필터는 그 범위를 넓힐 수 없다.
+- 모든 school의 후보 데이터를 HTML이나 JavaScript에 미리 내려받고 화면에서 숨기는 방식은 사용하지 않는다.
+- 필요하면 GET query parameter, Turbo Frame 부분 갱신 또는 server-side pagination으로 필요한 범위만 조회한다.
+- 구체적인 전송 방식은 구현 시점의 starter 구조와 데이터 규모에 맞는 가장 단순한 방식을 선택하며 autocomplete나 외부 검색 library 도입을 요구하지 않는다.
+- 후보 조회에서 N+1 query를 만들지 않는다.
+- 필터 편의를 위한 `teacher.grade`, `SchoolMembership.grade` 등의 중복 속성이나 별도 Grade 모델을 추가하지 않는다.
+
+### Teacher의 학년 파생 의미
+
+teacher의 학년은 별도 저장 값이 아니라 `ClassroomMembership(role: teacher)`과 연결된 `Classroom.grade`에서 파생한다.
+
+- `1학년`부터 `6학년`: 해당 grade의 classroom에 teacher membership이 하나라도 있는 teacher
+- `미배정`: teacher 역할의 `ClassroomMembership`이 하나도 없는 teacher
+- `전체`: 현재 허용된 school scope의 모든 대상 teacher
+
+한 teacher가 여러 학년의 classroom을 담당하면 해당하는 각 학년 필터 결과에 모두 포함한다.
+
+### `/teachers/new`, `/teachers/:id/edit` classroom picker
+
+global admin은 teacher form에서 school을 먼저 선택하고, 선택한 school의 active classroom만 assignment 후보로 조회한다. 그 후보를 `Classroom.grade`의 전체 또는 1학년부터 6학년 기준으로 좁힌 뒤 복수 선택할 수 있다. 선택하지 않은 다른 school의 classroom은 HTML 후보 목록에 포함하지 않는다.
+
+학교 대표 선생님의 school은 자신의 membership이 속한 학교로 고정한다. school 선택 UI를 제공하지 않으며 자기 학교의 active classroom만 전체 또는 1학년부터 6학년 기준으로 좁혀 복수 선택할 수 있다.
+
+두 역할 모두 inactive classroom을 신규 assignment 후보로 받지 않는다. 기존 teacher에게 이미 연결된 inactive classroom membership은 picker 필터링이나 update 때문에 우발적으로 삭제하지 않는다. 다른 school 또는 inactive classroom ID를 직접 제출해도 서버에서 거부한다. 버튼, tab 또는 select 중 구체적인 grade filter UI는 기존 starter UI와의 일관성을 기준으로 구현 단계에서 결정한다.
+
+### `/schools/:id/edit` 대표 선생님 picker
+
+대표 선생님 후보는 global admin이 선택한 현재 school에 소속된 active teacher로 제한한다. 모든 teacher를 긴 `<select>`에 무제한으로 렌더링하는 형태로 고정하지 않고, 다음 기준을 server-side scope 안에서 조합해 좁힐 수 있게 한다.
+
+- 검색: 이름 또는 이메일
+- 학년: 전체, 1학년부터 6학년, 미배정
+
+학년과 미배정의 의미는 이 문서의 teacher 학년 파생 정의를 따른다. 후보에는 동명이인을 구별할 수 있도록 이름, 이메일과 현재 담당 classroom 요약을 함께 표시한다. 담당 classroom이 없는 teacher는 미배정 상태를 명확히 표시한다.
+
+이 picker는 manager role의 승격·강등 권한을 변경하지 않는다. 대표 선생님 선택과 role 변경은 기존 정책대로 global admin만 수행한다.
+
 ## 권한 검증 원칙
 
 - navigation과 UI 숨김은 편의 수단이며 권한의 최종 방어선이 아니다.
@@ -253,6 +295,20 @@ bulk update의 atomic transaction, row validation, rollback, dirty tracking은 �
 23. 신규 teacher assignment는 active teacher, active classroom과 동일 학교 조건을 모두 만족해야 한다.
 24. `/admin/teachers`와 `/admin/classrooms` school operations 화면은 global admin만 접근할 수 있다.
 25. classroom 학년 동작은 `classroom_grade_foundation.md`의 데이터·표시·필터·정렬 정책을 유지한다.
+26. global admin의 teacher form은 모든 학교의 classroom을 한 번에 렌더링하지 않는다.
+27. global admin은 school을 먼저 선택하고 해당 school의 active classroom만 assignment 후보로 조회한다.
+28. 학교 대표 선생님의 teacher form은 자기 학교의 classroom만 후보로 조회한다.
+29. teacher form의 classroom 후보는 `Classroom.grade`의 전체 또는 1학년부터 6학년 기준으로 좁힐 수 있다.
+30. 다른 school 또는 inactive classroom의 신규 assignment는 직접 parameter를 제출해도 서버에서 차단된다.
+31. 기존 inactive classroom assignment는 form의 후보 filtering이나 update 때문에 우발적으로 삭제되지 않는다.
+32. teacher의 학년은 별도 저장하지 않고 teacher `ClassroomMembership`과 `Classroom.grade`에서 파생한다.
+33. 여러 학년을 담당하는 teacher는 해당하는 각 학년 filter 결과에 모두 포함된다.
+34. teacher membership이 없는 teacher는 미배정 filter로 조회할 수 있다.
+35. school manager 후보 검색은 현재 school에 소속된 active teacher만 대상으로 한다.
+36. school manager 후보는 이름 또는 이메일로 검색할 수 있다.
+37. 동명이인 후보는 이메일과 현재 담당 classroom 정보로 구별할 수 있고, 담당 classroom이 없으면 미배정 상태를 표시한다.
+38. teacher와 classroom 후보 선택 UI는 scope 전체 데이터를 무제한으로 사전 loading하거나 숨겨서 rendering하지 않는다.
+39. 후보 검색, grade filtering과 직접 parameter 조작은 policy scope 또는 authorization 범위를 넓히지 않는다.
 
 ## 제약
 
@@ -276,3 +332,5 @@ bulk update의 atomic transaction, row validation, rollback, dirty tracking은 �
 - 학생 도메인 재설계
 - 성장기록 기능
 - 서비스별 비즈니스 기능 추가
+- teacher/classroom picker의 controller, view, policy, route, Stimulus 또는 Turbo Frame 구현
+- 후보 pagination 또는 autocomplete 구현과 외부 검색 library 도입
