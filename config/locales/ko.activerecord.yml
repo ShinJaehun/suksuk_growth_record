@@ -25,3 +25,7 @@ ko:
               teacher_student_number_forbidden: "교사 배정에는 출석번호를 지정할 수 없습니다."
             status:
               teacher_must_be_active: "교사 소속은 비활성화할 수 없습니다."
+            user:
+              inactive_teacher: "비활성 선생님은 담당 학급에 배정할 수 없습니다."
+            classroom:
+              inactive_classroom: "비활성 학급에는 구성원을 배정할 수 없습니다."

@@ -221,9 +221,10 @@ RSpec.describe 'Classroom organization settings', type: :request do
   it 'counts and previews only active teachers on the classrooms index' do
     classroom = create(:classroom, school: school, name: '운영 교사 학급')
     active_teacher = create(:user, :teacher, name: '활성 담당 교사')
-    inactive_teacher = create(:user, :teacher, name: '비활성 담당 교사', active: false)
+    inactive_teacher = create(:user, :teacher)
     create(:classroom_membership, classroom: classroom, user: active_teacher, role: :teacher)
     create(:classroom_membership, classroom: classroom, user: inactive_teacher, role: :teacher)
+    inactive_teacher.update!(active: false)
     sign_in admin
 
     get classrooms_path
@@ -259,9 +260,10 @@ RSpec.describe 'Classroom organization settings', type: :request do
   it 'shows only active homeroom teachers on the classroom page' do
     classroom = create(:classroom, school: school)
     active_teacher = create(:user, :teacher, name: '활성 담임')
-    inactive_teacher = create(:user, :teacher, name: '비활성 담임', active: false)
+    inactive_teacher = create(:user, :teacher, name: '비활성 담임')
     create(:classroom_membership, classroom: classroom, user: active_teacher, role: :teacher)
     create(:classroom_membership, classroom: classroom, user: inactive_teacher, role: :teacher)
+    inactive_teacher.update!(active: false)
     sign_in admin
 
     get classroom_path(classroom)

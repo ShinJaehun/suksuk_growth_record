@@ -314,6 +314,61 @@ RSpec.describe ClassroomMembership, type: :model do
     expect(membership).to be_valid
   end
 
+  it "rejects assigning an inactive teacher" do
+    school = create(:school)
+    teacher = create(:user, :teacher, active: false)
+    create(:school_membership, user: teacher, school: school)
+    membership = build(
+      :classroom_membership,
+      user: teacher,
+      classroom: create(:classroom, school: school),
+      role: "teacher"
+    )
+
+    expect(membership).not_to be_valid
+    expect(membership.errors.added?(:user, :inactive_teacher)).to eq(true)
+  end
+
+  it "rejects assigning a teacher to an inactive classroom" do
+    school = create(:school)
+    teacher = create(:user, :teacher)
+    create(:school_membership, user: teacher, school: school)
+    membership = build(
+      :classroom_membership,
+      user: teacher,
+      classroom: create(:classroom, school: school, active: false),
+      role: "teacher"
+    )
+
+    expect(membership).not_to be_valid
+    expect(membership.errors.added?(:classroom, :inactive_classroom)).to eq(true)
+  end
+
+  it "allows multiple active teachers in one active classroom" do
+    school = create(:school)
+    classroom = create(:classroom, school: school)
+    teachers = create_list(:user, 2, :teacher)
+    teachers.each { |teacher| create(:school_membership, user: teacher, school: school) }
+
+    memberships = teachers.map do |teacher|
+      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    end
+
+    expect(memberships).to all(be_persisted)
+  end
+
+  it "preserves a teacher membership through teacher and classroom deactivation" do
+    school = create(:school)
+    classroom = create(:classroom, school: school)
+    teacher = create(:user, :teacher)
+    create(:school_membership, user: teacher, school: school)
+    membership = create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+
+    expect(teacher.update(active: false)).to eq(true)
+    expect(classroom.update(active: false)).to eq(true)
+    expect(described_class.exists?(membership.id)).to eq(true)
+  end
+
   it "rejects a teacher assignment without a school membership" do
     membership = described_class.new(
       user: create(:user, :teacher),
@@ -381,6 +436,66 @@ RSpec.describe ClassroomMembership, type: :model do
 
     expect(active_membership).to be_valid
     expect(inactive_membership).to be_valid
+  end
+
+  it "rejects a new student membership in an inactive classroom" do
+    inactive_classroom = create(:classroom, active: false)
+
+    %w[active inactive].each do |status|
+      membership = build(
+        :classroom_membership,
+        user: create(:user, :student),
+        classroom: inactive_classroom,
+        role: "student",
+        status: status
+      )
+
+      expect(membership).not_to be_valid
+      expect(membership.errors.added?(:classroom, :inactive_classroom)).to eq(true)
+    end
+  end
+
+  it "rejects moving a student membership to an inactive classroom" do
+    membership = create(
+      :classroom_membership,
+      user: student,
+      classroom: first_classroom,
+      role: "student",
+      status: "inactive"
+    )
+    inactive_classroom = create(:classroom, active: false)
+
+    expect(membership.update(classroom: inactive_classroom)).to eq(false)
+    expect(membership.errors.added?(:classroom, :inactive_classroom)).to eq(true)
+    expect(membership.reload.classroom).to eq(first_classroom)
+  end
+
+  it "rejects reactivating a student membership in an inactive classroom" do
+    membership = create(
+      :classroom_membership,
+      user: student,
+      classroom: first_classroom,
+      role: "student",
+      status: "inactive"
+    )
+    first_classroom.update!(active: false)
+
+    expect(membership.update(status: "active")).to eq(false)
+    expect(membership.errors.added?(:classroom, :inactive_classroom)).to eq(true)
+    expect(membership.reload).to be_inactive
+  end
+
+  it "preserves an existing student membership when its classroom is deactivated" do
+    membership = create(
+      :classroom_membership,
+      user: student,
+      classroom: first_classroom,
+      role: "student",
+      status: "active"
+    )
+
+    expect(first_classroom.update(active: false)).to eq(true)
+    expect(described_class.exists?(membership.id)).to eq(true)
   end
 
   it "allows different students to each have an active membership" do

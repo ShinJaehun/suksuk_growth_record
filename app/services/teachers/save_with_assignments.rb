@@ -42,8 +42,8 @@ module Teachers
       end
 
       result
-    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique, ActiveRecord::RecordNotDestroyed => error
-      copy_persistence_errors(error)
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique, ActiveRecord::RecordNotDestroyed => e
+      copy_persistence_errors(e)
       result
     end
 
@@ -72,6 +72,7 @@ module Teachers
       validate_school
       validate_classrooms
       validate_inactive_school
+      validate_assignment_lifecycle
     end
 
     def validate_teacher
@@ -116,6 +117,16 @@ module Teachers
       end
 
       add_inactive_school_error if (classroom_ids - managed_assignment_ids).any?
+    end
+
+    def validate_assignment_lifecycle
+      new_assignment_ids = classroom_ids - existing_assignment_ids
+      return if new_assignment_ids.empty?
+
+      add_error(:inactive_teacher) if teacher.inactive?
+      add_error(:inactive_classroom) if classrooms_by_id.values_at(*new_assignment_ids).compact.any? do |classroom|
+        !classroom.active?
+      end
     end
 
     def remove_teacher_assignments!
@@ -169,6 +180,12 @@ module Teachers
       managed_assignments.pluck(:classroom_id)
     end
 
+    def existing_assignment_ids
+      return [] unless teacher.persisted?
+
+      teacher.classroom_memberships.teacher.pluck(:classroom_id)
+    end
+
     def school_changed?
       current_school_id = teacher.school_membership&.school_id
       current_school_id.present? && current_school_id != school&.id
@@ -187,13 +204,13 @@ module Teachers
     end
 
     def add_inactive_school_error
-      teacher.errors.add(:base, I18n.t("school_status.inactive_school"))
+      teacher.errors.add(:base, I18n.t('school_status.inactive_school'))
     end
 
     def copy_persistence_errors(error)
       record = error.respond_to?(:record) ? error.record : nil
       if record.equal?(teacher)
-        return
+        nil
       elsif record&.errors&.any?
         record.errors.full_messages.each { |message| teacher.errors.add(:base, message) }
       else

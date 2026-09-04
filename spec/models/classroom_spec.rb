@@ -7,6 +7,18 @@ RSpec.describe Classroom, type: :model do
     expect(classroom.student_login_token).to be_present
   end
 
+  it "is active by default" do
+    expect(described_class.new).to be_active
+  end
+
+  it "scopes active and inactive classrooms" do
+    active_classroom = create(:classroom)
+    inactive_classroom = create(:classroom, active: false)
+
+    expect(described_class.active).to contain_exactly(active_classroom)
+    expect(described_class.inactive).to contain_exactly(inactive_classroom)
+  end
+
   it "allows a name with 50 characters" do
     classroom = build(:classroom, name: "가" * 50)
 

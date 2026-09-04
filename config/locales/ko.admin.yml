@@ -70,6 +70,8 @@ ko:
         classroom_school_mismatch: "선택한 학교에 속하지 않은 학급이 포함되어 있습니다."
         school_required_for_classrooms: "학교 소속이 없으면 담당 학급을 지정할 수 없습니다."
         assignment_save_failed: "학교와 담당 학급을 저장하지 못했습니다."
+        inactive_teacher: "비활성 선생님에게 담당 학급을 배정할 수 없습니다."
+        inactive_classroom: "비활성 학급에는 선생님을 배정할 수 없습니다."
         assignment_selection_required: "학교와 담당 학급의 최종 상태를 함께 선택해 주세요."
         teacher_required: "선생님 계정만 학교와 담당 학급을 변경할 수 있습니다."
       create:

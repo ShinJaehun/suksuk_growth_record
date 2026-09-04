@@ -26,6 +26,8 @@ class ClassroomMembership < ApplicationRecord
   validate :one_active_classroom_per_student, if: :active_student_membership?
   validate :membership_role_must_match_user_role
   validate :teacher_must_belong_to_classroom_school, if: :teacher?
+  validate :teacher_must_be_active, if: :teacher_assignment_changed?
+  validate :classroom_must_be_active, if: :active_classroom_required?
   validate :teacher_must_not_have_student_number, if: :teacher?
   validate :teacher_membership_must_be_active
 
@@ -37,6 +39,26 @@ class ClassroomMembership < ApplicationRecord
 
   def active_student_membership?
     student? && active?
+  end
+
+  def teacher_assignment_changed?
+    teacher? && assignment_relationship_changed?
+  end
+
+  def active_classroom_required?
+    return teacher_assignment_changed? if teacher?
+
+    student? && (
+      assignment_relationship_changed? ||
+      will_save_change_to_status?(to: "active")
+    )
+  end
+
+  def assignment_relationship_changed?
+    new_record? ||
+      will_save_change_to_user_id? ||
+      will_save_change_to_classroom_id? ||
+      will_save_change_to_role?
   end
 
   def one_active_classroom_per_student
@@ -66,6 +88,18 @@ class ClassroomMembership < ApplicationRecord
     elsif school_membership.school_id != classroom.school_id
       errors.add(:base, :teacher_school_mismatch)
     end
+  end
+
+  def teacher_must_be_active
+    return if user&.active?
+
+    errors.add(:user, :inactive_teacher)
+  end
+
+  def classroom_must_be_active
+    return if classroom&.active?
+
+    errors.add(:classroom, :inactive_classroom)
   end
 
   def teacher_must_not_have_student_number

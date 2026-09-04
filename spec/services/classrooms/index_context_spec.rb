@@ -41,9 +41,10 @@ RSpec.describe Classrooms::IndexContext do
     teachers.each do |teacher|
       create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
     end
-    inactive_teacher = create(:user, :teacher, active: false)
+    inactive_teacher = create(:user, :teacher)
     legacy_admin = create(:user, :admin)
     create(:classroom_membership, classroom: classroom, user: inactive_teacher, role: 'teacher')
+    inactive_teacher.update!(active: false)
     insert_legacy_teacher_membership!(user: legacy_admin, classroom: classroom)
     outside_classroom = create(:classroom)
     outside_teacher = create(:user, :teacher)

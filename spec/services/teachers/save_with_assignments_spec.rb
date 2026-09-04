@@ -105,6 +105,66 @@ RSpec.describe Teachers::SaveWithAssignments do
     expect(teacher.classroom_memberships.teacher.count).to eq(3)
   end
 
+  it "rejects adding an assignment to an inactive teacher without partial changes" do
+    school = create(:school)
+    existing_classroom = create(:classroom, school: school)
+    added_classroom = create(:classroom, school: school)
+    teacher = create(:school_membership, school: school).user
+    assignment = create(:classroom_membership, user: teacher, classroom: existing_classroom, role: :teacher)
+    teacher.update!(active: false)
+
+    result = call_service(
+      teacher: teacher,
+      school: school,
+      classroom_ids: [existing_classroom.id, added_classroom.id]
+    )
+
+    expect(result).not_to be_success
+    expect(teacher.errors.full_messages).to include(
+      I18n.t("admin.teachers.errors.inactive_teacher")
+    )
+    expect(teacher.classroom_memberships.teacher.pluck(:id)).to contain_exactly(assignment.id)
+  end
+
+  it "rejects adding an inactive classroom without partial changes" do
+    school = create(:school)
+    existing_classroom = create(:classroom, school: school)
+    inactive_classroom = create(:classroom, school: school, active: false)
+    teacher = create(:school_membership, school: school).user
+    assignment = create(:classroom_membership, user: teacher, classroom: existing_classroom, role: :teacher)
+
+    result = call_service(
+      teacher: teacher,
+      school: school,
+      classroom_ids: [existing_classroom.id, inactive_classroom.id]
+    )
+
+    expect(result).not_to be_success
+    expect(teacher.errors.full_messages).to include(
+      I18n.t("admin.teachers.errors.inactive_classroom")
+    )
+    expect(teacher.classroom_memberships.teacher.pluck(:id)).to contain_exactly(assignment.id)
+  end
+
+  it "preserves an inactive teacher's existing assignments" do
+    school = create(:school)
+    classroom = create(:classroom, school: school)
+    teacher = create(:school_membership, school: school).user
+    assignment = create(:classroom_membership, user: teacher, classroom: classroom, role: :teacher)
+    teacher.update!(active: false)
+
+    result = call_service(
+      teacher: teacher,
+      attributes: { name: "비활성 교사" },
+      school: school,
+      classroom_ids: [classroom.id]
+    )
+
+    expect(result).to be_success
+    expect(teacher.reload.name).to eq("비활성 교사")
+    expect(teacher.classroom_memberships.teacher.pluck(:id)).to contain_exactly(assignment.id)
+  end
+
   it "moves a teacher to another school and replaces classroom assignments" do
     old_school = create(:school)
     new_school = create(:school)

@@ -10,6 +10,9 @@ class Classroom < ApplicationRecord
     has_many :users, through: :classroom_memberships
     before_destroy :prevent_destroy_with_students, prepend: true
 
+    scope :active, -> { where(active: true) }
+    scope :inactive, -> { where(active: false) }
+
     def students
       users.merge(ClassroomMembership.where(role: "student", status: "active"))
     end
