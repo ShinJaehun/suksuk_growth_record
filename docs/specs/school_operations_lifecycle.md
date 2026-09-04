@@ -50,6 +50,7 @@ global admin도 Pundit policy, `policy_scope`와 서버 검증을 우회하지 �
 `/teachers`에서 다음을 할 수 있다.
 
 - 자기 학교 teacher 조회 및 추가
+- 자기 학교에 새 teacher를 생성할 때 최초 `password`와 `password_confirmation` 설정
 - 자기 학교 teacher의 이름, 이메일, 성별, avatar 등 현재 starter가 지원하는 일반 profile 수정
 - 자기 학교 일반 선생님(`SchoolMembership member`)의 활성/비활성 변경
 - 자기 학교 teacher의 복수 담당 교실 배정·해제
@@ -60,7 +61,7 @@ global admin도 Pundit policy, `policy_scope`와 서버 검증을 우회하지 �
 - 다른 학교 teacher 조회·수정 또는 다른 학교로 이동
 - teacher의 global admin 권한 부여·해제
 - manager role 승격·강등
-- 비밀번호 직접 설정
+- 기존 teacher의 비밀번호 직접 변경 또는 초기화
 - 자기 자신을 포함한 manager 계정의 활성/비활성 변경
 
 manager lifecycle은 manager 수나 다른 active manager 존재 여부와 관계없이 global admin만 관리한다. 일반 profile 편집 권한과 lifecycle·role 변경 권한은 서로 분리한다.
@@ -174,7 +175,9 @@ global admin도 학교 불일치 assignment를 만들 수 없다. inactive teach
 
 기본 기능은 teacher 목록, teacher 추가, 일반 profile 편집과 복수 담당 classroom 배정·해제다. 학교 대표 선생님은 자기 학교의 `SchoolMembership member` teacher만 활성/비활성 변경할 수 있고, global admin은 member teacher와 manager teacher 모두 활성/비활성 변경할 수 있다. manager role 승격·강등은 기존처럼 global admin 전용이다. global admin에게는 학교 범위 선택을 제공할 수 있지만 학교 대표 선생님에게 다른 학교 선택 UI나 parameter를 제공하지 않는다. 모든 record 조회와 변경은 서버에서 역할별 school scope를 다시 검증한다.
 
-기존 학교 대표 선생님용 교사 관리 기능을 `/teachers` 일반 운영 영역으로 통합할 때 manager가 사용하는 teacher profile strong parameters에서는 `password`와 `password_confirmation`을 허용하지 않는다. 별도 비밀번호 초기화 정책이 정의되기 전까지 학교 대표 선생님은 다른 교사의 비밀번호를 직접 설정하거나 변경할 수 없다.
+학교 대표 선생님은 자기 학교에 새 teacher를 생성할 때 최초 인증 정보를 설정하기 위해 `password`와 `password_confirmation`을 입력할 수 있다. global admin의 기존 teacher 생성 password 흐름도 유지한다.
+
+기존 teacher를 update할 때 학교 대표 선생님에게 허용되는 속성은 name, email, gender, avatar와 허용된 classroom assignments 등 일반 profile·운영 정보로 제한한다. update strong parameters에는 `password`와 `password_confirmation`을 허용하지 않으며, 일반 profile 수정 권한이 비밀번호 변경 권한으로 확대되어서는 안 된다. 기존 teacher의 비밀번호 변경·초기화는 별도 password reset 정책으로 정의하기 전까지 이 기능의 범위에 포함하지 않는다.
 
 ## `/classrooms` 일반 운영 영역
 
@@ -213,7 +216,7 @@ bulk update의 atomic transaction, row validation, rollback, dirty tracking은 �
 
 다음은 canonical policy와 현재 구현의 차이이며 후속 구현에서 해소한다.
 
-1. `Schools::TeachersController#teacher_params`는 manager에게 password 직접 설정을 허용한다. `/teachers` 일반 운영 구현에서는 password 관련 parameter를 제거해야 한다.
+1. `Schools::TeachersController#teacher_params`는 create와 update에 공통으로 password 관련 parameter를 허용한다. `/teachers` 일반 운영 구현에서는 manager의 create에만 최초 `password`와 `password_confirmation`을 허용하고 update에서는 제외하도록 strong parameters를 분리해야 한다.
 2. `UserPolicy#update?`는 현재 global admin만 허용한다. 자기 학교 manager의 일반 teacher profile 편집 권한을 profile 전용 정책 경계로 추가해야 한다.
 3. `Classroom.active`가 없다. 후속 migration에서 `default: true`, `null: false`로 추가하고 model, policy와 scope에 반영해야 한다.
 4. inactive classroom의 신규 assignment와 일반 mutation을 차단하는 서버 검증이 없다.
@@ -240,14 +243,16 @@ bulk update의 atomic transaction, row validation, rollback, dirty tracking은 �
 13. classroom 비활성화는 기존 membership과 학생·서비스 기록을 보존한다.
 14. inactive classroom은 일반 선생님의 목록, 자동 진입과 mutation 대상에서 제외된다.
 15. 학교 대표 선생님과 global admin은 각자의 관리 범위에서 inactive classroom을 조회하고 재활성화할 수 있다.
-16. 학교 대표 선생님은 자기 학교 teacher와 자신의 이름·이메일·성별·avatar 등 일반 profile을 수정할 수 있다.
-17. 학교 대표 선생님은 teacher를 다른 학교로 이동하거나 manager role 또는 global admin 권한을 변경하거나 비밀번호를 직접 설정할 수 없다.
-18. 학교 대표 선생님은 자기 자신이나 같은 학교의 다른 manager 계정을 비활성화·재활성화할 수 없다.
-19. manager 계정의 활성/비활성 및 manager role 승격·강등은 global admin만 수행할 수 있다.
-20. teacher와 classroom의 lifecycle 전환은 기존 membership과 과거 기록을 삭제하지 않는다.
-21. 신규 teacher assignment는 active teacher, active classroom과 동일 학교 조건을 모두 만족해야 한다.
-22. `/admin/teachers`와 `/admin/classrooms` school operations 화면은 global admin만 접근할 수 있다.
-23. classroom 학년 동작은 `classroom_grade_foundation.md`의 데이터·표시·필터·정렬 정책을 유지한다.
+16. 학교 대표 선생님은 자기 학교에 새 teacher를 생성할 때 최초 `password`와 `password_confirmation`을 설정할 수 있다.
+17. 학교 대표 선생님은 자기 학교 teacher와 자신의 이름·이메일·성별·avatar 등 일반 profile을 수정할 수 있지만 기존 teacher의 `password`와 `password_confirmation`은 update할 수 없다.
+18. 학교 대표 선생님의 일반 profile 수정 권한은 기존 teacher의 비밀번호 변경·초기화 권한으로 확대되지 않는다.
+19. 학교 대표 선생님은 teacher를 다른 학교로 이동하거나 manager role 또는 global admin 권한을 변경할 수 없다.
+20. 학교 대표 선생님은 자기 자신이나 같은 학교의 다른 manager 계정을 비활성화·재활성화할 수 없다.
+21. manager 계정의 활성/비활성 및 manager role 승격·강등은 global admin만 수행할 수 있다.
+22. teacher와 classroom의 lifecycle 전환은 기존 membership과 과거 기록을 삭제하지 않는다.
+23. 신규 teacher assignment는 active teacher, active classroom과 동일 학교 조건을 모두 만족해야 한다.
+24. `/admin/teachers`와 `/admin/classrooms` school operations 화면은 global admin만 접근할 수 있다.
+25. classroom 학년 동작은 `classroom_grade_foundation.md`의 데이터·표시·필터·정렬 정책을 유지한다.
 
 ## 제약
 
