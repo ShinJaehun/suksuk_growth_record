@@ -15,15 +15,16 @@ RSpec.describe Classrooms::IndexContext do
                                 })
   end
 
-  it 'returns only the supplied classrooms in reverse creation order with schools loaded' do
-    older = create(:classroom, school: school, created_at: 2.days.ago)
-    newer = create(:classroom, school: school, created_at: 1.day.ago)
+  it 'orders supplied classrooms by grade and then reverse creation time with schools loaded' do
+    older = create(:classroom, school: school, grade: 4, created_at: 2.days.ago)
+    newer = create(:classroom, school: school, grade: 4, created_at: 1.day.ago)
+    lower_grade = create(:classroom, school: school, grade: 3, created_at: Time.current)
     create(:classroom, school: school, created_at: Time.current)
-    scope = Classroom.where(id: [older.id, newer.id])
+    scope = Classroom.where(id: [older.id, newer.id, lower_grade.id])
 
     classrooms = described_class.new(classrooms_scope: scope).classrooms.load
 
-    expect(classrooms).to eq([newer, older])
+    expect(classrooms).to eq([lower_grade, newer, older])
     expect(classrooms).to all(satisfy { |classroom| classroom.association(:school).loaded? })
   end
 

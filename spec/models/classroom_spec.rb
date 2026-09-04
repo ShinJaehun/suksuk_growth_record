@@ -80,6 +80,12 @@ RSpec.describe Classroom, type: :model do
     end
   end
 
+  it "rejects a non-integer grade" do
+    classroom = build(:classroom, grade: 4.5)
+
+    expect(classroom).not_to be_valid
+  end
+
   it "rejects a name with more than 50 characters" do
     classroom = build(:classroom, name: "가" * 51)
 

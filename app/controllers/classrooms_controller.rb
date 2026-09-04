@@ -13,6 +13,8 @@ class ClassroomsController < ApplicationController
     prepare_school_filter if current_user.admin?
     classrooms_scope = policy_scope(Classroom).joins(:school).merge(School.active)
     classrooms_scope = classrooms_scope.where(school_id: @selected_school.id) if current_user.admin? && @selected_school
+    @selected_grade = grade_filter
+    classrooms_scope = classrooms_scope.where(grade: @selected_grade) if @selected_grade
     context = Classrooms::IndexContext.new(classrooms_scope: classrooms_scope)
     @classrooms = context.classrooms
     @classrooms_index_title = t(classrooms_index_title_key)
@@ -150,6 +152,13 @@ class ClassroomsController < ApplicationController
   def school_filter_id
     value = params[:school_id].to_s
     return nil unless value.match?(/\A[1-9]\d*\z/)
+
+    value.to_i
+  end
+
+  def grade_filter
+    value = params[:grade].to_s
+    return nil unless value.match?(/\A[1-6]\z/)
 
     value.to_i
   end

@@ -42,6 +42,9 @@ ko:
     school:
       label: "학교"
       all: "전체 학교"
+    grade:
+      label: "학년"
+      all: "전체 학년"
 
   time:
     formats:
