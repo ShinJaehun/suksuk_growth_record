@@ -23,11 +23,11 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   def post_student_pin(pin:, target_student: student, target_classroom: classroom, ip: remote_ip)
     post public_student_login_path(student_login_token: target_classroom.student_login_token),
-      params: {
-        student_id: target_student.id,
-        student_pin: pin
-      },
-      headers: { 'REMOTE_ADDR' => ip }
+         params: {
+           student_id: target_student.id,
+           student_pin: pin
+         },
+         headers: { 'REMOTE_ADDR' => ip }
   end
 
   def capture_request_log
@@ -353,7 +353,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     get classrooms_path
 
-    expect(response).to have_http_status(:ok)
+    expect(response).to redirect_to(classroom_path(classroom))
     expect(controller.current_user).to eq(teacher)
   end
 

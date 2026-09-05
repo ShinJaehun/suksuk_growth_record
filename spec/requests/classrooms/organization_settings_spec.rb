@@ -54,30 +54,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).not_to include('id="classroom-school-filter"')
   end
 
-  it 'keeps a regular teacher limited to operating their assigned classroom' do
-    create(:school_membership, school: school, user: teacher)
-    assigned = create(:classroom, school: school, name: '담당 학급')
-    unassigned = create(:classroom, school: school, name: '미담당 학급')
-    assign_teacher(assigned, teacher)
-    sign_in teacher
-
-    get classrooms_path
-
-    expect(response.body).to include(assigned.name)
-    expect(response.body).to include(
-      classroom_path(assigned),
-      classroom_members_path(assigned)
-    )
-    expect(response.body).not_to include(
-      edit_classroom_path(assigned),
-      deactivate_classroom_path(assigned),
-      reactivate_classroom_path(assigned)
-    )
-    expect(response.body).not_to include(unassigned.name)
-    expect(response.body).not_to include(new_classroom_path)
-    expect(response.body).not_to include('id="classroom-school-filter"')
-  end
-
   it 'shows a school filter to an admin while keeping the full classroom list by default' do
     school.update!(color_key: 'emerald')
     other_school = create(:school, name: '나래초등학교')
@@ -208,25 +184,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).to match(%r{<option selected="selected" value="4">4학년</option>})
   end
 
-  it 'filters a regular teacher within assigned classrooms' do
-    create(:school_membership, school: school, user: teacher)
-    assigned = create(:classroom, school: school, grade: 4, name: '담당 4학년')
-    other_grade = create(:classroom, school: school, grade: 5, name: '미담당 5학년')
-    unassigned = create(:classroom, school: school, grade: 4, name: '미담당 4학년')
-    assign_teacher(assigned, teacher)
-    sign_in teacher
-
-    get classrooms_path, params: { grade: 4 }
-    document = Nokogiri::HTML(response.body)
-    main = document.at_css('main')
-
-    expect(response).to have_http_status(:ok)
-    expect(main.text).to include(assigned.name, '전체 학년')
-    expect(main.text).not_to include(other_grade.name, unassigned.name)
-    expect(main.to_html).to include('name="grade"')
-    expect(main.to_html).not_to include('name="school_id"')
-  end
-
   it 'filters a manager within their school classrooms' do
     manager = create(:user, :teacher)
     create(:school_membership, :manager, school: school, user: manager)
@@ -272,7 +229,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     assign_teacher(classroom, teacher)
     create(:classroom_membership, classroom: classroom, user: active_student, role: :student, status: :active)
     create(:classroom_membership, classroom: classroom, user: inactive_student, role: :student, status: :inactive)
-    sign_in teacher
+    sign_in admin
 
     get classrooms_path
 

@@ -11,8 +11,13 @@ class ClassroomsController < ApplicationController
 
   def index
     # index는 policy_scope만 요구(verify_policy_scoped 훅 통과)
-    prepare_school_filter if current_user.admin?
     classrooms_scope = policy_scope(Classroom).joins(:school).merge(School.active)
+    if current_user.active_teacher? && !current_user_school_manager?
+      assigned_landing_path = regular_teacher_landing_path_for(current_user)
+      return redirect_to(assigned_landing_path) unless assigned_landing_path == classrooms_path
+    end
+
+    prepare_school_filter if current_user.admin?
     classrooms_scope = classrooms_scope.where(school_id: @selected_school.id) if current_user.admin? && @selected_school
     @selected_grade = grade_filter
     classrooms_scope = classrooms_scope.where(grade: @selected_grade) if @selected_grade

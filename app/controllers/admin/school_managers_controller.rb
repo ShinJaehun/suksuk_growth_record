@@ -29,7 +29,7 @@ module Admin
     end
 
     def authorize_admin
-      authorize @school, :manage_operations?
+      authorize @school, :manage_managers?
     end
 
     def render_manager_success(message_key)

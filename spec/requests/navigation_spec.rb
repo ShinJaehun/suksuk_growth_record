@@ -54,6 +54,8 @@ RSpec.describe 'Navigation', type: :request do
     sign_in teacher
 
     get classrooms_path
+    expect(response).to redirect_to(classroom_path(classroom))
+    follow_redirect!
 
     expect(navbar_links).to include(classroom_path(classroom))
   end

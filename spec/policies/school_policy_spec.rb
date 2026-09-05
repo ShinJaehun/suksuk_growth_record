@@ -84,6 +84,18 @@ RSpec.describe SchoolPolicy do
       expect(other_policy.manage_operations?).to eq(false)
     end
 
+    it "allows only an admin to manage school managers" do
+      admin = create(:user, :admin)
+      manager = create(:school_membership, :manager, school: school).user
+      member = create(:school_membership, school: other_school).user
+      student = create(:user, :student)
+
+      expect(described_class.new(admin, school).manage_managers?).to eq(true)
+      expect(described_class.new(manager, school).manage_managers?).to eq(false)
+      expect(described_class.new(member, school).manage_managers?).to eq(false)
+      expect(described_class.new(student, school).manage_managers?).to eq(false)
+    end
+
     it "rejects a teacher without a school and a student" do
       [create(:user, :teacher), create(:user, :student)].each do |user|
         policy = described_class.new(user, school)

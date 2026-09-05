@@ -20,6 +20,10 @@ class SchoolPolicy < ApplicationPolicy
     record.active? && (admin? || school_manager?)
   end
 
+  def manage_managers?
+    record.active? && admin?
+  end
+
   def manage_teachers?
     record.active? && school_manager?
   end
