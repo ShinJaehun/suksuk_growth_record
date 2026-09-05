@@ -124,6 +124,26 @@ Teacher lifecycle은 기존 `User.active`를 사용한다.
 
 학교 대표 선생님은 자기 학교의 member teacher만 비활성화·재활성화할 수 있다. manager 계정 lifecycle과 manager role 변경은 global admin만 수행한다.
 
+## Student lifecycle
+
+학교 운영의 세 lifecycle source는 서로 구분한다.
+
+- teacher의 재직·운영 상태: `User.active`
+- student의 현재 학급 재학·운영 상태: `ClassroomMembership.status`
+- classroom의 운영 상태: `Classroom.active`
+
+student의 전출과 현재 운영 제외는 `User.active`가 아니라 `ClassroomMembership.status = "inactive"`로 표현한다. deactivate는 membership row, `classroom_id`, 학생 계정과 과거 서비스 기록을 삭제하지 않으며 그 시점의 `student_number`를 자동 변경하지 않는다. inactive membership은 현재 roster, active 학생 수, PIN/token 로그인과 기존 student session의 운영 대상에서 제외한다.
+
+student membership을 reactivate하면 같은 membership row의 기존 classroom과 현재 저장된 `student_number`를 사용한다. 새 membership이나 번호를 자동 생성하거나 다른 classroom을 임의 배정하지 않으며, active classroom, active 학생 최대 30명과 학생당 active membership 최대 1개 불변식을 만족해야 한다. 현재 번호가 같은 classroom의 다른 active 학생 번호와 충돌하면 자동 조정하지 않고 재활성화를 거부하며, 관리자가 번호를 명시적으로 수정한 뒤 다시 시도한다.
+
+`student_number`는 교사가 개별 생성·수정과 일괄 관리 과정에서 직접 관리하는 운영 정보다. inactive 학생의 번호도 필요하면 수정할 수 있다. 시스템은 최대 번호 + 1이나 빈 번호 재사용 금지를 강제하지 않으며, bulk 생성의 제안 번호는 편의를 위한 기본값일 뿐 canonical invariant가 아니다. 번호는 historical immutable identifier가 아니지만, 같은 classroom의 active student membership끼리는 중복될 수 없다.
+
+현재 starter 운영에서 student는 최대 하나의 active `ClassroomMembership`을 가진다. inactive membership은 삭제하지 않고 보존한다. 여러 inactive membership과 학급·학년도 이력을 어떻게 해석할지는 학년도, 진급, 반 편성 및 학교 이동 history 설계에서 별도로 결정하며 이번 범위에서는 DB 구조를 추가로 제한하지 않는다.
+
+`/classrooms/:id/members` 같은 구성원 관리 화면에서는 active와 inactive 학생을 모두 조회하고 비활성화·재활성화할 수 있다. inactive 학생도 이름, `student_number`, 기존 classroom과 상태를 확인할 수 있어야 하며, 기존의 중립 배경, 낮은 opacity와 inactive badge 패턴을 재사용해 구분한다. 텍스트 식별과 접근성을 해칠 정도로 흐리게 표시하지 않는다.
+
+현재 학생 목록, 집계, 선택과 로그인 등 일반 교실 운영 화면에서는 active membership만 사용하고 inactive 학생을 표시하지 않는다. 구성원 관리 화면의 inactive 조회 정책을 일반 운영 화면이나 `/schools` 단위 학생 inventory로 확대하지 않는다.
+
 ## Classroom lifecycle
 
 `Classroom`에 다음 공통 lifecycle 속성을 도입한다.
@@ -324,6 +344,32 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 6. 같은 school의 manager membership을 최대 하나로 제한하는 model 및 DB 수준 invariant가 필요하다. 구현 전에 기존 복수 manager 데이터 유무를 확인하며 충돌이 있으면 임의 선택하지 않는다.
 7. 일반 teacher의 담당 active classroom 1개 자동 진입과 manager/admin의 lifecycle 관리 UI는 후속 구현 대상이다.
 8. 현재 `Classroom` delete protection을 약화하지 않고 student membership과 서비스 기록 보존 정책을 유지해야 한다.
+
+### Teacher/Student lifecycle 구현 감사 (2026-09-05)
+
+#### A. Already consistent
+
+- `User.active`는 teacher의 Devise 로그인과 운영 권한을 차단하며, teacher deactivate callback은 현재 `Classroom.teacher_id`를 해제한다. School membership과 과거 기록은 유지되고 reactivate 시 assignment를 자동 복원하지 않는다.
+- teacher assignment 저장은 inactive teacher를 신규 assignment 대상으로 거부한다.
+- student deactivate와 기존 destroy 호환 action은 membership row를 삭제하지 않고 `ClassroomMembership.status`만 inactive로 바꾼다. `classroom_id`와 `student_number`는 그대로 유지한다.
+- student reactivate는 같은 membership row를 active로 바꾸며 기존 classroom과 번호를 유지한다. 다른 active membership, inactive classroom과 active 학생 최대 30명 조건을 검사한다.
+- `student_number`는 개별·일괄 관리에서 직접 입력·수정할 수 있고, model과 DB는 같은 classroom의 active student membership 사이 중복을 거부한다. 재활성화 시 기존 번호가 active 번호와 충돌해도 자동 변경하지 않고 저장을 거부한다.
+- classroom roster와 active 학생 수는 active student membership만 사용한다. PIN 로그인은 active membership만 허용하고, 로그인 뒤 membership 또는 classroom이 inactive가 되면 다음 일반 request에서 student session을 종료한다.
+- `/classrooms/:id/members` 구성원 관리 화면은 inactive 학생을 조회·관리할 수 있고 기존 muted UI와 inactive badge로 상태를 구분한다. 일반 교실 운영 화면은 inactive 학생을 제외한다.
+- student의 `User.active`는 현재 PIN 로그인, roster 포함 여부와 student session 유효성의 기준으로 사용되지 않는다. 학생 enrollment lifecycle은 실질적으로 `ClassroomMembership.status`가 담당한다.
+- model과 DB가 학생당 active membership을 최대 하나로 제한하고 여러 inactive membership을 허용하는 현재 구조는 이번 canonical 범위와 일치한다.
+
+#### B. Implementation gap
+
+- 없음. 현재 감사 범위에서 Teacher/Student lifecycle 구현은 canonical과 일치한다.
+
+#### C. Ambiguous / needs user decision
+
+- 없음. 학년도 rollover, 진급, 반 편성·전입 이력과 여러 historical classroom 설계는 이번 canonical 범위에서 명시적으로 제외한다.
+
+#### D. Out of current scope
+
+- `/schools` 학생 목록과 학교 전체 student inventory, 일반 교실 화면의 inactive 학생 표시, 학년도·진급·졸업·학교 간 전입 이력, 별도 history/archive 모델과 physical delete 재설계는 후속 정책 범위다.
 
 ## Acceptance criteria
 
