@@ -8,61 +8,61 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
-#demo_student_pin = '1234' if Rails.env.development? || Rails.env.test?
+# demo_student_pin = '1234' if Rails.env.development? || Rails.env.test?
 #
-#def pick_demo_avatar_key(gender, used_avatar_keys)
+# def pick_demo_avatar_key(gender, used_avatar_keys)
 #  pool = existing_demo_avatar_keys(User.avatar_keys_for(gender))
 #  available = pool - used_avatar_keys
 #  avatar_key = available.sample || pool.sample
 #
 #  used_avatar_keys << avatar_key if avatar_key.present?
 #  avatar_key
-#end
+# end
 #
-#def existing_demo_avatar_keys(keys)
+# def existing_demo_avatar_keys(keys)
 #  keys.select { |key| Rails.root.join("app/assets/images/avatars/#{key}.png").exist? }
-#end
+# end
 #
-#def pick_existing_demo_avatar_key(gender, fallback_key)
+# def pick_existing_demo_avatar_key(gender, fallback_key)
 #  existing_demo_avatar_keys(User.avatar_keys_for(gender)).sample || fallback_key
-#end
+# end
 #
-#admin_user = User.find_or_initialize_by(email: 'a@a')
-#admin_user.assign_attributes(
+# admin_user = User.find_or_initialize_by(email: 'a@a')
+# admin_user.assign_attributes(
 #  email: 'a@a',
 #  password: 'password',
 #  name: '관리자에이',
 #  role: 'admin',
 #  avatar_key: 'admin'
-#)
-#admin_user.save!
+# )
+# admin_user.save!
 #
-#teacherB = User.find_or_initialize_by(email: 'b@b')
-#teacherB.assign_attributes(
+# teacherB = User.find_or_initialize_by(email: 'b@b')
+# teacherB.assign_attributes(
 #  email: 'b@b',
 #  password: 'password',
 #  name: '티쳐비',
 #  role: 'teacher',
 #  gender: 'female',
 #  avatar_key: pick_existing_demo_avatar_key('female', 'teacherF01')
-#)
-#teacherB.save!
+# )
+# teacherB.save!
 #
-#teacherT = User.find_or_initialize_by(email: 't@t')
-#teacherT.assign_attributes(
+# teacherT = User.find_or_initialize_by(email: 't@t')
+# teacherT.assign_attributes(
 #  email: 't@t',
 #  password: 'password',
 #  name: '티쳐티',
 #  role: 'teacher',
 #  gender: 'male',
 #  avatar_key: pick_existing_demo_avatar_key('male', 'teacherM01')
-#)
-#teacherT.save!
+# )
+# teacherT.save!
 #
-#student_genders = (Array.new(15, 'boy') + Array.new(15, 'girl')).shuffle
-#used_student_avatar_keys = []
+# student_genders = (Array.new(15, 'boy') + Array.new(15, 'girl')).shuffle
+# used_student_avatar_keys = []
 #
-#students = 30.times.map do |i|
+# students = 30.times.map do |i|
 #  student = User.where(role: 'student', name: "학생#{i + 1}").first_or_initialize
 #  gender = student_genders[i] || (i.even? ? 'boy' : 'girl')
 #  avatar_key = pick_demo_avatar_key(gender, used_student_avatar_keys)
@@ -77,36 +77,36 @@
 #  student.assign_attributes(attrs)
 #  student.save!
 #  student
-#end
+# end
 #
-#classroom1 = Classroom.find_or_create_by!(name: '1반')
-#classroom2 = Classroom.find_or_create_by!(name: '2반')
+# classroom1 = Classroom.find_or_create_by!(name: '1반')
+# classroom2 = Classroom.find_or_create_by!(name: '2반')
 #
-#ClassroomMembership.find_or_create_by!(
+# ClassroomMembership.find_or_create_by!(
 #  user: teacherT,
 #  classroom: classroom1,
 #  role: 'teacher'
-#)
+# )
 #
-#ClassroomMembership.find_or_create_by!(
+# ClassroomMembership.find_or_create_by!(
 #  user: teacherB,
 #  classroom: classroom2,
 #  role: 'teacher'
-#)
+# )
 #
-#students.each do |student|
+# students.each do |student|
 #  ClassroomMembership.find_or_create_by!(
 #    user: student,
 #    classroom: classroom1,
 #    role: 'student'
 #  )
-#end
+# end
 #
-#if demo_student_pin.present?
+# if demo_student_pin.present?
 #  User.student.find_each do |student|
 #    student.update!(student_pin: demo_student_pin)
 #  end
-#end
+# end
 #
 # frozen_string_literal: true
 
@@ -121,12 +121,12 @@
 # 여러 번 실행해도 같은 기본 데이터를 재사용하도록 작성한다.
 
 unless Rails.env.development? || Rails.env.test?
-  puts "Demo seeds are only available in development and test environments."
+  puts 'Demo seeds are only available in development and test environments.'
   return
 end
 
-demo_password = "password"
-demo_student_pin = "1234"
+demo_password = 'password'
+demo_student_pin = '1234'
 
 def existing_seed_avatar_keys(keys)
   keys.select do |key|
@@ -175,12 +175,12 @@ def seed_student!(
   student_pin:
 )
   student = User
-    .where(role: "student", name: name)
-    .first_or_initialize
+            .where(role: 'student', name: name)
+            .first_or_initialize
 
   student.assign_attributes(
     name: name,
-    role: "student",
+    role: 'student',
     gender: gender,
     avatar_key: avatar_key,
     student_pin: student_pin
@@ -193,7 +193,8 @@ end
 def seed_classroom_membership!(
   user:,
   classroom:,
-  role:
+  role:,
+  student_number: nil
 )
   membership = ClassroomMembership.find_or_initialize_by(
     user: user,
@@ -202,7 +203,8 @@ def seed_classroom_membership!(
 
   membership.assign_attributes(
     role: role,
-    status: "active"
+    status: 'active',
+    student_number: student_number
   )
 
   membership.save!
@@ -216,12 +218,12 @@ def seed_students!(
   student_pin:
 )
   gender_indexes = {
-    "boy" => 0,
-    "girl" => 0
+    'boy' => 0,
+    'girl' => 0
   }
 
   count.times.map do |index|
-    gender = index.even? ? "boy" : "girl"
+    gender = index.even? ? 'boy' : 'girl'
     avatar_index = gender_indexes.fetch(gender)
     gender_indexes[gender] += 1
 
@@ -236,70 +238,71 @@ def seed_students!(
     ClassroomMembership
       .where(
         user: student,
-        role: "student",
-        status: "active"
+        role: 'student',
+        status: 'active'
       )
       .where.not(classroom: classroom)
       .update_all(
-        status: "inactive",
+        status: 'inactive',
         updated_at: Time.current
       )
 
     seed_classroom_membership!(
       user: student,
       classroom: classroom,
-      role: "student"
+      role: 'student',
+      student_number: index + 1
     )
 
     student
   end
 end
 
-puts "== 관리자 계정 생성 =="
+puts '== 관리자 계정 생성 =='
 
 seed_account!(
-  email: "a@a",
-  name: "개발 관리자",
-  role: "admin",
+  email: 'a@a',
+  name: '개발 관리자',
+  role: 'admin',
   password: demo_password,
-  avatar_key: "admin"
+  avatar_key: 'admin'
 )
 
-puts "== 교사 계정 생성 =="
+puts '== 교사 계정 생성 =='
 
 school_manager = seed_account!(
-  email: "manager@example.com",
-  name: "학교 관리자 교사",
-  role: "teacher",
+  email: 'manager@example.com',
+  name: '학교 관리자 교사',
+  role: 'teacher',
   password: demo_password,
-  gender: "male",
+  gender: 'male',
   avatar_key: first_seed_avatar_key(
-    "male",
-    "teacherM01"
+    'male',
+    'teacherM01'
   )
 )
 
 classroom_teacher = seed_account!(
-  email: "teacher@example.com",
-  name: "4학년 1반 담임",
-  role: "teacher",
+  email: 'teacher@example.com',
+  name: '4학년 1반 담임',
+  role: 'teacher',
   password: demo_password,
-  gender: "female",
+  gender: 'female',
   avatar_key: first_seed_avatar_key(
-    "female",
-    "teacherF01"
+    'female',
+    'teacherF01'
   )
 )
 
-puts "== 학교 생성 =="
+puts '== 학교 생성 =='
 
 school = School.find_or_initialize_by(
-  name: "쑥쑥초등학교"
+  name: '쑥쑥초등학교'
 )
 
 school.save!
 
-puts "== 학교 교사 소속 생성 =="
+puts '== 학교 교사 소속 생성 =='
 
 manager_school_membership =
   SchoolMembership.find_or_initialize_by(
@@ -308,7 +311,8 @@ manager_school_membership =
 
 manager_school_membership.assign_attributes(
   school: school,
-  role: "manager"
+  role: 'manager',
+  grade: 4
 )
 
 manager_school_membership.save!
@@ -320,17 +324,18 @@ teacher_school_membership =
 
 teacher_school_membership.assign_attributes(
   school: school,
-  role: "member"
+  role: 'member',
+  grade: 4
 )
 
 teacher_school_membership.save!
 
-puts "== 교실 생성 =="
+puts '== 교실 생성 =='
 
 classroom = Classroom.find_or_initialize_by(
   school: school,
   grade: 4,
-  name: "1반"
+  name: '1반'
 )
 
 classroom.save!
@@ -338,63 +343,48 @@ classroom.save!
 empty_classroom = Classroom.find_or_initialize_by(
   school: school,
   grade: 4,
-  name: "2반"
+  name: '2반'
 )
 
 empty_classroom.save!
 
-puts "== 교실 담당 교사 배정 =="
+puts '== 교실 담당 교사 배정 =='
 
-seed_classroom_membership!(
-  user: school_manager,
-  classroom: classroom,
-  role: "teacher"
-)
+classroom.update!(teacher: classroom_teacher)
+empty_classroom.update!(teacher: school_manager)
 
-seed_classroom_membership!(
-  user: classroom_teacher,
-  classroom: classroom,
-  role: "teacher"
-)
-
-seed_classroom_membership!(
-  user: school_manager,
-  classroom: empty_classroom,
-  role: "teacher"
-)
-
-puts "== 학생 25명 생성 =="
+puts '== 학생 25명 생성 =='
 
 students = seed_students!(
   classroom: classroom,
   count: 25,
-  name_prefix: "4-1",
+  name_prefix: '4-1',
   student_pin: demo_student_pin
 )
 
 puts
-puts "========================================"
-puts "Seed 데이터 생성 완료"
-puts "========================================"
+puts '========================================'
+puts 'Seed 데이터 생성 완료'
+puts '========================================'
 puts
-puts "관리자"
-puts "  이메일: a@a"
+puts '관리자'
+puts '  이메일: a@a'
 puts "  비밀번호: #{demo_password}"
 puts
-puts "학교 관리자 교사"
-puts "  이메일: manager@example.com"
+puts '학교 관리자 교사'
+puts '  이메일: manager@example.com'
 puts "  비밀번호: #{demo_password}"
 puts
-puts "담임 교사"
-puts "  이메일: teacher@example.com"
+puts '담임 교사'
+puts '  이메일: teacher@example.com'
 puts "  비밀번호: #{demo_password}"
 puts
-puts "학생"
+puts '학생'
 puts "  학교: #{school.name}"
 puts "  교실: #{classroom.grade}학년 #{classroom.name}"
 puts "  인원: #{students.count}명"
 puts "  PIN: #{demo_student_pin}"
 puts
-puts "학생 로그인 토큰"
+puts '학생 로그인 토큰'
 puts "  #{classroom.student_login_token}"
 puts

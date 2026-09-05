@@ -19,7 +19,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "shows the student login modal link without exposing the token URL on the classroom show page" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get classroom_path(classroom)
@@ -37,7 +37,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "shows actual homeroom teachers to an admin on the classroom show page" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in admin
 
     get classroom_path(classroom)
@@ -59,7 +59,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "shows the token student login controls to a classroom teacher in the modal" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get student_login_info_classroom_path(classroom)
@@ -130,7 +130,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "does not show student login controls on the members page" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get classroom_members_path(classroom)
@@ -144,7 +144,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "shows the student login QR page to a classroom teacher" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get student_login_qr_classroom_path(classroom)
@@ -166,7 +166,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "downloads the student login QR PNG for a classroom teacher" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get download_student_login_qr_classroom_path(classroom)
@@ -219,7 +219,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "regenerates the student login token for a classroom teacher" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     old_token = classroom.student_login_token
     sign_in teacher
 
@@ -233,7 +233,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "uses the new token URL on the QR page after regeneration" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     old_token = classroom.student_login_token
     sign_in teacher
 
@@ -248,7 +248,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "downloads a QR PNG after regeneration" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     patch regenerate_student_login_token_classroom_path(classroom)
@@ -261,7 +261,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "expires the old token route and keeps the new token route available after regeneration" do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+    assign_teacher(classroom, teacher)
     old_token = classroom.student_login_token
     sign_in teacher
 

@@ -28,12 +28,10 @@ RSpec.describe Classrooms::ShowContext do
     expect(loaded_membership.user.association(:avatar_attachment)).to be_loaded
   end
 
-  it "returns active homeroom teachers in name order" do
-    later = create(:user, :teacher, name: "나교사")
-    earlier = create(:user, :teacher, name: "가교사")
-    create(:classroom_membership, classroom: classroom, user: later, role: "teacher")
-    create(:classroom_membership, classroom: classroom, user: earlier, role: "teacher")
+  it "returns the assigned teacher" do
+    teacher = create(:user, :teacher)
+    assign_teacher(classroom, teacher)
 
-    expect(described_class.new(classroom: classroom).homeroom_teachers).to eq([earlier, later])
+    expect(described_class.new(classroom: classroom).homeroom_teachers).to eq([teacher])
   end
 end

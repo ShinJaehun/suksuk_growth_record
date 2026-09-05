@@ -10,7 +10,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   before do
     create(:classroom_membership, classroom: classroom, user: student, role: 'student')
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
   end
 
   around do |example|

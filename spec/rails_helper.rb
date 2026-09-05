@@ -12,6 +12,16 @@ require 'shoulda/matchers'
 require 'devise'
 # Add additional requires below this line. Rails is not loaded until this point!
 
+module TeacherAssignmentHelpers
+  def assign_teacher(classroom, teacher)
+    membership = teacher.school_membership || teacher.build_school_membership
+    unless membership.persisted? && membership.school_id == classroom.school_id && membership.grade == classroom.grade
+      membership.update!(school: classroom.school, grade: classroom.grade)
+    end
+    classroom.update!(teacher: teacher)
+  end
+end
+
 Shoulda::Matchers.configure do |config|
   config.integrate do |with|
     with.test_framework :rspec
@@ -75,6 +85,7 @@ RSpec.configure do |config|
   # To enable this behaviour uncomment the line below.
   config.infer_spec_type_from_file_location!
   config.include FactoryBot::Syntax::Methods
+  config.include TeacherAssignmentHelpers
 
   # Filter lines from Rails gems in backtraces.
   config.filter_rails_from_backtrace!

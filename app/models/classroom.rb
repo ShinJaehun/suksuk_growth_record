@@ -42,7 +42,7 @@ class Classroom < ApplicationRecord
   end
 
   def deactivating?
-    will_save_change_to_active?(from: true, to: false)
+    persisted? && will_save_change_to_active?(from: true, to: false)
   end
 
   def release_teacher

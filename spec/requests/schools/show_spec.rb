@@ -59,22 +59,23 @@ RSpec.describe 'School overview', type: :request do
   end
 
   it 'excludes inactive teachers and managers from the overview' do
-    active_manager = manager
-    inactive_manager = create(
-      :school_membership,
-      :manager,
-      school: school,
-      user: create(:user, :teacher, name: '비활성 관리자')
-    ).user
+    inactive_manager = manager
     inactive_manager.update!(active: false)
-    create(:school_membership, school: school, user: create(:user, :teacher, active: false))
+    active_teacher = create(:school_membership, school: school,
+                                                user: create(:user, :teacher, name: '활성 교사')).user
+    inactive_teacher = create(:school_membership, school: school,
+                                                  user: create(:user, :teacher, name: '비활성 교사', active: false)).user
     sign_in create(:user, :admin)
 
     get school_path(school)
 
     overview = Nokogiri::HTML(response.body).at_css('turbo-frame#school_overview')
-    expect(overview.text).to include('소속 교사', '1명', active_manager.name)
-    expect(overview.text).not_to include(inactive_manager.name, '3명')
+    expect(overview.text).to include(
+      '소속 교사',
+      '1명',
+      '지정된 학교 관리자 없음'
+    )
+    expect(overview.text).not_to include('3명')
   end
 
   it 'keeps an inactive school readable to admins but blocks members until reactivation' do

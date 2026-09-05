@@ -15,7 +15,7 @@ RSpec.describe ClassroomStudentPolicy do
 
     it "permits a teacher member of the classroom" do
       teacher = create(:user, :teacher)
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       policy = described_class.new(teacher, record)
 
       expect(policy.create?).to eq(true)

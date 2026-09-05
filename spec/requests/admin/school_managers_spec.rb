@@ -8,14 +8,14 @@ RSpec.describe "Admin school managers", type: :request do
   it "promotes an existing school member without changing assignments" do
     membership = create(:school_membership, school: school, user: teacher)
     classroom = create(:classroom, school: school)
-    classroom_membership = create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
+    assign_teacher(classroom, teacher)
     sign_in admin
 
     post admin_school_school_managers_path(school), params: { user_id: teacher.id }
 
     expect(response).to redirect_to(edit_school_path(school))
     expect(membership.reload).to be_manager
-    expect(classroom_membership.reload).to be_present
+    expect(classroom.reload.teacher).to eq(teacher)
     expect(teacher.reload.school_membership).to eq(membership)
   end
 
@@ -42,14 +42,15 @@ RSpec.describe "Admin school managers", type: :request do
 
   it "demotes a manager without deleting membership or assignments" do
     membership = create(:school_membership, :manager, school: school, user: teacher)
-    classroom_membership = create(:classroom_membership, classroom: create(:classroom, school: school), user: teacher, role: :teacher)
+    classroom = create(:classroom, school: school)
+    assign_teacher(classroom, teacher)
     sign_in admin
 
     delete admin_school_manager_path(school, teacher)
 
     expect(response).to redirect_to(edit_school_path(school))
     expect(membership.reload).to be_member
-    expect(classroom_membership.reload).to be_present
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 
   it "returns to school settings after a Turbo manager change" do

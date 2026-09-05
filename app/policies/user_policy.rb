@@ -17,6 +17,8 @@ class UserPolicy < ApplicationPolicy
     return true if user&.admin?
 
     if user&.active_teacher?
+      return true if user == record
+
       # 담임인 반 학생들 정보만 조회 가능
       classroom = user.assigned_classroom
       return classroom&.active? && classroom.school.active? &&

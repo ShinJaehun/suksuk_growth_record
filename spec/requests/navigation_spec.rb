@@ -50,7 +50,7 @@ RSpec.describe 'Navigation', type: :request do
   it 'links a teacher with one classroom directly to that classroom' do
     teacher = create(:user, :teacher)
     classroom = create(:classroom)
-    create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get classrooms_path
@@ -58,19 +58,4 @@ RSpec.describe 'Navigation', type: :request do
     expect(navbar_links).to include(classroom_path(classroom))
   end
 
-  it 'shows every assigned classroom to a teacher with multiple classrooms' do
-    school = create(:school)
-    teacher = create(:user, :teacher)
-    classrooms = create_list(:classroom, 2, school: school)
-    classrooms.each do |classroom|
-      create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
-    end
-    sign_in teacher
-
-    get classrooms_path
-
-    classrooms.each do |classroom|
-      expect(navbar_links).to include(classroom_path(classroom))
-    end
-  end
 end

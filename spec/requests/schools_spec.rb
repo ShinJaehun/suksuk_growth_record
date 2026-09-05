@@ -42,13 +42,9 @@ RSpec.describe 'School workspaces', type: :request do
 
   it 'counts and names only active teachers on the school index' do
     active_manager = manager
-    inactive_manager = create(
-      :school_membership,
-      :manager,
-      school: school,
-      user: create(:user, :teacher, name: '비활성 관리자')
-    ).user
-    inactive_manager.update!(active: false)
+    inactive_teacher = create(:school_membership, school: school,
+                                                  user: create(:user, :teacher, name: '비활성 교사')).user
+    inactive_teacher.update!(active: false)
     create(:school_membership, school: school, user: create(:user, :teacher, active: false))
     sign_in admin
 
@@ -56,15 +52,15 @@ RSpec.describe 'School workspaces', type: :request do
 
     card = Nokogiri::HTML(response.body)
                    .at_xpath("//h2[normalize-space()='#{school.name}']/ancestor::article[1]")
-    expect(card.text).to include('소속 교사 2명', active_manager.name)
-    expect(card.text).not_to include(inactive_manager.name, '소속 교사 4명')
+    expect(card.text).to include('소속 교사 2명')
+    expect(card.text).not_to include('소속 교사 3명', '소속 교사 4명')
 
-    inactive_manager.update!(active: true)
+    inactive_teacher.update!(active: true)
     get schools_path
 
     card = Nokogiri::HTML(response.body)
                    .at_xpath("//h2[normalize-space()='#{school.name}']/ancestor::article[1]")
-    expect(card.text).to include('소속 교사 3명', inactive_manager.name)
+    expect(card.text).to include('소속 교사 3명')
   end
 
   it 'redirects a member or manager index to their only school without exposing others' do
@@ -135,5 +131,4 @@ RSpec.describe 'School workspaces', type: :request do
     expect(response.body).not_to include(school_path(other_school))
     expect(response.body).not_to include('translation missing')
   end
-
 end

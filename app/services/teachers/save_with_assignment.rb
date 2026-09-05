@@ -63,7 +63,9 @@ module Teachers
       add_error(:school_not_found) unless school.nil? || school.is_a?(School)
       add_error(:membership_grade_invalid) if invalid_grade?
       add_error(:classroom_not_found) if invalid_classroom_id?
-      add_inactive_school_error if school&.inactive?
+      if school&.inactive? && (teacher.school_membership&.school_id != school.id || classroom)
+        add_inactive_school_error
+      end
       return if teacher.errors.any? || classroom.nil?
 
       add_error(:school_required_for_classrooms) unless school

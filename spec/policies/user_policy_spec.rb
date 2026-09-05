@@ -30,14 +30,14 @@ RSpec.describe UserPolicy do
     end
 
     it "permits a teacher for a student in the teacher's classroom" do
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       create(:classroom_membership, user: student, classroom: classroom, role: "student")
 
       expect(described_class.new(teacher, student).show?).to eq(true)
     end
 
     it "permits an assigned teacher to view an inactive student record" do
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       create(:classroom_membership, user: student, classroom: classroom, role: "student", status: "inactive")
 
       expect(described_class.new(teacher, student).show?).to eq(true)
@@ -45,7 +45,7 @@ RSpec.describe UserPolicy do
 
     it "rejects a teacher for a student outside the teacher's classroom" do
       other_classroom = create(:classroom)
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       create(:classroom_membership, user: student, classroom: other_classroom, role: "student")
 
       expect(described_class.new(teacher, student).show?).to eq(false)
@@ -74,14 +74,14 @@ RSpec.describe UserPolicy do
     end
 
     it "permits a teacher for a student in the teacher's classroom" do
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       create(:classroom_membership, user: student, classroom: classroom, role: "student")
 
       expect(described_class.new(teacher, student).destroy_student?).to eq(true)
     end
 
     it "permits an assigned teacher to manage an inactive student account" do
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       create(:classroom_membership, user: student, classroom: classroom, role: "student", status: "inactive")
 
       expect(described_class.new(teacher, student).destroy_student?).to eq(true)
@@ -89,7 +89,7 @@ RSpec.describe UserPolicy do
 
     it "rejects a teacher for a student outside the teacher's classroom" do
       other_classroom = create(:classroom)
-      create(:classroom_membership, user: teacher, classroom: classroom, role: "teacher")
+      assign_teacher(classroom, teacher)
       create(:classroom_membership, user: student, classroom: other_classroom, role: "student")
 
       expect(described_class.new(teacher, student).destroy_student?).to eq(false)

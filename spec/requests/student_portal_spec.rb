@@ -8,7 +8,7 @@ RSpec.describe 'Student portal flow', type: :request do
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-      create(:classroom_membership, user: teacher, classroom: classroom, role: 'teacher')
+      assign_teacher(classroom, teacher)
     end
 
     it 'does not create a session from invalid Devise credentials' do
@@ -95,16 +95,6 @@ RSpec.describe 'Student portal flow', type: :request do
       expect(response).to redirect_to(classroom_path(classroom))
     end
 
-    it 'redirects a teacher from their own user show to classrooms index when they have multiple assigned classrooms' do
-      other_classroom = create(:classroom, school: classroom.school)
-      create(:classroom_membership, user: teacher, classroom: other_classroom, role: 'teacher')
-      sign_in teacher
-
-      get user_path(teacher)
-
-      expect(response).to redirect_to(classrooms_path)
-    end
-
     it 'redirects an admin from teacher user show to schools index' do
       admin = create(:user, :admin)
       sign_in admin
@@ -157,7 +147,7 @@ RSpec.describe 'Student portal flow', type: :request do
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-      create(:classroom_membership, user: teacher, classroom: classroom, role: 'teacher')
+      assign_teacher(classroom, teacher)
     end
 
     it 'rejects self-service student deletion' do
@@ -189,7 +179,7 @@ RSpec.describe 'Student portal flow', type: :request do
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-      create(:classroom_membership, user: teacher, classroom: classroom, role: 'teacher')
+      assign_teacher(classroom, teacher)
     end
 
     it 'links from member management with the current filter context' do

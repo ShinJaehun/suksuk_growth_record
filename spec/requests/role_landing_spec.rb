@@ -34,27 +34,12 @@ RSpec.describe "Role landing pages", type: :request do
     school = create(:school)
     classroom = create(:classroom, school: school)
     create(:school_membership, school: school, user: teacher)
-    create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     get root_path
 
     expect(response).to redirect_to(classroom_path(classroom))
-  end
-
-  it "routes a regular teacher with multiple assigned classrooms to classrooms" do
-    teacher = create(:user, :teacher)
-    school = create(:school)
-    classrooms = create_list(:classroom, 2, school: school)
-    create(:school_membership, school: school, user: teacher)
-    classrooms.each do |classroom|
-      create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
-    end
-    sign_in teacher
-
-    get root_path
-
-    expect(response).to redirect_to(classrooms_path)
   end
 
   it "keeps the student landing behavior" do

@@ -1,39 +1,23 @@
 require 'rails_helper'
 
 RSpec.describe SchoolStructure::IntegrityAudit do
-  def insert_classroom_membership!(user:, classroom:, role:, student_number: nil)
-    now = Time.current
-
-    ClassroomMembership.insert!({
-                                  user_id: user.id,
-                                  classroom_id: classroom.id,
-                                  role: role,
-                                  status: 'active',
-                                  student_number: student_number,
-                                  created_at: now,
-                                  updated_at: now
-                                })
+  def assign_without_validation(classroom, teacher)
+    classroom.update_columns(teacher_id: teacher.id)
   end
 
   def insert_school_membership!(user:, school:)
-    now = Time.current
-
-    SchoolMembership.insert!({
-                               user_id: user.id,
-                               school_id: school.id,
-                               role: SchoolMembership.roles.fetch('member'),
-                               created_at: now,
-                               updated_at: now
-                             })
+    membership = SchoolMembership.new(
+      user: user,
+      school: school,
+      role: :member
+    )
+    membership.save!(validate: false)
+    membership
   end
 
-  it "is clean for a teacher assigned to classrooms in the teacher's school" do
-    school = create(:school)
-    teacher = create(:user, :teacher)
-    create(:school_membership, user: teacher, school: school)
-    create_list(:classroom, 2, school: school).each do |classroom|
-      create(:classroom_membership, user: teacher, classroom: classroom, role: 'teacher')
-    end
+  it 'is clean for a valid teacher assignment' do
+    membership = create(:school_membership, grade: 4)
+    create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
 
     result = described_class.call
 
@@ -44,102 +28,67 @@ RSpec.describe SchoolStructure::IntegrityAudit do
   it 'finds a teacher assignment without a school membership' do
     teacher = create(:user, :teacher)
     classroom = create(:classroom)
-    insert_classroom_membership!(user: teacher, classroom: classroom, role: 'teacher')
-    membership = ClassroomMembership.find_by!(user: teacher, classroom: classroom)
+    assign_without_validation(classroom, teacher)
 
     result = described_class.call
 
     expect(result.count_for(:teacher_without_school)).to eq(1)
     expect(result.samples_for(:teacher_without_school)).to include(
-      include('classroom_membership_id' => membership.id, 'user_id' => teacher.id)
+      include('classroom_id' => classroom.id, 'user_id' => teacher.id)
     )
   end
 
   it 'finds a teacher assigned to a classroom in another school' do
-    teacher_school = create(:school)
-    teacher = create(:user, :teacher)
-    school_membership = create(:school_membership, user: teacher, school: teacher_school)
-    classroom = create(:classroom)
-    insert_classroom_membership!(
-      user: teacher,
-      classroom: classroom,
-      role: 'teacher'
-    )
-    membership = ClassroomMembership.find_by!(user: teacher, classroom: classroom)
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, grade: 4)
+    assign_without_validation(classroom, membership.user)
 
     result = described_class.call
 
     expect(result.count_for(:teacher_classroom_school_mismatch)).to eq(1)
     expect(result.samples_for(:teacher_classroom_school_mismatch)).to include(
-      include(
-        'classroom_membership_id' => membership.id,
-        'teacher_school_id' => teacher_school.id,
-        'school_membership_id' => school_membership.id
-      )
+      include('classroom_id' => classroom.id, 'user_id' => membership.user_id,
+              'teacher_school_id' => membership.school_id)
     )
   end
 
-  it 'finds a teacher membership with a student number' do
-    school = create(:school)
+  it 'finds a teacher assigned to a classroom in another grade' do
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, school: membership.school, grade: 5)
+    assign_without_validation(classroom, membership.user)
+
+    result = described_class.call
+
+    expect(result.count_for(:teacher_classroom_grade_mismatch)).to eq(1)
+    expect(result.samples_for(:teacher_classroom_grade_mismatch)).to include(
+      include('classroom_id' => classroom.id, 'teacher_grade' => 4, 'classroom_grade' => 5)
+    )
+  end
+
+  it 'finds student classroom memberships whose user is not a student' do
     teacher = create(:user, :teacher)
-    create(:school_membership, user: teacher, school: school)
-    classroom = create(:classroom, school: school)
-    insert_classroom_membership!(
-      user: teacher,
-      classroom: classroom,
-      role: 'teacher',
-      student_number: 7
-    )
-    membership = ClassroomMembership.find_by!(user: teacher, classroom: classroom)
+    membership = build(:classroom_membership, user: teacher, role: 'student')
+    membership.save!(validate: false)
 
     result = described_class.call
 
-    expect(result.count_for(:teacher_membership_with_student_number)).to eq(1)
-    expect(result.samples_for(:teacher_membership_with_student_number)).to include(
-      include('classroom_membership_id' => membership.id, 'student_number' => 7)
+    expect(result.count_for(:role_mismatch)).to eq(1)
+    expect(result.samples_for(:role_mismatch)).to include(
+      include('classroom_membership_id' => membership.id, 'user_id' => teacher.id)
     )
   end
 
-  it 'finds classroom membership roles that do not match user roles' do
-    teacher_as_student = create(:user, :teacher)
-    student_as_teacher = create(:user, :student)
-    insert_classroom_membership!(
-      user: teacher_as_student,
-      classroom: create(:classroom),
-      role: 'student'
-    )
-    insert_classroom_membership!(
-      user: student_as_teacher,
-      classroom: create(:classroom),
-      role: 'teacher'
-    )
+  it 'finds an inactive teacher assignment' do
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, school: membership.school, grade: 4)
+    membership.user.update_columns(active: false)
+    assign_without_validation(classroom, membership.user)
 
     result = described_class.call
 
-    expect(result.count_for(:role_mismatch)).to eq(2)
-    expect(result.samples_for(:role_mismatch).map { |sample| sample['user_id'] })
-      .to contain_exactly(teacher_as_student.id, student_as_teacher.id)
-  end
-
-  it 'finds a teacher assigned to classrooms across multiple schools' do
-    first_school = create(:school)
-    second_school = create(:school)
-    teacher = create(:user, :teacher)
-    create(:school_membership, user: teacher, school: first_school)
-    [first_school, second_school].each do |school|
-      insert_classroom_membership!(
-        user: teacher,
-        classroom: create(:classroom, school: school),
-        role: 'teacher'
-      )
-    end
-
-    result = described_class.call
-
-    expect(result.count_for(:teacher_assigned_across_multiple_schools)).to eq(1)
-    expect(result.samples_for(:teacher_assigned_across_multiple_schools)).to include(
-      'user_id' => teacher.id,
-      'classroom_school_ids' => [first_school.id, second_school.id].sort
+    expect(result.count_for(:inactive_teacher_assignment)).to eq(1)
+    expect(result.samples_for(:inactive_teacher_assignment)).to include(
+      include('classroom_id' => classroom.id, 'user_id' => membership.user_id)
     )
   end
 
@@ -158,11 +107,8 @@ RSpec.describe SchoolStructure::IntegrityAudit do
 
   it 'limits samples without changing the total issue count' do
     2.times do
-      insert_classroom_membership!(
-        user: create(:user, :teacher),
-        classroom: create(:classroom),
-        role: 'teacher'
-      )
+      teacher = create(:user, :teacher)
+      assign_without_validation(create(:classroom), teacher)
     end
 
     result = described_class.call(sample_limit: 1)

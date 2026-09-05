@@ -121,7 +121,7 @@ RSpec.describe Classroom, type: :model do
 
       expect(classroom.destroy).to be_truthy
       expect(Classroom.exists?(classroom.id)).to eq(false)
-      expect(User.exists?(teacher.id)).to eq(true)
+      expect(User.exists?(membership.user_id)).to eq(true)
       expect(ClassroomMembership.where(classroom_id: classroom.id)).to be_empty
     end
 

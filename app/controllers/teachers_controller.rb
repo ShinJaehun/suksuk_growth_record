@@ -114,7 +114,7 @@ class TeachersController < ApplicationController
 
     school.classrooms.active
       .where(grade: selected_membership_grade)
-      .where(teacher_id: [nil, @teacher.id])
+      .where(teacher_id: [nil, @teacher&.id].uniq)
       .order(:name, :id)
       .load
   end
@@ -210,7 +210,7 @@ class TeachersController < ApplicationController
   def selected_classroom_id_for_form
     return params[:classroom_id].presence&.to_i if params.key?(:classroom_id)
 
-    @teacher.assigned_classroom&.id
+    @teacher&.assigned_classroom&.id
   end
 
   def assignment_invalid?

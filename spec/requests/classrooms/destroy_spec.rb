@@ -7,7 +7,7 @@ RSpec.describe 'Classroom deletion', type: :request do
     admin = create(:user, :admin)
     teacher = create(:user, :teacher)
     classroom = create(:classroom, school: school)
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     sign_in admin
 
     expect do
@@ -23,7 +23,7 @@ RSpec.describe 'Classroom deletion', type: :request do
   it 'rejects direct deletion by an assigned teacher' do
     teacher = create(:user, :teacher)
     classroom = create(:classroom, school: school)
-    membership = create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     sign_in teacher
 
     expect do
@@ -32,7 +32,7 @@ RSpec.describe 'Classroom deletion', type: :request do
 
     expect(response).to redirect_to(root_path)
     expect(response).to have_http_status(:found)
-    expect(ClassroomMembership.exists?(membership.id)).to eq(true)
+    expect(classroom.reload.teacher).to eq(teacher)
     expect(flash[:notice]).to be_nil
   end
 
@@ -55,7 +55,7 @@ RSpec.describe 'Classroom deletion', type: :request do
     manager = create(:user, :teacher)
     classroom = create(:classroom, school: school)
     create(:school_membership, :manager, school: school, user: manager)
-    membership = create(:classroom_membership, classroom: classroom, user: manager, role: 'teacher')
+    assign_teacher(classroom, manager)
     sign_in manager
 
     expect do
@@ -64,7 +64,7 @@ RSpec.describe 'Classroom deletion', type: :request do
 
     expect(response).to redirect_to(root_path)
     expect(response).to have_http_status(:found)
-    expect(ClassroomMembership.exists?(membership.id)).to eq(true)
+    expect(classroom.reload.teacher).to eq(manager)
   end
 
   it 'preserves an admin classroom when a student membership exists' do
@@ -88,7 +88,7 @@ RSpec.describe 'Classroom deletion', type: :request do
     admin = create(:user, :admin)
     teacher = create(:user, :teacher)
     classroom = create(:classroom, school: school)
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     delete_description = I18n.t('classrooms.edit.delete_description')
 
     sign_in admin
@@ -118,7 +118,7 @@ RSpec.describe 'Classroom deletion', type: :request do
     manager = create(:user, :teacher)
     classroom = create(:classroom, school: school)
     create(:school_membership, :manager, school: school, user: manager)
-    create(:classroom_membership, classroom: classroom, user: manager, role: 'teacher')
+    assign_teacher(classroom, manager)
     sign_in manager
 
     get edit_classroom_path(classroom)

@@ -24,8 +24,7 @@ RSpec.describe ClassroomPolicy do
       teacher = create(:user, :teacher)
       create(:school_membership, school: school, user: teacher)
       assigned_classroom = create(:classroom, school: school)
-      create(:classroom_membership, classroom: assigned_classroom, user: teacher, role: :teacher)
-
+      assign_teacher(assigned_classroom, teacher)
       expect(Pundit.policy_scope!(teacher, Classroom)).to contain_exactly(assigned_classroom)
     end
 
@@ -73,8 +72,7 @@ RSpec.describe ClassroomPolicy do
 
     it "permits a teacher assigned to the classroom" do
       teacher = create(:user, :teacher)
-      create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
-
+      assign_teacher(classroom, teacher)
       expect(described_class.new(teacher, classroom).view_student_data?).to eq(true)
     end
 
@@ -92,8 +90,7 @@ RSpec.describe ClassroomPolicy do
     it "permits a manager who is also assigned to the classroom" do
       manager = create(:user, :teacher)
       create(:school_membership, :manager, school: school, user: manager)
-      create(:classroom_membership, classroom: classroom, user: manager, role: "teacher")
-
+      assign_teacher(classroom, manager)
       expect(described_class.new(manager, classroom).view_student_data?).to eq(true)
     end
 
@@ -123,7 +120,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "combines manager access with existing classroom teacher permissions" do
-      create(:classroom_membership, classroom: classroom, user: manager, role: :teacher)
+      assign_teacher(classroom, manager)
       policy = described_class.new(manager, classroom)
 
       expect(policy.update?).to eq(true)
@@ -166,7 +163,7 @@ RSpec.describe ClassroomPolicy do
     it "combines structure and teacher permissions for an assigned school manager" do
       manager = create(:user, :teacher)
       create(:school_membership, :manager, school: school, user: manager)
-      create(:classroom_membership, classroom: classroom, user: manager, role: :teacher)
+      assign_teacher(classroom, manager)
       policy = described_class.new(manager, classroom)
 
       expect(policy.manage_structure?).to eq(true)
@@ -177,7 +174,7 @@ RSpec.describe ClassroomPolicy do
 
     it "allows an assigned regular teacher to manage operations and members only" do
       teacher = create(:user, :teacher)
-      create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
+      assign_teacher(classroom, teacher)
       policy = described_class.new(teacher, classroom)
 
       expect(policy.manage_structure?).to eq(false)
@@ -210,8 +207,7 @@ RSpec.describe ClassroomPolicy do
 
     it "rejects an assigned teacher" do
       teacher = create(:user, :teacher)
-      create(:classroom_membership, classroom: classroom, user: teacher, role: "teacher")
-
+      assign_teacher(classroom, teacher)
       expect(described_class.new(teacher, classroom).destroy?).to eq(false)
     end
 
@@ -229,8 +225,7 @@ RSpec.describe ClassroomPolicy do
     it "rejects a school manager who is also an assigned teacher" do
       manager = create(:user, :teacher)
       create(:school_membership, :manager, school: school, user: manager)
-      create(:classroom_membership, classroom: classroom, user: manager, role: "teacher")
-
+      assign_teacher(classroom, manager)
       expect(described_class.new(manager, classroom).destroy?).to eq(false)
     end
 

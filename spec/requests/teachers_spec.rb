@@ -48,7 +48,6 @@ RSpec.describe "Teacher operations", type: :request do
     document = Nokogiri::HTML(response.body)
     expect(document.css('select[name="membership_grade"]').size).to eq(1)
     expect(document.css('select[name="classroom_id"]').size).to eq(1)
-    expect(document.css('[name="classroom_ids[]"]')).to be_empty
     expect(document.css('input[type="checkbox"]')).to be_empty
     expect(response.body).to include(classroom.name)
     expect(response.body).not_to include(I18n.t("admin.teachers.form.current_classrooms"))

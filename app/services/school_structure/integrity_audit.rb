@@ -45,8 +45,14 @@ module SchoolStructure
       Result.new(
         issues: {
           role_mismatch: issue(role_mismatch_scope),
-          teacher_without_school: issue(teacher_without_school_scope),
-          teacher_classroom_school_mismatch: issue(teacher_school_mismatch_scope),
+          teacher_without_school: issue(
+            teacher_without_school_scope,
+            sample_scope: classroom_assignment_sample_scope(teacher_without_school_scope)
+          ),
+          teacher_classroom_school_mismatch: issue(
+            teacher_school_mismatch_scope,
+            sample_scope: classroom_assignment_sample_scope(teacher_school_mismatch_scope)
+          ),
           teacher_classroom_grade_mismatch: issue(
             teacher_grade_mismatch_scope,
             sample_scope: classroom_assignment_sample_scope(teacher_grade_mismatch_scope)
@@ -70,7 +76,6 @@ module SchoolStructure
     def classroom_membership_scope
       ClassroomMembership
         .joins(:user, :classroom)
-        .joins('LEFT JOIN school_memberships ON school_memberships.user_id = classroom_memberships.user_id')
     end
 
     def classroom_sample_scope(scope)
@@ -79,8 +84,6 @@ module SchoolStructure
         'classroom_memberships.user_id AS user_id',
         'classroom_memberships.classroom_id AS classroom_id',
         'classrooms.school_id AS classroom_school_id',
-        'school_memberships.school_id AS teacher_school_id',
-        'school_memberships.id AS school_membership_id',
         'classroom_memberships.role AS role',
         'classroom_memberships.student_number AS student_number'
       )
@@ -98,12 +101,8 @@ module SchoolStructure
     end
 
     def role_mismatch_scope
-      classroom_membership_scope.where(
-        '(classroom_memberships.role = :teacher AND users.role <> :teacher) OR ' \
-          '(classroom_memberships.role = :student AND users.role <> :student)',
-        teacher: 'teacher',
-        student: 'student'
-      )
+      classroom_membership_scope.where(classroom_memberships: { role: 'student' })
+        .where.not(users: { role: 'student' })
     end
 
     def teacher_without_school_scope

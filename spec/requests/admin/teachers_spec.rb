@@ -8,12 +8,10 @@ RSpec.describe 'Admin teachers', type: :request do
     school = create(:school, name: '새싹초등학교', color_key: 'orange')
     other_school = create(:school, name: '나래초등학교')
     classroom = create(:classroom, school: school, grade: 4, name: '4학년 1반')
-    later_classroom = create(:classroom, school: school, grade: 6, name: '기러기반')
     manager = create(:school_membership, :manager, school: school, user: teacher).user
     member_teacher = create(:school_membership, school: school, user: create(:user, :teacher, name: '일반 선생님')).user
     unassigned_teacher = create(:user, :teacher, name: '미배정 선생님')
-    create(:classroom_membership, classroom: later_classroom, user: manager, role: :teacher)
-    create(:classroom_membership, classroom: classroom, user: manager, role: :teacher)
+    assign_teacher(classroom, manager)
     sign_in admin
 
     get admin_teachers_path
@@ -25,7 +23,7 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).to include('name="school_id"')
     expect(response.body).to include('전체 학교')
     expect(response.body).to include(school.name, other_school.name)
-    expect(response.body).to include('담당 교사', '새싹초등학교', '대표 선생님', '4학년 1반', '6학년 기러기반')
+    expect(response.body).to include('담당 교사', '새싹초등학교', '대표 선생님', '4학년 1반')
     expect(response.body).to include('일반 선생님', '선생님')
     expect(response.body).to include('미배정 선생님', '학교 미지정', '해당 없음', '담당 교실 없음')
     expect(response.body).not_to include('학교 역할', '학교 관리자', '일반 구성원', '담당 교실 2개')
@@ -43,7 +41,6 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(teacher_row.at_css('.bg-orange-500')).to be_present
     expect(teacher_row.at_css('.bg-violet-100')&.text).to include('대표 선생님')
     expect(member_row.at_css('.bg-sky-100')&.text).to include('선생님')
-    expect(teacher_row.text.index('4학년 1반')).to be < teacher_row.text.index('6학년 기러기반')
     expect(unassigned_row['class']).to include('border-l-slate-200', 'bg-white')
     expect(unassigned_row.css('.bg-slate-100').map(&:text)).to include('학교 미지정', '해당 없음', '담당 교실 없음')
     expect(unassigned_row.css("[class*='bg-orange-500']").to_a).to be_empty
@@ -186,13 +183,14 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).to include('name="user[gender]"')
     expect(response.body).to include('name="user[avatar_key]"')
     expect(response.body).to include('data-controller="teacher-school-classrooms"')
-    expect(response.body).to include('name="school_id"', 'name="classroom_ids[]"')
+    expect(response.body).to include('name="school_id"', 'name="membership_grade"', 'name="classroom_id"')
     expect(response.body).to include('4학년 1반', '6학년 기러기반')
     expect(response.body).not_to include('6학년 6학년 기러기반')
     document = Nokogiri::HTML(response.body)
-    classroom_input = document.at_css(%(input[name="classroom_ids[]"][value="#{classroom.id}"]))
-    expect(classroom_input['class']).to include('peer', 'sr-only')
-    expect(classroom_input.ancestors('label').first['class']).to include('rounded-full', 'has-[:checked]:bg-blue-50')
+    classroom_select = document.at_css('select[name="classroom_id"]')
+    expect(classroom_select).to be_present
+    expect(classroom_select.at_css(%(option[value="#{classroom.id}"]))).to be_present
+    expect(document.css('input[type="checkbox"]')).to be_empty
   end
 
   it 'saves a submitted male teacher avatar_key for male gender' do
@@ -408,7 +406,7 @@ RSpec.describe 'Admin teachers', type: :request do
 
     sign_in manager_membership.user
     assigned_classroom = create(:classroom, school: manager_membership.school)
-    create(:classroom_membership, classroom: assigned_classroom, user: manager_membership.user, role: :teacher)
+    assign_teacher(assigned_classroom, manager_membership.user)
     get school_teachers_path(manager_membership.school)
     document = Nokogiri::HTML(response.body)
     expect(response.body).not_to include(admin_teachers_path)
@@ -441,7 +439,7 @@ RSpec.describe 'Admin teachers', type: :request do
     get edit_admin_teacher_path(teacher)
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include(%(name="classroom_ids[]"))
+    expect(response.body).to include(%(name="classroom_id"))
     expect(response.body).to include('4학년 1반', '6학년 기러기반')
     expect(response.body).not_to include('6학년 6학년 기러기반')
     expect(response.body).to include(%(value="#{other_classroom.id}"))
@@ -449,17 +447,17 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).not_to include('담당 학급은 해당 학교의 선생님 관리 화면에서 배정합니다.')
   end
 
-  it 'filters and changes teacher account status without removing assignments' do
+  it 'filters teacher status and releases the assignment on deactivation' do
     school = create(:school)
     classroom = create(:classroom, school: school)
     membership = create(:school_membership, school: school, user: teacher)
-    classroom_membership = create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     sign_in admin
 
     patch deactivate_admin_teacher_path(teacher)
     expect(teacher.reload).to be_inactive
     expect(membership.reload).to be_present
-    expect(classroom_membership.reload).to be_present
+    expect(classroom.reload.teacher).to be_nil
 
     get admin_teachers_path(status: 'inactive', school_id: school.id)
     expect(response.body).to include(teacher.name, '비활성')
@@ -483,7 +481,7 @@ RSpec.describe 'Admin teachers', type: :request do
           password: 'password123'
         },
         school_id: inactive_school.id,
-        classroom_ids: ['']
+        classroom_id: ''
       }
     end.not_to change(User.teacher, :count)
   end
@@ -496,7 +494,7 @@ RSpec.describe 'Admin teachers', type: :request do
     get edit_admin_teacher_path(teacher)
     expect(response.body).to include(inactive_school.name)
 
-    patch admin_teacher_path(teacher), params: { school_id: '', classroom_ids: [''] }
+    patch admin_teacher_path(teacher), params: { school_id: '', classroom_id: '' }
     expect(response).to redirect_to(edit_admin_teacher_path(teacher))
     expect { membership.reload }.to raise_error(ActiveRecord::RecordNotFound)
     expect(inactive_school.reload).to be_inactive

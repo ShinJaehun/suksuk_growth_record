@@ -8,7 +8,7 @@ RSpec.describe 'Classroom students', type: :request do
   let(:turbo_headers) { { 'ACCEPT' => 'text/vnd.turbo-stream.html' } }
 
   before do
-    create(:classroom_membership, user: teacher, classroom: classroom, role: 'teacher')
+    assign_teacher(classroom, teacher)
     sign_in teacher
   end
 
@@ -1107,7 +1107,7 @@ RSpec.describe 'Classroom students', type: :request do
 
     it 'allows the past classroom teacher to view inactive student records' do
       past_teacher = create(:user, :teacher)
-      create(:classroom_membership, user: past_teacher, classroom: past_classroom, role: 'teacher')
+      assign_teacher(past_classroom, past_teacher)
       sign_out teacher
       sign_in past_teacher
 

@@ -19,7 +19,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'shows member management sections to a classroom teacher' do
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     student = create(:user, :student, name: '활성 학생', gender: 'boy', avatar_key: 'boy01')
     create(:classroom_membership, classroom: classroom, user: student, role: 'student')
     sign_in teacher
@@ -76,7 +76,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'does not show teacher assignment controls to an admin' do
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     other_teacher
     sign_in admin
 
@@ -280,7 +280,7 @@ RSpec.describe 'Classroom members', type: :request do
 
   it 'allows a manager assigned as the classroom teacher to manage members' do
     create(:school_membership, :manager, school: classroom.school, user: teacher)
-    create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
+    assign_teacher(classroom, teacher)
     student = create(:user, :student, name: '활성 학생')
     create(:classroom_membership, classroom: classroom, user: student, role: :student)
     sign_in teacher
@@ -293,7 +293,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'renders the filtered student roster edit modal with membership-scoped fields' do
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     active_student = create(:user, :student, name: '활성 이름')
     inactive_student = create(:user, :student, name: '비활성 이름')
     active_membership = create(:classroom_membership, classroom: classroom, user: active_student, role: 'student',
@@ -367,7 +367,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'keeps the selected filter after saving names from the modal' do
-    create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+    assign_teacher(classroom, teacher)
     active_student = create(:user, :student, name: '활성 저장 전')
     inactive_student = create(:user, :student, name: '비활성 저장 전')
     active_membership = create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
@@ -434,7 +434,7 @@ RSpec.describe 'Classroom members', type: :request do
 
   describe 'PATCH /classrooms/:classroom_id/members/students/name' do
     it 'updates student numbers, names, genders, and avatar keys together' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       first = create(:user, :student, name: '첫 학생', gender: 'boy', avatar_key: 'boy01')
       second = create(:user, :student, name: '둘 학생', gender: 'girl', avatar_key: 'girl01')
       first_membership = create(:classroom_membership, classroom: classroom, user: first, role: 'student',
@@ -770,7 +770,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'lets a classroom teacher update active student names' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       student = create(:user, :student, name: '이전 이름')
       membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
       sign_in teacher
@@ -787,7 +787,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'lets a classroom teacher update inactive student names' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       student = create(:user, :student, name: '쉬는 학생')
       membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
                                                  status: 'inactive')
@@ -867,7 +867,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'fails when a membership outside the classroom is submitted' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       student = create(:user, :student, name: '내 학생')
       membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
       other_student = create(:user, :student, name: '다른 학생')
@@ -878,9 +878,6 @@ RSpec.describe 'Classroom members', type: :request do
       patch classroom_member_student_names_path(classroom), params: {
         students: {
           membership.id => { name: '변경 실패' },
-          teacher.classroom_memberships.find_by!(classroom: classroom).id => {
-            name: '교사 변경 금지', role: 'student'
-          },
           other_membership.id => { name: '변경되면 안 됨' }
         }
       }
@@ -909,7 +906,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rolls back all changes and shows row errors when any name is invalid' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       valid_student = create(:user, :student, name: '유효 학생')
       invalid_student = create(:user, :student, name: '무효 학생')
       valid_membership = create(:classroom_membership, classroom: classroom, user: valid_student, role: 'student')
@@ -940,7 +937,7 @@ RSpec.describe 'Classroom members', type: :request do
     let(:turbo_headers) { { 'ACCEPT' => 'text/vnd.turbo-stream.html' } }
 
     it 'shows the PIN reset modal form' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       sign_in teacher
 
       get classroom_edit_member_student_pin_path(classroom)
@@ -961,7 +958,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'lets a classroom teacher reset active student PINs without changing inactive students' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       active_student = create(:user, :student, student_pin: '1234')
       second_active_student = create(:user, :student, student_pin: '2345')
       inactive_student = create(:user, :student, student_pin: '3456')
@@ -1019,7 +1016,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'keeps the modal open when PIN is blank' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       active_student = create(:user, :student, student_pin: '1234')
       create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
       sign_in teacher
@@ -1035,7 +1032,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'keeps the modal open when PIN is not four digits' do
-      create(:classroom_membership, classroom: classroom, user: teacher, role: 'teacher')
+      assign_teacher(classroom, teacher)
       active_student = create(:user, :student, student_pin: '1234')
       create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
       sign_in teacher

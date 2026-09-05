@@ -27,7 +27,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     assigned_classroom = create(:classroom, school: school, name: '담당 학급')
     unassigned_classroom = create(:classroom, school: school, name: '미담당 학급')
     create(:classroom, school: create(:school), name: '다른 학교 학급')
-    create(:classroom_membership, classroom: assigned_classroom, user: manager, role: :teacher)
+    assign_teacher(assigned_classroom, manager)
     sign_in manager
 
     get classrooms_path
@@ -58,7 +58,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     create(:school_membership, school: school, user: teacher)
     assigned = create(:classroom, school: school, name: '담당 학급')
     unassigned = create(:classroom, school: school, name: '미담당 학급')
-    create(:classroom_membership, classroom: assigned, user: teacher, role: :teacher)
+    assign_teacher(assigned, teacher)
     sign_in teacher
 
     get classrooms_path
@@ -107,8 +107,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
     other_teacher = create(:school_membership, school: other_school, user: create(:user, :teacher, name: '나래 선생님')).user
     student = create(:user, :student, name: '새싹 학생')
     other_student = create(:user, :student, name: '나래 학생')
-    create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
-    create(:classroom_membership, classroom: other_classroom, user: other_teacher, role: :teacher)
+    assign_teacher(classroom, teacher)
+    assign_teacher(other_classroom, other_teacher)
     create(:classroom_membership, classroom: classroom, user: student, role: :student)
     create(:classroom_membership, classroom: other_classroom, user: other_student, role: :student)
     sign_in admin
@@ -143,10 +143,9 @@ RSpec.describe 'Classroom organization settings', type: :request do
   it 'filters a regular teacher within assigned classrooms' do
     create(:school_membership, school: school, user: teacher)
     assigned = create(:classroom, school: school, grade: 4, name: '담당 4학년')
-    other_grade = create(:classroom, school: school, grade: 5, name: '담당 5학년')
+    other_grade = create(:classroom, school: school, grade: 5, name: '미담당 5학년')
     unassigned = create(:classroom, school: school, grade: 4, name: '미담당 4학년')
-    create(:classroom_membership, classroom: assigned, user: teacher, role: :teacher)
-    create(:classroom_membership, classroom: other_grade, user: teacher, role: :teacher)
+    assign_teacher(assigned, teacher)
     sign_in teacher
 
     get classrooms_path, params: { grade: 4 }
@@ -202,7 +201,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     classroom = create(:classroom, school: school, name: '활성 기준 학급')
     active_student = create(:user, :student, name: '활성 미리보기 학생', gender: 'boy', avatar_key: 'boy01')
     inactive_student = create(:user, :student, name: '비활성 제외 학생', gender: 'girl', avatar_key: 'girl01')
-    create(:classroom_membership, classroom: classroom, user: teacher, role: :teacher)
+    assign_teacher(classroom, teacher)
     create(:classroom_membership, classroom: classroom, user: active_student, role: :student, status: :active)
     create(:classroom_membership, classroom: classroom, user: inactive_student, role: :student, status: :inactive)
     sign_in teacher
@@ -218,58 +217,30 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).not_to include('비활성 제외 학생 avatar')
   end
 
-  it 'counts and previews only active teachers on the classrooms index' do
+  it 'shows the single assigned teacher on the classrooms index' do
     classroom = create(:classroom, school: school, name: '운영 교사 학급')
-    active_teacher = create(:user, :teacher, name: '활성 담당 교사')
-    inactive_teacher = create(:user, :teacher)
-    create(:classroom_membership, classroom: classroom, user: active_teacher, role: :teacher)
-    create(:classroom_membership, classroom: classroom, user: inactive_teacher, role: :teacher)
-    inactive_teacher.update!(active: false)
+    assigned_teacher = create(:user, :teacher, name: '활성 담당 교사')
+    assign_teacher(classroom, assigned_teacher)
     sign_in admin
 
     get classrooms_path
 
     card = Nokogiri::HTML(response.body)
                    .at_xpath("//h2[contains(normalize-space(), '#{classroom.name}')]/ancestor::article[1]")
-    expect(card.text).to include(active_teacher.name)
-    expect(card.text).not_to include(inactive_teacher.name, '외 1명')
-
-    inactive_teacher.update!(active: true)
-    get classrooms_path
-
-    card = Nokogiri::HTML(response.body)
-                   .at_xpath("//h2[contains(normalize-space(), '#{classroom.name}')]/ancestor::article[1]")
-    expect(card.text).to include(active_teacher.name, '외 1명')
-
-    additional_teachers = 2.times.map do |index|
-      create(:user, :teacher, name: "추가 담당 #{index + 1}")
-    end
-    additional_teachers.each do |additional_teacher|
-      create(:classroom_membership, classroom: classroom, user: additional_teacher, role: :teacher)
-    end
-
-    get classrooms_path
-
-    card = Nokogiri::HTML(response.body)
-                   .at_xpath("//h2[contains(normalize-space(), '#{classroom.name}')]/ancestor::article[1]")
-    expect(card.text).to include(active_teacher.name, '외 3명')
-    expect(card.css("img[alt$=' avatar']").size).to eq(3)
-    expect(card.to_html).not_to include("#{additional_teachers.last.name} avatar")
+    expect(card.text).to include(assigned_teacher.name)
   end
 
-  it 'shows only active homeroom teachers on the classroom page' do
+  it 'does not show a teacher released by deactivation on the classroom page' do
     classroom = create(:classroom, school: school)
-    active_teacher = create(:user, :teacher, name: '활성 담임')
-    inactive_teacher = create(:user, :teacher, name: '비활성 담임')
-    create(:classroom_membership, classroom: classroom, user: active_teacher, role: :teacher)
-    create(:classroom_membership, classroom: classroom, user: inactive_teacher, role: :teacher)
-    inactive_teacher.update!(active: false)
+    teacher = create(:user, :teacher, name: '비활성 담임')
+    assign_teacher(classroom, teacher)
+    teacher.update!(active: false)
     sign_in admin
 
     get classroom_path(classroom)
 
-    expect(response.body).to include(active_teacher.name)
-    expect(response.body).not_to include(inactive_teacher.name)
+    expect(classroom.reload.teacher).to be_nil
+    expect(response.body).not_to include(teacher.name)
   end
 
   it 'hides inactive-school classrooms from index while keeping admin read access' do
@@ -277,7 +248,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     classroom = create(:classroom, school: inactive_school, name: '중단된 학교 교실')
     assigned_teacher = create(:user, :teacher)
     create(:school_membership, school: inactive_school, user: assigned_teacher)
-    create(:classroom_membership, classroom: classroom, user: assigned_teacher, role: :teacher)
+    assign_teacher(classroom, assigned_teacher)
     sign_in admin
 
     get classrooms_path
@@ -430,7 +401,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response).to redirect_to(classroom_path(classroom))
     expect(classroom.school).to eq(school)
     expect(classroom.grade).to eq(2)
-    expect(classroom.classroom_memberships.teacher).to be_empty
+    expect(classroom.teacher).to be_nil
   end
 
   it 'rejects manager classroom creation without a grade' do
@@ -598,7 +569,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
   it 'keeps classroom identification while removing school and teacher management sections' do
     classroom = create(:classroom, name: '2학년 지정 교실', school: school, grade: 2)
     homeroom = create(:school_membership, school: school, user: create(:user, :teacher, name: '담당 선생님')).user
-    create(:classroom_membership, classroom: classroom, user: homeroom, role: :teacher)
+    assign_teacher(classroom, homeroom)
     sign_in admin
 
     get classrooms_path
