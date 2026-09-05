@@ -52,6 +52,15 @@ class User < ApplicationRecord
     foreign_key: :teacher_id,
     inverse_of: :teacher,
     dependent: :nullify
+  has_many :issued_teacher_credential_events,
+    class_name: "TeacherCredentialEvent",
+    foreign_key: :actor_user_id,
+    inverse_of: :actor_user,
+    dependent: :restrict_with_error
+  has_many :teacher_credential_events,
+    foreign_key: :teacher_user_id,
+    inverse_of: :teacher_user,
+    dependent: :restrict_with_error
 
   def self.avatar_keys_for(gender)
     AVATAR_KEYS_BY_GENDER.fetch(gender.to_s, [])

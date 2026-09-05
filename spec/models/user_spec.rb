@@ -1,6 +1,25 @@
 require "rails_helper"
 
 RSpec.describe User, type: :model do
+  describe "teacher credential foundation" do
+    it "defaults users to no forced password change" do
+      expect(create(:user, :teacher)).not_to be_password_change_required
+    end
+
+    it "exposes issued and received credential audit events" do
+      actor = create(:user, :admin)
+      teacher = create(:user, :teacher)
+      event = TeacherCredentialEvent.create!(
+        actor_user: actor,
+        teacher_user: teacher,
+        action: :temporary_password_issued
+      )
+
+      expect(actor.issued_teacher_credential_events).to contain_exactly(event)
+      expect(teacher.teacher_credential_events).to contain_exactly(event)
+    end
+  end
+
   describe "annual teacher compatibility schema" do
     it "optionally belongs to a school year" do
       school_year = create(:school_year)

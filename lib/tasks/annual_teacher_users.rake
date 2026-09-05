@@ -1,6 +1,22 @@
 require "csv"
 
 namespace :annual_teacher_users do
+  desc "Audit or reconcile annual teacher fields before Phase 2C cutover"
+  task cutover_readiness: :environment do
+    dry_run_value = ENV.fetch("DRY_RUN", "true")
+    abort "DRY_RUN must be true or false." unless %w[true false].include?(dry_run_value)
+
+    result = AnnualTeacherUsers::CutoverReadiness.call(dry_run: dry_run_value == "true")
+    result.issues.each { |issue| warn "error #{issue}" }
+    puts [
+      "ready=#{result.ready?}",
+      "dry_run=#{result.dry_run}",
+      "reconciled=#{result.reconciled_count}",
+      "normalized=#{result.normalized_count}"
+    ].join(" ")
+    abort "Annual teacher cutover is not ready." unless result.ready?
+  end
+
   desc "Map existing teachers to an explicit active SchoolYear"
   task map_existing: :environment do
     school_year_id = ENV.fetch("SCHOOL_YEAR_ID")

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -109,6 +109,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_010000) do
     t.index ["active"], name: "index_schools_on_active"
   end
 
+  create_table "teacher_credential_events", force: :cascade do |t|
+    t.string "action", null: false
+    t.bigint "actor_user_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "teacher_user_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["actor_user_id"], name: "index_teacher_credential_events_on_actor_user_id"
+    t.index ["teacher_user_id"], name: "index_teacher_credential_events_on_teacher_user_id"
+    t.check_constraint "action::text = ANY (ARRAY['temporary_password_issued'::character varying, 'temporary_password_reissued'::character varying]::text[])", name: "chk_teacher_credential_events_action"
+  end
+
   create_table "users", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.string "avatar_key"
@@ -119,6 +130,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_010000) do
     t.integer "grade"
     t.string "login_id"
     t.string "name"
+    t.boolean "password_change_required", default: false, null: false
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
@@ -146,5 +158,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_010000) do
   add_foreign_key "school_memberships", "schools"
   add_foreign_key "school_memberships", "users", on_delete: :cascade
   add_foreign_key "school_years", "schools"
+  add_foreign_key "teacher_credential_events", "users", column: "actor_user_id"
+  add_foreign_key "teacher_credential_events", "users", column: "teacher_user_id"
   add_foreign_key "users", "school_years"
 end
