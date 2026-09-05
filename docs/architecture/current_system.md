@@ -2,7 +2,7 @@
 
 ## 문서 목적
 
-현재 starter에 실제로 존재하는 공통 학교·교실·사용자 구조와 확정된 teacher assignment migration target을 구분해 기록한다. 추출 과정에서 제거된 service-specific 도메인은 현재 시스템으로 설명하지 않는다.
+현재 starter에 실제로 존재하는 공통 학교·교실·사용자 구조를 기록한다. 추출 과정에서 제거된 service-specific 도메인은 현재 시스템으로 설명하지 않는다.
 
 ## 핵심 역할
 
@@ -15,7 +15,7 @@
 ## 인증과 학생 세션
 
 - teacher와 admin은 Devise 로그인 흐름을 사용한다.
-- inactive user는 로그인하거나 일반 운영 권한을 얻을 수 없다.
+- inactive teacher는 로그인하거나 일반 운영 권한을 얻을 수 없다.
 - student는 교실 범위 PIN/token 로그인 흐름을 사용한다.
 - PIN 로그인은 classroom, active student membership과 PIN을 서버에서 확인한다.
 - 학생 로그인 성공 시 기존 session을 reset하고 student로 로그인한다.
@@ -38,17 +38,12 @@
 - teacher는 classroom 없이 school과 grade만 가질 수 있다.
 - `User.grade`와 별도 Grade model은 사용하지 않는다.
 - 한 school의 manager는 없거나 한 명이며 canonical source는 `SchoolMembership.role == "manager"`다.
+- manager가 없는 임시 상태는 허용하지만 한 school에 둘 이상을 둘 수 없다. global admin은 manager 수에 포함하지 않는다.
 - manager 지정·교체·해제는 global admin만 수행하고 `School.manager_id`는 추가하지 않는다.
 
-## Teacher assignment: 현재 구현
+## Teacher assignment
 
-현재 checkout의 teacher assignment는 아직 `ClassroomMembership(role: "teacher")`를 사용한다. 관련 controller, service, policy, scope와 UI도 이 구현에 의존하는 부분이 남아 있다.
-
-이 구조를 최종 1:1 모델로 완료된 것처럼 해석하지 않는다.
-
-## Teacher assignment: canonical migration target
-
-확정된 target은 다음과 같다.
+현재 구조는 다음과 같다.
 
 ```text
 Classroom.teacher_id nullable
@@ -60,13 +55,12 @@ Teacher 0..1 ↔ 0..1 Classroom
 
 - teacher는 담당 classroom이 없거나 하나다.
 - classroom은 담당 teacher가 없거나 한 명이다.
-- 연결된 teacher와 classroom은 같은 school과 grade를 가지며 둘 다 active여야 한다.
+- 신규 assignment 시 teacher와 classroom은 같은 school과 grade를 가지며 둘 다 active여야 한다.
 - 신규 teacher `ClassroomMembership`은 만들지 않는다.
-- migration 이후 `ClassroomMembership`은 학생 classroom 소속에 사용한다.
-- teacher 또는 classroom 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
+- `ClassroomMembership`은 학생 classroom 소속에 사용한다.
+- teacher 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
+- classroom 비활성화 시 현재 `teacher_id`와 student membership을 보존한 채 운영을 잠그며, 재활성화하면 보존된 관계를 다시 사용한다.
 - classroom grade 변경이 teacher의 membership grade와 충돌하면 먼저 assignment를 해제해야 한다.
-
-기존 teacher membership 데이터는 migration 전에 감사한다. 1:1 호환 관계만 자동 이전하고 다중 assignment 충돌은 임의 선택하지 않으며 명시적으로 정리한 뒤 이전한다.
 
 ## Teacher 운영 영역
 
@@ -82,7 +76,9 @@ Teacher 0..1 ↔ 0..1 Classroom
 
 - 학생의 classroom 소속 source는 `ClassroomMembership(role: "student")`다.
 - active student membership은 현재 소속이고 inactive membership은 과거 소속 기록이다.
+- 학생의 현재 운영 lifecycle은 `User.active`가 아니라 `ClassroomMembership.status`로 관리한다.
 - 한 student는 active classroom membership을 최대 하나만 가진다.
+- 같은 classroom의 active 학생끼리 `student_number`가 중복될 수 없으며 번호는 교사가 직접 관리한다.
 - 학생은 classroom별 출석번호, name, gender, avatar와 PIN을 기존 운영 정책에 따라 관리한다.
 - 담당 teacher와 admin은 학생 명부, 학생 정보와 PIN을 관리할 수 있다.
 - 학생 자신은 허용된 자기 정보와 PIN 중심 흐름만 사용한다.

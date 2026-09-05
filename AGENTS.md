@@ -2,7 +2,7 @@
 
 ## 목적
 
-이 문서는 `suksuk_praise` 저장소에서 작업하는 에이전트(Codex 등)가
+이 문서는 `suksuk_school_starter` 저장소에서 작업하는 에이전트(Codex 등)가
 프로젝트의 기본 작업 원칙과 문서 참조 순서를 일관되게 따르도록 하기 위한 안내서다.
 
 ---
@@ -58,7 +58,9 @@
 - 교사/학생/admin을 별도 인증 모델로 성급히 분리하지 않는다.
 - 권한 판단은 controller/policy 중심으로 유지한다.
 - view에서 직접 복잡한 권한 조건을 늘리지 않는다.
-- coupon/compliment 규칙은 문서화된 불변식을 우선 기준으로 삼는다.
+- Teacher와 Classroom의 1:1 담당 관계는 `Classroom.teacher_id`를 canonical source로 사용한다.
+- 학생 소속은 student `ClassroomMembership`, 교사 소속과 학년은 `SchoolMembership`을 기준으로 한다.
+- Teacher, Student membership, Classroom lifecycle은 각각의 canonical spec과 상태 source를 따른다.
 - 학생 관련 기능은 교실 사용 맥락을 먼저 고려한다.
 - 공유 태블릿 환경에서는 학생 세션, 로그아웃, PIN, 권한 노출에 특히 주의한다.
 - Turbo 응답과 HTML 응답은 둘 다 깨지지 않도록 주의한다.

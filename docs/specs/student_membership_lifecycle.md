@@ -25,7 +25,7 @@
 
 ### 교사 assignment 경계
 
-teacher의 현재 담당 관계는 이 student membership lifecycle의 책임이 아니다. canonical target은 nullable `Classroom.teacher_id`이며 신규 teacher `ClassroomMembership`을 만들지 않는다. teacher 또는 classroom 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
+teacher의 현재 담당 관계는 이 student membership lifecycle의 책임이 아니다. canonical source는 nullable `Classroom.teacher_id`이며 신규 teacher `ClassroomMembership`을 만들지 않는다. teacher 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다. classroom 비활성화는 teacher assignment와 student membership을 보존한 채 운영을 잠근다.
 
 `Classroom#students`는 일반 교실 운영에서 사용하는 active 학생 목록을 의미한다.
 inactive 학생은 교사 일반 운영 화면과 학생 PIN 로그인 선택 목록에서 제외한다.

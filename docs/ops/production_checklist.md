@@ -16,7 +16,7 @@
 
 - [ ] Cloudflare가 Full (strict)이고 `FORCE_SSL=true`이다.
 - [ ] HTTPS, HSTS와 secure session cookie가 정상이다.
-- [ ] Rails는 `praise.suksukclass.kr`만 허용하고 unknown HTTPS SNI는 거부된다.
+- [ ] reverse proxy는 배포 서비스의 공식 host만 전달하고 unknown HTTPS SNI를 거부한다.
 - [ ] OCI/host firewall에서 app port 3000이 공개되지 않는다.
 
 ## Real IP

@@ -332,18 +332,15 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 - inactive teacher, inactive classroom과 inactive School 상태를 mutation 시점에 서버에서 확인한다.
 - profile 편집, lifecycle 변경, role 변경은 각각 독립된 권한으로 검사한다.
 
-## 현재 코드와 구현 선행조건
+## 현재 구현 상태
 
-다음은 canonical policy와 현재 구현의 차이이며 후속 구현에서 해소한다.
-
-1. 기존 teacher assignment code와 데이터는 `ClassroomMembership(role: "teacher")`를 사용한다. 구현 전에 1:1 호환 여부를 점검하고 충돌 데이터를 명시적으로 정리한 뒤 nullable `Classroom.teacher_id`로 이전해야 한다.
-2. `Classroom.teacher_id`에는 `users` foreign key와 null이 아닌 값에 대한 unique index가 필요하다. 정확한 migration 순서와 DB constraint는 현재 schema와 실제 데이터 확인 후 정한다.
-3. teacher assignment의 controller, service, policy, scope와 UI를 단일 `Classroom.teacher_id` 기준으로 변경하고 신규 teacher `ClassroomMembership` 생성을 제거해야 한다.
-4. teacher 비활성화 시 현재 assignment를 같은 transaction에서 해제한다. classroom 비활성화는 assignment를 보존한 채 운영만 잠그고, 재활성화 시 보존된 관계를 다시 사용한다.
-5. classroom grade 변경은 담당 teacher의 membership grade와 충돌하면 거부하도록 서버 불변식을 추가해야 한다.
-6. 같은 school의 manager membership을 최대 하나로 제한하는 model 및 DB 수준 invariant가 필요하다. 구현 전에 기존 복수 manager 데이터 유무를 확인하며 충돌이 있으면 임의 선택하지 않는다.
-7. 일반 teacher의 담당 active classroom 1개 자동 진입과 manager/admin의 lifecycle 관리 UI는 후속 구현 대상이다.
-8. 현재 `Classroom` delete protection을 약화하지 않고 student membership과 서비스 기록 보존 정책을 유지해야 한다.
+- teacher assignment의 controller, service, policy, scope와 UI는 `Classroom.teacher_id`를 사용하며 신규 teacher `ClassroomMembership` 생성을 거부한다.
+- `Classroom.teacher_id`는 `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 cardinality를 방어한다.
+- teacher 비활성화는 현재 assignment를 해제하고, classroom 비활성화는 assignment를 보존한 채 운영만 잠근다.
+- classroom grade, teacher school·grade와 lifecycle validation이 assignment 불변식을 방어한다.
+- school당 manager 최대 한 명을 model validation과 DB partial unique index로 방어한다.
+- 일반 teacher의 담당 active classroom 진입과 manager/admin lifecycle 관리 UI가 역할별 policy를 따른다.
+- Classroom delete protection은 student membership과 서비스 기록을 보존한다.
 
 ### Teacher/Student lifecycle 구현 감사 (2026-09-05)
 

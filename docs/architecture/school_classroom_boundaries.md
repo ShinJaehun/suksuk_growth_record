@@ -39,7 +39,7 @@ Teacher 0..1 ─ 0..1 Classroom
 
 학교 소속이 없는 teacher 계정 자체는 허용하지만 교실 담당자로 배정할 수 없다. 신규 teacher `ClassroomMembership`은 만들지 않으며 `ClassroomMembership`은 학생의 교실 소속에 사용한다.
 
-현재 구현은 teacher assignment에 `ClassroomMembership(role: "teacher")`를 사용한다. canonical migration은 nullable `Classroom.teacher_id`, `users` foreign key와 null이 아닌 `teacher_id` unique index를 추가한 뒤 1:1 호환 데이터만 이전한다. 다중 배정 충돌은 임의 선택하지 않고 migration 전에 명시적으로 정리한다.
+teacher assignment는 nullable `Classroom.teacher_id`, `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 관계를 보장한다. `ClassroomMembership`은 student membership에만 사용한다.
 
 ## 학생의 학교
 

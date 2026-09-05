@@ -33,7 +33,8 @@ starter의 인증, 학교·교실 경계, teacher assignment, 학생 membership,
 - classroom active/inactive lifecycle
 - teacher와 classroom의 0..1 대 0..1 cardinality
 - 같은 school·grade 및 active 상태 assignment invariant
-- teacher/classroom 비활성화 시 assignment 해제와 재활성화 시 미복원
+- teacher 비활성화 시 assignment 해제와 재활성화 시 미복원
+- classroom 비활성화 시 assignment와 student membership 보존 및 운영 차단
 - 기존 teacher membership의 1:1 migration과 충돌 데이터 거부
 
 ### Student membership과 roster

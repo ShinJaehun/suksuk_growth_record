@@ -46,7 +46,7 @@ manager의 canonical source는 기존 `SchoolMembership.role == "manager"`이며
 
 이 policy는 학교 운영 정보와 학교별 선생님 관리 route에 연결된다. member는 자신의 학교 현황을 읽고 global admin은 manager를 지정·해제할 수 있다. manager는 학급을 다른 학교로 이동할 수 없고, teacher를 다른 학교로 이동하거나 학교 소속을 해제하거나 manager 지정·해제를 할 수 없다. 학교 manager의 teacher 생성은 URL의 학교로 고정되며 항상 일반 구성원으로 생성된다.
 
-담당 teacher 배정·해제는 역할별 전용 경로에서 수행한다. canonical target에서는 teacher form이 학교, 학년, 단일 학급을 함께 관리하고 현재 담당 관계는 `Classroom.teacher_id`에 저장한다. classroom create/update는 담당 teacher를 동시에 지정하지 않는다. `/classrooms/:id/edit`에서 admin과 해당 학교 manager는 교실 이름·학년 등 구조 정보를 관리하고, 담당 teacher는 허용된 교실 운영 기능만 관리한다. manager가 담당 teacher가 아니라면 학생 관리와 운영 권한은 없다.
+담당 teacher 배정·해제는 역할별 전용 경로에서 수행한다. teacher form은 학교, 학년, 단일 학급을 함께 관리하고 현재 담당 관계는 `Classroom.teacher_id`에 저장한다. classroom create/update는 담당 teacher를 동시에 지정하지 않는다. `/classrooms/:id/edit`에서 admin과 해당 학교 manager는 교실 이름·학년 등 구조 정보를 관리하고, 담당 teacher는 허용된 교실 운영 기능만 관리한다. manager가 담당 teacher가 아니라면 학생 관리와 운영 권한은 없다.
 
 ---
 
@@ -63,22 +63,15 @@ manager의 canonical source는 기존 `SchoolMembership.role == "manager"`이며
 
 teacher의 담당 classroom을 바꾸면 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 한 transaction에서 처리한다. 학교나 학년 변경 후 유효한 classroom을 선택하지 않으면 미배정으로 저장한다. 같은 학교에서는 manager 역할을 유지하고 학교 변경 시 새 학교의 member가 된다. classroom 자체의 학교는 생성 후 변경할 수 없다.
 
-현재 구현의 teacher `ClassroomMembership`은 canonical target이 아니다. 구현 단계에서는 실제 데이터를 감사해 1:1 호환 관계만 `Classroom.teacher_id`로 이전하고, 한 teacher의 다중 classroom 또는 한 classroom의 다중 teacher 충돌은 임의 선택하지 않고 명시적 정리 후 migration한다.
+현재 teacher assignment는 `Classroom.teacher_id`를 canonical source로 사용하며 teacher와 classroom 양쪽 모두 최대 하나의 상대만 가진다. `ClassroomMembership`은 student membership에 사용한다.
 
 ---
 
-## 5. 구현 단계
+## 5. Lifecycle 경계
 
-이 브랜치에서는 다음 순서로 진행한다.
-
-1. 학교 운영 정책 문서
-2. SchoolMembership manager 역할
-3. 학교 manager policy와 scope
-4. 학교 운영 정보와 manager 지정
-5. teacher와 classroom의 단일 담당 관계 migration
-6. 통합 테스트와 문서 동기화
-
-구현 중 확인되는 현재 구조와 의존성에 따라 순서는 작게 조정할 수 있다.
+- teacher 비활성화는 현재 classroom assignment를 해제하며 재활성화 시 자동 복원하지 않는다.
+- classroom 비활성화는 teacher assignment와 student membership을 보존한 채 운영을 잠근다.
+- student의 현재 운영 상태는 `ClassroomMembership.status`로 관리한다.
 
 ---
 
