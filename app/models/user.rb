@@ -44,6 +44,7 @@ class User < ApplicationRecord
   # 교실 멤버십은 유저 삭제 시 같이 삭제(조인 테이블)
   has_many :classroom_memberships, dependent: :destroy
   has_many :classrooms, through: :classroom_memberships
+  belongs_to :school_year, optional: true
   has_one :school_membership, dependent: :destroy
   has_one :school, through: :school_membership
   has_one :assigned_classroom,

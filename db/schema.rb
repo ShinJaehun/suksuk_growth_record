@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -116,16 +116,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_000000) do
     t.string "email"
     t.string "encrypted_password", default: "", null: false
     t.string "gender"
+    t.integer "grade"
+    t.string "login_id"
     t.string "name"
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
     t.string "role", default: "student", null: false
+    t.string "school_role"
+    t.bigint "school_year_id"
     t.string "student_pin_digest"
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["role", "active"], name: "index_users_on_role_and_active"
+    t.index ["school_year_id", "login_id"], name: "index_users_on_school_year_id_and_login_id", unique: true
+    t.index ["school_year_id"], name: "index_users_on_school_year_id"
+    t.index ["school_year_id"], name: "index_users_on_unique_manager_school_year", unique: true, where: "(((role)::text = 'teacher'::text) AND ((school_role)::text = 'manager'::text) AND (school_year_id IS NOT NULL))"
+    t.check_constraint "grade IS NULL OR grade >= 1 AND grade <= 6", name: "chk_users_grade_range"
+    t.check_constraint "school_role IS NULL OR (school_role::text = ANY (ARRAY['member'::character varying, 'manager'::character varying]::text[]))", name: "chk_users_school_role"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
@@ -137,4 +146,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_000000) do
   add_foreign_key "school_memberships", "schools"
   add_foreign_key "school_memberships", "users", on_delete: :cascade
   add_foreign_key "school_years", "schools"
+  add_foreign_key "users", "school_years"
 end

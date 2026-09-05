@@ -1,6 +1,122 @@
 require "rails_helper"
 
 RSpec.describe User, type: :model do
+  describe "annual teacher compatibility schema" do
+    it "optionally belongs to a school year" do
+      school_year = create(:school_year)
+      teacher = create(:user, :teacher, school_year: school_year)
+
+      expect(teacher.school_year).to eq(school_year)
+      expect(build(:user, :teacher, school_year: nil)).to be_valid
+    end
+
+    it "rejects an unknown school year at the database boundary" do
+      teacher = create(:user, :teacher)
+
+      expect do
+        teacher.update_columns(school_year_id: -1)
+      end.to raise_error(ActiveRecord::InvalidForeignKey)
+    end
+
+    it "rejects duplicate login IDs within one school year" do
+      school_year = create(:school_year)
+      first_teacher = create(:user, :teacher)
+      second_teacher = create(:user, :teacher)
+      first_teacher.update_columns(school_year_id: school_year.id, login_id: "tara0411")
+
+      expect do
+        second_teacher.update_columns(school_year_id: school_year.id, login_id: "tara0411")
+      end.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+
+    it "allows the same login ID in different school years" do
+      school = create(:school)
+      first_year = create(:school_year, :archived, school: school, year: 2025)
+      second_year = create(:school_year, :active, school: school, year: 2026)
+      first_teacher = create(:user, :teacher)
+      second_teacher = create(:user, :teacher)
+
+      first_teacher.update_columns(school_year_id: first_year.id, login_id: "tara0411")
+
+      expect do
+        second_teacher.update_columns(school_year_id: second_year.id, login_id: "tara0411")
+      end.not_to raise_error
+    end
+
+    it "allows multiple null login IDs" do
+      school_year = create(:school_year)
+      first_teacher = create(:user, :teacher, school_year: school_year)
+
+      expect { create(:user, :teacher, school_year: school_year) }
+        .to change(described_class.teacher, :count).by(1)
+      expect(first_teacher.login_id).to be_nil
+    end
+
+    it "rejects an unsupported school role at the database boundary" do
+      teacher = create(:user, :teacher)
+
+      expect do
+        teacher.update_columns(school_role: "owner")
+      end.to raise_error(ActiveRecord::StatementInvalid)
+    end
+
+    it "rejects grades below the supported range at the database boundary" do
+      teacher = create(:user, :teacher)
+
+      expect do
+        teacher.update_columns(grade: 0)
+      end.to raise_error(ActiveRecord::StatementInvalid)
+    end
+
+    it "rejects grades above the supported range at the database boundary" do
+      teacher = create(:user, :teacher)
+
+      expect do
+        teacher.update_columns(grade: 7)
+      end.to raise_error(ActiveRecord::StatementInvalid)
+    end
+
+    it "rejects a second manager teacher within one school year" do
+      school_year = create(:school_year)
+      first_teacher = create(:user, :teacher)
+      second_teacher = create(:user, :teacher)
+      first_teacher.update_columns(school_year_id: school_year.id, school_role: "manager")
+
+      expect do
+        second_teacher.update_columns(school_year_id: school_year.id, school_role: "manager")
+      end.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+
+    it "allows manager teachers in different school years" do
+      first_year = create(:school_year)
+      second_year = create(:school_year)
+      first_teacher = create(:user, :teacher)
+      second_teacher = create(:user, :teacher)
+      first_teacher.update_columns(school_year_id: first_year.id, school_role: "manager")
+
+      expect do
+        second_teacher.update_columns(school_year_id: second_year.id, school_role: "manager")
+      end.not_to raise_error
+    end
+
+    it "keeps existing account kinds valid without annual fields" do
+      users = [
+        create(:user, :teacher),
+        create(:user, :admin),
+        create(:user, :student)
+      ]
+
+      expect(users).to all(
+        have_attributes(
+          school_year_id: nil,
+          login_id: nil,
+          school_role: nil,
+          grade: nil
+        )
+      )
+    end
+  end
+
   describe ".avatar_keys_for" do
     it "returns boy avatar keys" do
       expect(described_class.avatar_keys_for("boy")).to include("boy01", "boy23")
