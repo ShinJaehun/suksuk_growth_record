@@ -4,6 +4,8 @@
 
 학교 공통 starter에서 teacher와 classroom의 운영 lifecycle, 역할별 접근·관리 권한, 일반 운영 영역과 향후 global admin bulk management 영역의 경계를 정의한다. teacher와 classroom의 단일 담당 관계를 명확히 하고 활성 상태를 일상적인 운영 lifecycle로 사용한다.
 
+이 문서는 현재 runtime의 `SchoolMembership`, `Classroom.teacher_id`, student `ClassroomMembership`과 Devise email/password 흐름을 기준으로 한다. 장기 SchoolYear target에서는 annual teacher User, HomeroomAssignment, StudentEnrollment와 School-scoped `login_id` 인증으로 책임을 이전하며, manager는 자기 School 전체의 school-level operator가 된다. 아직 구현되지 않은 target은 [`school_year_architecture.md`](school_year_architecture.md)를 따른다.
+
 ## 용어와 현재 구조
 
 - global admin은 `User.role == "admin"`인 사용자다.
@@ -242,7 +244,7 @@ global admin과 학교 대표 선생님은 권한 범위에서 classroom 추가,
 - 한 번에 한 학교를 선택해 관리
 - policy 또는 scope 밖 record 수정 금지
 - starter의 단일 teacher assignment와 학생용 classroom membership 모델 유지
-- 투표 앱의 `login_id`, `class_label`, `school_year` 구조를 복제하지 않음
+- 다른 서비스의 `login_id`, `class_label`, `school_year` 구현을 그대로 복제하지 않음. 장기 target 자체는 `school_year_architecture.md`에서 독립적으로 정의한다.
 
 bulk update의 atomic transaction, row validation, rollback, dirty tracking은 별도 canonical spec에서 정의한다.
 
@@ -362,7 +364,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 
 #### C. Ambiguous / needs user decision
 
-- 없음. 학년도 rollover, 진급, 반 편성·전입 이력과 여러 historical classroom 설계는 이번 canonical 범위에서 명시적으로 제외한다.
+- 없음. 이 current-runtime lifecycle 범위에서 제외한 학년도 rollover와 historical classroom target은 `school_year_architecture.md`에서 별도로 확정하며, 진급·반 편성·전입 이력의 상세 운영은 후속 정책 범위다.
 
 #### D. Out of current scope
 
@@ -428,8 +430,8 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 - teacher 또는 classroom 물리 삭제 기능 확대
 - `User.grade` 추가
 - teacher의 복수 classroom 담당 또는 classroom의 복수 teacher 담당
-- 학년도 `school_year` 도입
-- `class_label` 도입
+- 학년도 `school_year` 도입(이 current-runtime spec의 범위 밖이며 장기 target은 별도 canonical을 따름)
+- `class_label` 도입(이 current-runtime spec의 범위 밖이며 장기 target은 별도 canonical을 따름)
 - 교사 비밀번호 관리 또는 초기화 정책
 - global admin 역할 편집
 - manager 승격·강등 UI 변경

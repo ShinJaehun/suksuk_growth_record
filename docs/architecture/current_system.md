@@ -4,6 +4,8 @@
 
 현재 starter에 실제로 존재하는 공통 학교·교실·사용자 구조를 기록한다. 추출 과정에서 제거된 service-specific 도메인은 현재 시스템으로 설명하지 않는다.
 
+이 문서는 현재 runtime을 설명한다. SchoolYear, annual teacher User, HomeroomAssignment와 StudentEnrollment의 승인된 장기 target은 [`school_year_architecture.md`](../specs/school_year_architecture.md)를 따르며 아직 구현된 구조로 서술하지 않는다.
+
 ## 핵심 역할
 
 - `admin`: 전체 학교 범위의 관리 권한을 가진다.
@@ -94,6 +96,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 
 ## 관련 canonical 문서
 
+- 장기 SchoolYear architecture: [`school_year_architecture.md`](../specs/school_year_architecture.md)
 - 학교 운영 lifecycle과 1:1 teacher assignment: [`school_operations_lifecycle.md`](../specs/school_operations_lifecycle.md)
 - 학교와 교실 경계: [`school_classroom_boundaries.md`](school_classroom_boundaries.md)
 - classroom grade: [`classroom_grade_foundation.md`](../specs/classroom_grade_foundation.md)

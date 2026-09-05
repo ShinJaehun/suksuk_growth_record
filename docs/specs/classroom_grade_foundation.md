@@ -14,6 +14,8 @@
 - global admin은 권한 범위 안의 학교를 대상으로 기존 `school_id` 필터를 사용할 수 있다.
 - student가 `/classrooms`에 접근하면 자신의 페이지로 이동한다.
 
+이 문서는 현재 runtime의 `Classroom.grade`, `Classroom.name`과 직접 School 소속을 기준으로 한다. 장기 SchoolYear target에서는 grade `1..6`을 유지하면서 Classroom을 SchoolYear에 귀속하고 반 식별을 normalized string `class_label`로 분리하며, 같은 SchoolYear의 `grade + class_label`을 유일하게 한다. 자세한 target은 [`school_year_architecture.md`](school_year_architecture.md)를 따른다.
+
 ## 요구사항과 정책
 
 ### 학년 데이터 정책

@@ -1,5 +1,7 @@
 # Roles And Permissions
 
+이 문서의 role, policy와 권한 매트릭스는 현재 runtime을 설명한다. 장기 SchoolYear target에서는 manager를 자기 School 전체의 school-level operator로 정의하며 active 운영, planning bootstrap과 archived read-only 권한은 [`school_year_architecture.md`](../specs/school_year_architecture.md)를 따른다. 이는 현재 policy가 이미 그 범위로 구현됐다는 뜻이 아니다.
+
 ## 권한 구조 요약
 
 - 서버측 권한 판단의 중심은 Pundit policy와 `policy_scope`다.
@@ -26,7 +28,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 - 자기 학교의 teacher, classroom과 student 운영만 관리한다.
 - 자기 학교 ordinary teacher의 profile, lifecycle과 단일 담당 classroom을 관리한다.
 - 다른 학교, global admin 권한, manager role과 manager lifecycle을 변경할 수 없다.
-- manager라는 이유만으로 미담당 classroom의 학생 운영 권한을 얻지 않는다.
+- 현재 runtime에서는 manager라는 이유만으로 미담당 classroom의 학생 운영 권한을 얻지 않는다. 장기 target의 school-wide manager authority와 구분한다.
 
 학교별 manager는 `SchoolMembership.role == "manager"`로 없거나 한 명만 둔다. `School.manager_id`는 추가하지 않으며 manager 지정·교체·해제는 global admin만 수행한다.
 
@@ -44,6 +46,8 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 - PIN/token 로그인과 짧은 student session 정책을 따른다.
 
 ## 주요 권한 매트릭스
+
+다음 표는 현재 구현 기준이다.
 
 | 리소스/액션 | global admin | manager | 일반 teacher | student |
 |---|---|---|---|---|

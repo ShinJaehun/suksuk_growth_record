@@ -5,6 +5,8 @@
 학생의 교실 활동 상태는 `User`가 아니라 `ClassroomMembership`으로 관리한다.
 운영 화면에서는 학생 계정을 기본적으로 삭제하지 않고, 교실 membership을 비활성화하거나 복구한다.
 
+이 문서는 현재 runtime의 student `User`와 `ClassroomMembership` lifecycle을 정의한다. 장기 SchoolYear target에서는 별도 `Student`와 `StudentEnrollment`로 책임을 이전하며, manager는 자기 School 전체를 담당하는 방향으로 확장한다. 해당 target은 [`school_year_architecture.md`](school_year_architecture.md)를 따른다.
+
 ## Membership 역할별 정책
 
 `ClassroomMembership`에 `status`를 둔다.
@@ -72,7 +74,7 @@ transfer service를 만들지 않으며, 기존 active membership과 대상 학�
 
 학생 상세와 계정 관리 화면은 URL에 지정된 classroom을 기준으로 권한을 확인한다.
 global admin은 모든 학급에 접근할 수 있고, teacher는 해당 classroom의 `teacher_id`가 자신일 때만
-접근할 수 있다. 학교 manager도 실제 담당 teacher가 아니면 학생 데이터에 접근할 수 없다. student는
+접근할 수 있다. 현재 runtime에서는 학교 manager도 실제 담당 teacher가 아니면 학생 데이터에 접근할 수 없다. student는
 본인이면서 해당 classroom의 membership이 active일 때만 접근할 수 있다.
 
 ## 사용자 안내
