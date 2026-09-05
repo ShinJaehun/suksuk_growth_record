@@ -61,6 +61,9 @@
                 <span class="truncate"><%= classroom.school&.name || t("classrooms.index.school_unspecified") %></span>
               </p>
               <h2 class="mt-1 truncate text-lg font-bold text-slate-900"><%= classroom_display_name(classroom) %></h2>
+              <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold <%= classroom.active? ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600" %>">
+                <%= t(classroom.active? ? "classroom_status.active" : "classroom_status.inactive") %>
+              </span>
             </div>
 
             <div class="space-y-3">
@@ -111,12 +114,12 @@
             <%= link_to t("classrooms.index.open"),
                   classroom_path(classroom),
                   class: "inline-flex flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
-            <% if @member_manageable_classroom_ids.include?(classroom.id) %>
+            <% if policy(classroom).manage_members? %>
               <%= link_to t("classrooms.show.manage_members"),
                     classroom_members_path(classroom),
                     class: "inline-flex flex-1 items-center justify-center rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100" %>
             <% end %>
-            <% if @manageable_classroom_ids.include?(classroom.id) %>
+            <% if policy(classroom).edit? %>
               <%= link_to t("classrooms.actions.settings"),
                     edit_classroom_path(classroom),
                     class: "inline-flex flex-1 items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" %>

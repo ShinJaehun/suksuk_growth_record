@@ -17,7 +17,30 @@
     </div>
   </div>
 
-  <%= render "classrooms/form", classroom: @classroom, submit_label: t("classrooms.edit.submit") %>
+  <% if policy(@classroom).manage_structure? %>
+    <%= render "classrooms/form", classroom: @classroom, submit_label: t("classrooms.edit.submit") %>
+  <% end %>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <h2 class="text-base font-semibold text-slate-900"><%= t("classrooms.edit.lifecycle_title") %></h2>
+    <p class="mt-1 text-sm text-slate-600">
+      <%= t("classrooms.edit.current_status", status: t(@classroom.active? ? "classroom_status.active" : "classroom_status.inactive")) %>
+    </p>
+
+    <div class="mt-4">
+      <% if policy(@classroom).deactivate? %>
+        <%= link_to t("classroom_status.deactivate"),
+              deactivate_classroom_path(@classroom),
+              data: { turbo_method: :patch, turbo_confirm: t("classroom_status.confirm_deactivate") },
+              class: "inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100" %>
+      <% elsif policy(@classroom).reactivate? %>
+        <%= link_to t("classroom_status.reactivate"),
+              reactivate_classroom_path(@classroom),
+              data: { turbo_method: :patch },
+              class: "inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100" %>
+      <% end %>
+    </div>
+  </section>
 
   <% if policy(@classroom).destroy? %>
     <section class="rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-sm">

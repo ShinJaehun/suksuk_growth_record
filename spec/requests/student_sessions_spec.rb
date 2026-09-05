@@ -131,6 +131,17 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response.body).to include('새 QR 코드나 로그인 주소')
   end
 
+  it 'rejects GET and POST login through an inactive classroom token' do
+    classroom.update!(active: false)
+
+    get public_student_login_path(student_login_token: classroom.student_login_token)
+    expect(response).to have_http_status(:not_found)
+
+    post_student_pin(pin: '1234')
+    expect(response).to have_http_status(:not_found)
+    expect(controller.current_user).to be_nil
+  end
+
   it 'filters the raw token from valid GET student login request logs' do
     token = classroom.student_login_token
 
@@ -253,6 +264,16 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(session[:student_last_seen_at]).to eq(Time.zone.local(2026, 5, 22, 10, 5, 0).to_i)
+  end
+
+  it 'ends an existing student session after the classroom is deactivated' do
+    post_student_pin(pin: '1234')
+    classroom.update!(active: false)
+
+    get user_path(student)
+
+    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(controller.current_user).to be_nil
   end
 
   it 'redirects an expired student session to the classroom PIN login page' do

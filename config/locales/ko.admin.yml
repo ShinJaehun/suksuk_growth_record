@@ -61,6 +61,7 @@ ko:
         select_grade: "학년을 선택하면 담당 학급을 선택할 수 있습니다."
         current_classrooms: "현재 담당 학급"
         inactive_classroom: "비활성"
+        inactive_classroom_assignment_locked: "비활성 교실의 담당 관계는 교실을 재활성화한 뒤 변경할 수 있습니다."
         avatar_select: "썸네일 선택"
         submitting: "저장 중..."
       info:
@@ -80,6 +81,7 @@ ko:
         assignment_save_failed: "학교와 담당 학급을 저장하지 못했습니다."
         inactive_teacher: "비활성 선생님에게 담당 학급을 배정할 수 없습니다."
         inactive_classroom: "비활성 학급에는 선생님을 배정할 수 없습니다."
+        inactive_classroom_assignment_locked: "비활성 교실의 담당 관계는 교실을 재활성화한 뒤 변경할 수 있습니다."
         assignment_selection_required: "학교와 담당 학급의 최종 상태를 함께 선택해 주세요."
         teacher_required: "선생님 계정만 학교와 담당 학급을 변경할 수 있습니다."
         membership_grade_invalid: "학년은 1학년부터 6학년까지만 선택할 수 있습니다."

@@ -7,6 +7,7 @@ class ClassroomsController < ApplicationController
   before_action :set_classroom, only: [
     :show, :destroy
   ]
+  before_action :set_lifecycle_classroom, only: %i[deactivate reactivate]
 
   def index
     # index는 policy_scope만 요구(verify_policy_scoped 훅 통과)
@@ -103,10 +104,36 @@ class ClassroomsController < ApplicationController
       status: :see_other
   end
 
+  def deactivate
+    authorize @classroom, :deactivate?
+    update_classroom_status(false)
+  end
+
+  def reactivate
+    authorize @classroom, :reactivate?
+    update_classroom_status(true)
+  end
+
   private
 
   def set_classroom
     @classroom = Classroom.find(params[:id])
+  end
+
+  def set_lifecycle_classroom
+    @classroom = policy_scope(Classroom).find(params[:id])
+  end
+
+  def update_classroom_status(active)
+    if @classroom.update(active: active)
+      redirect_to classrooms_path,
+        notice: t(active ? "classroom_status.reactivated" : "classroom_status.deactivated"),
+        status: :see_other
+    else
+      redirect_to classroom_path(@classroom),
+        alert: t("classroom_status.failure"),
+        status: :see_other
+    end
   end
 
   def classroom_destroy_error_message

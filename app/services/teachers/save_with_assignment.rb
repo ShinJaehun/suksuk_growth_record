@@ -30,11 +30,12 @@ module Teachers
       User.transaction do
         teacher.lock! if teacher.persisted?
         teacher.assign_attributes(attributes)
+        @current_classroom = teacher.assigned_classroom
         normalize_inputs
+        validate_inactive_assignment_lock
         validate_inputs
         raise ActiveRecord::Rollback if teacher.errors.any?
 
-        current_classroom = teacher.assigned_classroom
         [current_classroom, classroom].compact.uniq.sort_by(&:id).each(&:lock!)
 
         teacher.save!
@@ -51,7 +52,8 @@ module Teachers
 
     private
 
-    attr_reader :teacher, :attributes, :school, :raw_classroom_id, :membership_grade, :classroom, :grade
+    attr_reader :teacher, :attributes, :school, :raw_classroom_id, :membership_grade, :classroom, :grade,
+                :current_classroom
 
     def normalize_inputs
       @grade = normalized_grade
@@ -72,8 +74,17 @@ module Teachers
       add_error(:classroom_school_mismatch) if school && classroom.school_id != school.id
       add_error(:classroom_grade_mismatch) unless grade && classroom.grade == grade
       add_error(:inactive_teacher) unless teacher.active?
-      add_error(:inactive_classroom) unless classroom.active?
+      add_error(:inactive_classroom) unless classroom.active? || classroom == current_classroom
       add_error(:classroom_already_assigned) if classroom.teacher_id.present? && classroom.teacher_id != teacher.id
+    end
+
+    def validate_inactive_assignment_lock
+      return unless current_classroom&.inactive?
+      return if school&.id == teacher.school_membership&.school_id &&
+                grade == teacher.school_membership&.grade &&
+                classroom == current_classroom
+
+      add_error(:inactive_classroom_assignment_locked)
     end
 
     def normalized_grade

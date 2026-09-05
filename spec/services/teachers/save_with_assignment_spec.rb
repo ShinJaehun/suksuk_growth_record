@@ -31,6 +31,64 @@ RSpec.describe Teachers::SaveWithAssignment do
     expect(teacher.reload.name).to eq("변경 후")
   end
 
+  it "updates profile attributes while preserving an inactive classroom assignment" do
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+    classroom.update!(active: false)
+
+    result = save(teacher: membership.user, school: membership.school, grade: 4,
+                  classroom: classroom, attributes: { name: "변경 후" })
+
+    expect(result).to be_success
+    expect(membership.user.reload.name).to eq("변경 후")
+    expect(classroom.reload.teacher).to eq(membership.user)
+  end
+
+  it "rejects grade changes while preserving an inactive classroom assignment" do
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+    classroom.update!(active: false)
+
+    result = save(teacher: membership.user, school: membership.school, grade: 5,
+                  classroom: classroom)
+
+    expect(result).not_to be_success
+    expect(membership.reload.grade).to eq(4)
+    expect(classroom.reload.teacher).to eq(membership.user)
+  end
+
+  it "rejects removing or moving an inactive classroom assignment" do
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+    destination = create(:classroom, school: membership.school, grade: 4)
+    classroom.update!(active: false)
+
+    removal = save(teacher: membership.user, school: membership.school, grade: 4)
+    expect(removal).not_to be_success
+    expect(classroom.reload.teacher).to eq(membership.user)
+
+    membership.user.errors.clear
+    move = save(teacher: membership.user, school: membership.school, grade: 4, classroom: destination)
+    expect(move).not_to be_success
+    expect(classroom.reload.teacher).to eq(membership.user)
+    expect(destination.reload.teacher).to be_nil
+  end
+
+  it "allows assignment changes after the classroom is reactivated" do
+    membership = create(:school_membership, grade: 4)
+    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+    destination = create(:classroom, school: membership.school, grade: 4)
+    classroom.update!(active: false)
+    classroom.update!(active: true)
+
+    result = save(teacher: membership.user, school: membership.school, grade: 4,
+                  classroom: destination)
+
+    expect(result).to be_success
+    expect(classroom.reload.teacher).to be_nil
+    expect(destination.reload.teacher).to eq(membership.user)
+  end
+
   it "assigns one active classroom from the same school and grade" do
     membership = create(:school_membership, grade: 5)
     classroom = create(:classroom, school: membership.school, grade: 5)

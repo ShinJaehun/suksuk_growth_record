@@ -144,14 +144,17 @@ active:boolean, default: true, null: false
 
 - 삭제하지 않고 기존 student membership과 학생·서비스 기록을 보존한다.
 - 신규 student와 teacher를 배정할 수 없다.
-- 비활성화 transaction에서 현재 `teacher_id`를 `nil`로 변경한다.
+- 비활성화는 교실 전체 운영을 잠그며 현재 `teacher_id`, student membership과 `student_number`를 그대로 보존한다.
 - 학생 관리 등 일반 운영 mutation을 허용하지 않는다.
+- student token/PIN 로그인을 허용하지 않으며 기존 학생 session도 다음 request에서 종료한다.
 - 일반 선생님의 목록, 자동 진입과 정상 운영 대상에서 제외한다.
 - 학교 대표 선생님은 자기 학교 범위에서, global admin은 관리 권한 범위에서 조회하고 재활성화할 수 있다.
 
 inactive School에 대한 기존 lifecycle과 접근 차단이 상위 경계다. classroom의 active 상태가 inactive School의 운영을 다시 허용하거나 기존 School policy를 우회하지 않는다.
 
-classroom을 재활성화해도 과거 담당 teacher를 자동 복원하지 않는다. 필요하면 active teacher를 다시 명시적으로 배정한다.
+classroom을 재활성화하면 보존된 `teacher_id`와 student membership을 별도 복원 작업 없이 다시 사용한다. 기존 teacher가 그 시점에도 active이고 school·grade 불변식을 만족해야 한다. classroom이 inactive인 동안 teacher 자체가 비활성화되면 Teacher lifecycle 정책에 따라 `teacher_id`를 해제하며, 이 경우 classroom을 재활성화해도 teacher를 자동 복원하지 않는다.
+
+inactive classroom에 보존된 teacher assignment는 classroom을 재활성화하기 전까지 해당 teacher의 membership grade 변경, classroom 이동과 assignment 해제를 허용하지 않는다. 이름·이메일·성별·avatar 등 일반 profile 변경은 허용하며, teacher 자체의 lifecycle 변경은 별도 정책을 따른다.
 
 ## 교사·교실 배정 불변식
 
@@ -316,7 +319,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 1. 기존 teacher assignment code와 데이터는 `ClassroomMembership(role: "teacher")`를 사용한다. 구현 전에 1:1 호환 여부를 점검하고 충돌 데이터를 명시적으로 정리한 뒤 nullable `Classroom.teacher_id`로 이전해야 한다.
 2. `Classroom.teacher_id`에는 `users` foreign key와 null이 아닌 값에 대한 unique index가 필요하다. 정확한 migration 순서와 DB constraint는 현재 schema와 실제 데이터 확인 후 정한다.
 3. teacher assignment의 controller, service, policy, scope와 UI를 단일 `Classroom.teacher_id` 기준으로 변경하고 신규 teacher `ClassroomMembership` 생성을 제거해야 한다.
-4. teacher 또는 classroom 비활성화 시 현재 assignment를 같은 transaction에서 해제하고, 재활성화 시 자동 복원하지 않도록 lifecycle 경로를 변경해야 한다.
+4. teacher 비활성화 시 현재 assignment를 같은 transaction에서 해제한다. classroom 비활성화는 assignment를 보존한 채 운영만 잠그고, 재활성화 시 보존된 관계를 다시 사용한다.
 5. classroom grade 변경은 담당 teacher의 membership grade와 충돌하면 거부하도록 서버 불변식을 추가해야 한다.
 6. 같은 school의 manager membership을 최대 하나로 제한하는 model 및 DB 수준 invariant가 필요하다. 구현 전에 기존 복수 manager 데이터 유무를 확인하며 충돌이 있으면 임의 선택하지 않는다.
 7. 일반 teacher의 담당 active classroom 1개 자동 진입과 manager/admin의 lifecycle 관리 UI는 후속 구현 대상이다.
@@ -348,7 +351,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 22. 담당 classroom 변경은 기존 `teacher_id` 해제와 새 `teacher_id` 설정을 하나의 transaction에서 처리한다.
 23. 담당 teacher가 있는 classroom의 grade를 불일치 상태로 변경할 수 없으며 기본 운영에서는 먼저 assignment를 해제한다.
 24. teacher를 deactivate하면 현재 classroom assignment를 해제하고 reactivation 시 자동 복원하지 않는다.
-25. classroom을 deactivate하면 현재 teacher assignment를 해제하고 reactivation 시 자동 복원하지 않는다.
+25. classroom을 deactivate하면 현재 teacher assignment와 student membership을 보존한 채 운영을 잠그고, reactivation 시 별도 복원 없이 보존된 관계를 다시 사용한다.
 26. assignment 해제와 lifecycle 전환은 서비스 기록, 작성자 정보와 학생 membership을 삭제하지 않는다.
 27. inactive classroom은 일반 선생님의 목록, 자동 진입과 mutation 대상에서 제외되며 manager와 global admin은 권한 범위에서 조회·재활성화할 수 있다.
 28. 일반 선생님의 담당 active classroom이 하나이면 해당 classroom으로 바로 진입하고 없으면 정상 안내 상태를 표시한다.
@@ -371,7 +374,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 ## 제약
 
 - 이 spec 단계에서는 구현, migration, route 변경 또는 기존 endpoint 삭제를 하지 않는다.
-- lifecycle 구현은 학생 membership과 과거 서비스 기록을 파괴하지 않아야 한다. 현재 teacher assignment는 lifecycle 전환 시 정책에 따라 해제한다.
+- lifecycle 구현은 학생 membership과 과거 서비스 기록을 파괴하지 않아야 한다. classroom lifecycle은 현재 teacher assignment를 보존하며, teacher lifecycle에서 teacher를 비활성화할 때만 현재 assignment를 해제한다.
 - 기존 Pundit 경계를 우회하는 별도 조회나 update 경로를 만들지 않는다.
 - 일반 운영 책임 이동과 bulk management 구현은 단계적으로 진행할 수 있지만 최종 권한 경계는 이 문서를 따른다.
 

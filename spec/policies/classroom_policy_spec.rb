@@ -179,7 +179,8 @@ RSpec.describe ClassroomPolicy do
 
       expect(policy.manage_structure?).to eq(false)
       expect(policy.manage_operations?).to eq(true)
-      expect(policy.update?).to eq(true)
+      expect(policy.update?).to eq(false)
+      expect(policy.edit?).to eq(false)
       expect(policy.manage_members?).to eq(true)
     end
 
@@ -194,6 +195,59 @@ RSpec.describe ClassroomPolicy do
         expect(policy.update?).to eq(false)
         expect(policy.manage_members?).to eq(false)
       end
+    end
+  end
+
+  describe "lifecycle permissions" do
+    let(:school) { create(:school) }
+    let(:active_classroom) { create(:classroom, school: school) }
+    let(:inactive_classroom) { create(:classroom, school: school, active: false) }
+
+    it "allows an admin to deactivate active and reactivate inactive classrooms" do
+      admin = create(:user, :admin)
+
+      expect(described_class.new(admin, active_classroom).deactivate?).to eq(true)
+      expect(described_class.new(admin, inactive_classroom).reactivate?).to eq(true)
+    end
+
+    it "allows only the classroom school's manager" do
+      manager = create(:school_membership, :manager, school: school).user
+      other_manager = create(:school_membership, :manager, school: create(:school)).user
+
+      expect(described_class.new(manager, active_classroom).deactivate?).to eq(true)
+      expect(described_class.new(manager, inactive_classroom).reactivate?).to eq(true)
+      expect(described_class.new(other_manager, active_classroom).deactivate?).to eq(false)
+      expect(described_class.new(other_manager, inactive_classroom).reactivate?).to eq(false)
+    end
+
+    it "rejects ordinary teachers and students" do
+      teacher = create(:user, :teacher)
+      student = create(:user, :student)
+      assign_teacher(active_classroom, teacher)
+      create(:classroom_membership, classroom: active_classroom, user: student, role: :student)
+
+      [teacher, student].each do |user|
+        expect(described_class.new(user, active_classroom).deactivate?).to eq(false)
+        expect(described_class.new(user, inactive_classroom).reactivate?).to eq(false)
+      end
+    end
+
+    it "rejects lifecycle mutations inside an inactive school" do
+      admin = create(:user, :admin)
+      school.update!(active: false)
+
+      expect(described_class.new(admin, active_classroom).deactivate?).to eq(false)
+      expect(described_class.new(admin, inactive_classroom).reactivate?).to eq(false)
+    end
+
+    it "blocks ordinary operations and member management in inactive classrooms" do
+      admin = create(:user, :admin)
+
+      expect(described_class.new(admin, inactive_classroom).edit?).to eq(true)
+      expect(described_class.new(admin, inactive_classroom).manage_structure?).to eq(false)
+      expect(described_class.new(admin, inactive_classroom).manage_operations?).to eq(false)
+      expect(described_class.new(admin, inactive_classroom).manage_members?).to eq(false)
+      expect(described_class.new(admin, inactive_classroom).update?).to eq(false)
     end
   end
 

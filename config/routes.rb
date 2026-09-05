@@ -30,6 +30,9 @@ Rails.application.routes.draw do
   end
 
   resources :classrooms, except: [:edit, :update] do
+    patch :deactivate, on: :member
+    patch :reactivate, on: :member
+
     resource :members, only: :show, module: :classrooms
     get "members/students/names/edit",
       to: "classrooms/members#edit_student_names",

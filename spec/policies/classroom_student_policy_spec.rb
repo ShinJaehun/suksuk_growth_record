@@ -45,5 +45,13 @@ RSpec.describe ClassroomStudentPolicy do
       expect(policy.create?).to eq(false)
       expect(policy.destroy?).to eq(false)
     end
+
+    it "rejects mutations in an inactive classroom" do
+      classroom.update!(active: false)
+      policy = described_class.new(create(:user, :admin), record)
+
+      expect(policy.create?).to eq(false)
+      expect(policy.destroy?).to eq(false)
+    end
   end
 end

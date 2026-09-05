@@ -9,10 +9,13 @@ class Classroom < ApplicationRecord
   has_many :classroom_memberships, dependent: :destroy
   has_many :users, through: :classroom_memberships
   before_destroy :prevent_destroy_with_students, prepend: true
-  before_validation :release_teacher, if: :deactivating?
 
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
+
+  def inactive?
+    !active?
+  end
 
   def students
     users.merge(ClassroomMembership.where(role: 'student', status: 'active'))
@@ -41,14 +44,6 @@ class Classroom < ApplicationRecord
     errors.add(:school, :immutable)
   end
 
-  def deactivating?
-    persisted? && will_save_change_to_active?(from: true, to: false)
-  end
-
-  def release_teacher
-    self.teacher = nil
-  end
-
   def prevent_destroy_with_students
     return unless classroom_memberships.student.exists?
 
@@ -61,7 +56,7 @@ class Classroom < ApplicationRecord
 
     errors.add(:teacher, :invalid) unless teacher.teacher?
     errors.add(:teacher, :inactive) unless teacher.active?
-    errors.add(:teacher, :inactive_classroom) unless active?
+    errors.add(:teacher, :inactive_classroom) if !active? && will_save_change_to_teacher_id?
 
     membership = teacher.school_membership
     errors.add(:teacher, :school_membership_required) unless membership

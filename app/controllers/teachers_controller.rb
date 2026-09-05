@@ -19,7 +19,10 @@ class TeachersController < ApplicationController
     school = managed_school
     membership_grade = normalized_membership_grade
     classroom_id = selected_classroom_id(school, membership_grade)
-    result = save_teacher(school, classroom_id, attributes: {}, membership_grade: membership_grade) unless assignment_invalid?
+    unless assignment_invalid?
+      result = save_teacher(school, classroom_id, attributes: {},
+                                                  membership_grade: membership_grade)
+    end
 
     if result&.success?
       redirect_to teachers_path, notice: t('admin.teachers.create.success'), status: :see_other
@@ -46,12 +49,14 @@ class TeachersController < ApplicationController
     membership_grade = normalized_membership_grade
     classroom_id = selected_classroom_id(school, membership_grade)
     attributes = normalized_profile_attributes(update_params, current_avatar_key: @teacher.avatar_key)
-    result = save_teacher(
-      school,
-      classroom_id,
-      attributes: attributes,
-      membership_grade: membership_grade
-    ) unless assignment_invalid?
+    unless assignment_invalid?
+      result = save_teacher(
+        school,
+        classroom_id,
+        attributes: attributes,
+        membership_grade: membership_grade
+      )
+    end
 
     if result&.success?
       redirect_to teachers_path, notice: t('admin.teachers.update.success'), status: :see_other
@@ -91,7 +96,8 @@ class TeachersController < ApplicationController
                        else
                          manager_school
                        end
-    scope = teacher_management_scope.with_attached_avatar.includes(school_membership: :school, assigned_classroom: :school)
+    scope = teacher_management_scope.with_attached_avatar.includes(school_membership: :school,
+                                                                   assigned_classroom: :school)
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
     if @selected_school
       scope = scope.joins(:school_membership).where(school_memberships: { school_id: @selected_school.id })
@@ -100,12 +106,14 @@ class TeachersController < ApplicationController
   end
 
   def prepare_form
+    assigned_classroom = @teacher&.assigned_classroom
+    @locked_classroom = assigned_classroom if assigned_classroom&.inactive?
     @schools = manageable_schools
     @selected_school_id = managed_school&.id
-    @membership_grade = membership_grade_for_form
+    @membership_grade = @locked_classroom ? @teacher.school_membership&.grade : membership_grade_for_form
     @classroom_selection_ready = @selected_school_id.present? && selected_membership_grade.present?
     @classroom_selection_prompt_key = classroom_selection_prompt_key
-    @classroom_candidates = classroom_candidates(managed_school)
+    @classroom_candidates = @locked_classroom ? Classroom.none : classroom_candidates(managed_school)
     @selected_classroom_id = selected_classroom_id_for_form
   end
 
@@ -113,10 +121,10 @@ class TeachersController < ApplicationController
     return Classroom.none unless school && selected_membership_grade
 
     school.classrooms.active
-      .where(grade: selected_membership_grade)
-      .where(teacher_id: [nil, @teacher&.id].uniq)
-      .order(:name, :id)
-      .load
+          .where(grade: selected_membership_grade)
+          .where(teacher_id: [nil, @teacher&.id].uniq)
+          .order(:name, :id)
+          .load
   end
 
   def classroom_option_locals(school)
@@ -198,8 +206,9 @@ class TeachersController < ApplicationController
     return nil if raw_id.blank?
 
     classroom = if raw_id.match?(/\A[1-9]\d*\z/) && school && membership_grade
-                  school.classrooms.active.find_by(id: raw_id, grade: membership_grade)
+                  school.classrooms.find_by(id: raw_id, grade: membership_grade)
                 end
+    classroom = nil if classroom&.inactive? && classroom != @teacher.assigned_classroom
     if classroom.nil? || (classroom.teacher_id.present? && classroom.teacher_id != @teacher.id)
       @assignment_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.classroom_not_found'))

@@ -47,11 +47,11 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def update?
-    manage_structure? || manage_operations?
+    manage_structure?
   end
 
   def edit?
-    update?
+    active_school? && !!(admin? || school_manager_of?(record))
   end
 
   def destroy?
@@ -59,15 +59,23 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def manage_members?
-    active_school? && (admin? || teacher_of?(record))
+    active_school? && active_classroom? && (admin? || teacher_of?(record))
   end
 
   def manage_structure?
-    active_school? && !!(admin? || school_manager_of?(record))
+    active_school? && active_classroom? && !!(admin? || school_manager_of?(record))
   end
 
   def manage_operations?
-    active_school? && !!(admin? || teacher_of?(record))
+    active_school? && active_classroom? && !!(admin? || teacher_of?(record))
+  end
+
+  def deactivate?
+    active_school? && active_classroom? && !!(admin? || school_manager_of?(record))
+  end
+
+  def reactivate?
+    active_school? && inactive_classroom? && !!(admin? || school_manager_of?(record))
   end
 
   def view_student_data?
@@ -86,6 +94,14 @@ class ClassroomPolicy < ApplicationPolicy
     return true if admin? && record.respond_to?(:new_record?) && record.new_record?
 
     record.respond_to?(:school) && record.school&.active?
+  end
+
+  def active_classroom?
+    record.respond_to?(:active?) && record.active?
+  end
+
+  def inactive_classroom?
+    record.respond_to?(:active?) && !record.active?
   end
 
   def school_manager?

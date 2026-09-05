@@ -54,7 +54,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).not_to include('id="classroom-school-filter"')
   end
 
-  it 'keeps a regular teacher limited to assigned classrooms' do
+  it 'keeps a regular teacher limited to operating their assigned classroom' do
     create(:school_membership, school: school, user: teacher)
     assigned = create(:classroom, school: school, name: '담당 학급')
     unassigned = create(:classroom, school: school, name: '미담당 학급')
@@ -65,8 +65,13 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
     expect(response.body).to include(assigned.name)
     expect(response.body).to include(
-      edit_classroom_path(assigned),
+      classroom_path(assigned),
       classroom_members_path(assigned)
+    )
+    expect(response.body).not_to include(
+      edit_classroom_path(assigned),
+      deactivate_classroom_path(assigned),
+      reactivate_classroom_path(assigned)
     )
     expect(response.body).not_to include(unassigned.name)
     expect(response.body).not_to include(new_classroom_path)
@@ -97,6 +102,69 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
     expect(classroom_card['class']).to include('border-emerald-200', 'bg-emerald-50/70')
     expect(classroom_card.at_css('.bg-emerald-500')).to be_present
+  end
+
+  it 'shows classroom status without lifecycle actions on the index' do
+    active_classroom = create(:classroom, school: school, name: '활성 학급')
+    inactive_classroom = create(:classroom, school: school, name: '비활성 학급', active: false)
+    sign_in admin
+
+    get classrooms_path
+
+    document = Nokogiri::HTML(response.body)
+    active_card = document.at_xpath(
+      "//article[.//a[@href='#{classroom_path(active_classroom)}']]"
+    )
+    inactive_card = document.at_xpath(
+      "//article[.//a[@href='#{classroom_path(inactive_classroom)}']]"
+    )
+    expect(active_card.text).to include(I18n.t('classroom_status.active'))
+    expect(active_card.to_html).not_to include(
+      deactivate_classroom_path(active_classroom),
+      reactivate_classroom_path(active_classroom)
+    )
+    expect(inactive_card.text).to include(I18n.t('classroom_status.inactive'))
+    expect(inactive_card.to_html).not_to include(
+      deactivate_classroom_path(inactive_classroom),
+      reactivate_classroom_path(inactive_classroom),
+      classroom_members_path(inactive_classroom)
+    )
+    expect(inactive_card.to_html).to include(edit_classroom_path(inactive_classroom))
+  end
+
+  it 'shows structure and deactivate controls on an active classroom edit page' do
+    classroom = create(:classroom, school: school)
+    sign_in admin
+
+    get edit_classroom_path(classroom)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include('name="classroom[name]"', deactivate_classroom_path(classroom))
+    expect(response.body).not_to include(reactivate_classroom_path(classroom))
+  end
+
+  it 'lets a manager enter an inactive classroom edit page only to reactivate it' do
+    manager = create(:school_membership, :manager, school: school).user
+    classroom = create(:classroom, school: school, active: false)
+    sign_in manager
+
+    get edit_classroom_path(classroom)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(reactivate_classroom_path(classroom))
+    expect(response.body).not_to include('name="classroom[name]"', deactivate_classroom_path(classroom))
+  end
+
+  it 'rejects structure updates for an inactive classroom' do
+    classroom = create(:classroom, school: school, active: false, name: '잠긴 학급')
+    sign_in admin
+
+    patch classroom_path(classroom), params: {
+      classroom: classroom_update_params(classroom).merge(name: '변경되면 안 됨')
+    }
+
+    expect(response).to redirect_to(root_path)
+    expect(classroom.reload.name).to eq('잠긴 학급')
   end
 
   it 'filters classrooms by selected school for an admin' do
@@ -581,11 +649,11 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(classroom_card.text).to include(school.name, '2학년 지정 교실', '담당 선생님')
     expect(classroom_card.text).not_to include('2학년 2학년 지정 교실')
     expect(classroom_card.at_css('p').text).to include(school.name)
-    expect(action_paths).to eq([
-                                 classroom_path(classroom),
-                                 classroom_members_path(classroom),
-                                 edit_classroom_path(classroom)
-                               ])
+    expect(action_paths).to include(
+      classroom_path(classroom),
+      classroom_members_path(classroom),
+      edit_classroom_path(classroom)
+    )
     expect(classroom_card.at_css(%(a[href="#{classroom_members_path(classroom)}"]))['class']).to include(
       'border-indigo-300',
       'bg-indigo-50',

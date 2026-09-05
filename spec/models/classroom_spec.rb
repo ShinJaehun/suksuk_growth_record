@@ -175,11 +175,36 @@ RSpec.describe Classroom, type: :model do
       expect(invalid).to all(be_invalid)
     end
 
-    it "releases its teacher when deactivated" do
+    it "preserves its teacher through deactivation and reactivation" do
       membership = create(:school_membership, grade: 4)
       classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
 
       classroom.update!(active: false)
+      expect(classroom.reload.teacher).to eq(membership.user)
+
+      classroom.update!(active: true)
+
+      expect(classroom.reload.teacher).to eq(membership.user)
+    end
+
+    it "rejects assigning or replacing a teacher while inactive" do
+      first_membership = create(:school_membership, grade: 4)
+      second_membership = create(:school_membership, school: first_membership.school, grade: 4)
+      unassigned = create(:classroom, school: first_membership.school, grade: 4, active: false)
+      assigned = create(:classroom, school: first_membership.school, grade: 4, teacher: first_membership.user)
+      assigned.update!(active: false)
+
+      expect(unassigned.update(teacher: second_membership.user)).to eq(false)
+      expect(assigned.update(teacher: second_membership.user)).to eq(false)
+      expect(assigned.reload.teacher).to eq(first_membership.user)
+    end
+
+    it "releases an inactive classroom assignment when its teacher is deactivated" do
+      membership = create(:school_membership, grade: 4)
+      classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      classroom.update!(active: false)
+
+      membership.user.update!(active: false)
 
       expect(classroom.reload.teacher).to be_nil
     end

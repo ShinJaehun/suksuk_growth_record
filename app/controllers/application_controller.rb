@@ -108,7 +108,7 @@ class ApplicationController < ActionController::Base
   end
 
   def active_student_membership?(classroom_id)
-    ClassroomMembership.joins(classroom: :school).merge(School.active).exists?(
+    ClassroomMembership.joins(classroom: :school).merge(Classroom.active).merge(School.active).exists?(
       classroom_id: classroom_id,
       user_id: current_user.id,
       role: "student",

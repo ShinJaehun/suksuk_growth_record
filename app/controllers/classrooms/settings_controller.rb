@@ -3,12 +3,12 @@ class Classrooms::SettingsController < ApplicationController
   before_action :set_classroom
 
   def edit
-    authorize @classroom
+    authorize @classroom, :edit?
     render "classrooms/edit"
   end
 
   def update
-    authorize @classroom
+    authorize @classroom, :manage_structure?
 
     if school_change_attempt?
       render "classrooms/edit", status: :unprocessable_content

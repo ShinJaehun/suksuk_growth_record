@@ -108,6 +108,34 @@ RSpec.describe "Teacher operations", type: :request do
     expect(document.at_css(%(select[name="classroom_id"] option[value="#{classroom.id}"][selected]))).to be_present
   end
 
+  it "shows and preserves a locked inactive classroom assignment during profile updates" do
+    membership = create(:school_membership, school: school, grade: 5)
+    classroom = create(:classroom, school: school, grade: 5, teacher: membership.user)
+    classroom.update!(active: false)
+    sign_in manager
+
+    get edit_teacher_path(membership.user)
+
+    document = Nokogiri::HTML(response.body)
+    expect(response.body).to include(
+      I18n.t("admin.teachers.form.inactive_classroom_assignment_locked"),
+      classroom.name
+    )
+    expect(document.at_css('input[name="classroom_id"]')['value']).to eq(classroom.id.to_s)
+    expect(document.css('select[name="membership_grade"], select[name="classroom_id"]')).to be_empty
+
+    patch teacher_path(membership.user), params: {
+      school_id: school.id,
+      membership_grade: 5,
+      classroom_id: classroom.id,
+      user: { name: "변경된 이름", email: membership.user.email }
+    }
+
+    expect(response).to redirect_to(teachers_path)
+    expect(membership.user.reload.name).to eq("변경된 이름")
+    expect(classroom.reload.teacher).to eq(membership.user)
+  end
+
   it "rejects direct assignment of a different-grade or occupied classroom" do
     teacher = create(:school_membership, school: school, grade: 5).user
     other_teacher = create(:school_membership, school: school, grade: 5).user
