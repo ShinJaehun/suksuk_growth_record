@@ -8,7 +8,6 @@ RSpec.describe 'Classroom members', type: :request do
       annual_school: classroom.school,
       name: '담당 교사')
   end
-  let(:other_teacher) { create(:user, :teacher, name: '추가 교사') }
 
   def insert_legacy_teacher_membership!(user:, classroom:)
     ClassroomMembership.insert!({
@@ -81,7 +80,6 @@ RSpec.describe 'Classroom members', type: :request do
 
   it 'does not show teacher assignment controls to an admin' do
     assign_teacher(classroom, teacher)
-    other_teacher
     sign_in admin
 
     get classroom_members_path(classroom)

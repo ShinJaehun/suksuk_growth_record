@@ -18,7 +18,8 @@ RSpec.describe Classrooms::IndexContext do
 
   it 'counts and preloads the single active teacher preview' do
     classroom = create(:classroom, school: school)
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: classroom.school)
     teacher.avatar.attach(
       io: StringIO.new('avatar'),
       filename: 'avatar.png',
@@ -26,7 +27,8 @@ RSpec.describe Classrooms::IndexContext do
     )
     assign_teacher(classroom, teacher)
     outside_classroom = create(:classroom)
-    outside_teacher = create(:user, :teacher)
+    outside_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: outside_classroom.school)
     assign_teacher(outside_classroom, outside_teacher)
     context = described_class.new(classrooms_scope: Classroom.where(id: classroom.id))
     previews = context.teacher_previews.fetch(classroom.id)

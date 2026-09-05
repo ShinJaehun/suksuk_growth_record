@@ -131,11 +131,19 @@ RSpec.describe Teachers::SaveWithAssignment do
 
   it "rejects moving an existing annual teacher to another school" do
     school = create(:school)
-    teacher = annual_teacher(school: school, grade: 4, school_role: "manager")
+    teacher = annual_teacher(school: school, grade: 4, school_role: "manager", name: "변경 전")
+    current_classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    destination_school = create(:school)
+    destination_classroom = create(:classroom, school: destination_school, grade: 5)
 
-    expect(save(teacher: teacher, school: create(:school), grade: 4)).not_to be_success
+    result = save(teacher: teacher, school: destination_school, grade: 5,
+      classroom: destination_classroom, attributes: { name: "변경 후" })
+
+    expect(result).not_to be_success
     expect(teacher.reload).to have_attributes(school_year: school.school_years.active.first,
-      school_role: "manager", grade: 4)
+      school_role: "manager", grade: 4, name: "변경 전")
+    expect(current_classroom.reload.teacher).to eq(teacher)
+    expect(destination_classroom.reload.teacher).to be_nil
   end
 
   it "rejects detaching an annual teacher when school is nil" do

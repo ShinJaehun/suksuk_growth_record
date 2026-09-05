@@ -1,10 +1,14 @@
 require "rails_helper"
 
 RSpec.describe TeacherCredentialEvent, type: :model do
+  let(:teacher) do
+    create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
+  end
+
   it "records an allowed credential action for a teacher" do
     event = described_class.new(
       actor_user: create(:user, :admin),
-      teacher_user: create(:user, :teacher),
+      teacher_user: teacher,
       action: :temporary_password_issued
     )
 
@@ -24,7 +28,7 @@ RSpec.describe TeacherCredentialEvent, type: :model do
   it "rejects unsupported actions" do
     event = described_class.new(
       actor_user: create(:user, :admin),
-      teacher_user: create(:user, :teacher),
+      teacher_user: teacher,
       action: "password_viewed"
     )
 

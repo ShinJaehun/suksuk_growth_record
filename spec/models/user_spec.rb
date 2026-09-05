@@ -3,7 +3,8 @@ require "rails_helper"
 RSpec.describe User, type: :model do
   describe "role-specific email requirements" do
     it "allows a teacher without email" do
-      expect(build(:user, :teacher, email: nil)).to be_valid
+      expect(build(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school), email: nil)).to be_valid
     end
 
     it "requires email for a global admin" do
@@ -16,12 +17,14 @@ RSpec.describe User, type: :model do
 
   describe "teacher credential foundation" do
     it "defaults users to no forced password change" do
-      expect(create(:user, :teacher)).not_to be_password_change_required
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
+
+      expect(teacher).not_to be_password_change_required
     end
 
     it "exposes issued and received credential audit events" do
       actor = create(:user, :admin)
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
       event = TeacherCredentialEvent.create!(
         actor_user: actor,
         teacher_user: teacher,
@@ -33,17 +36,52 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "annual teacher compatibility schema" do
-    it "optionally belongs to a school year" do
-      school_year = create(:school_year)
-      teacher = create(:user, :teacher, school_year: school_year)
+  describe "annual account invariants" do
+    it "requires every annual identity field for a teacher except grade" do
+      teacher = build(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school), annual_grade: nil)
 
-      expect(teacher.school_year).to eq(school_year)
-      expect(build(:user, :teacher, school_year: nil)).to be_valid
+      expect(teacher).to be_valid
+      %i[school_year login_id school_role].each do |attribute|
+        invalid_teacher = teacher.dup
+        invalid_teacher.public_send("#{attribute}=", nil)
+
+        expect(invalid_teacher).not_to be_valid
+      end
+      expect(teacher.dup.tap { |user| user.grade = 0 }).not_to be_valid
+      expect(teacher.dup.tap { |user| user.grade = 7 }).not_to be_valid
+    end
+
+    it "requires admin and student annual authority fields to be absent" do
+      school_year = create(:school_year)
+
+      %i[admin student].each do |role|
+        user = build(:user, role, school_year: school_year, login_id: "annual-id",
+          school_role: "member", grade: 4)
+
+        expect(user).not_to be_valid
+      end
+    end
+
+    it "enforces role-dependent annual fields at the database boundary" do
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
+      admin = create(:user, :admin)
+      student = create(:user, :student)
+
+      %i[school_year_id login_id school_role].each do |attribute|
+        expect { teacher.update_columns(attribute => nil) }
+          .to raise_error(ActiveRecord::StatementInvalid)
+      end
+      [admin, student].each do |user|
+        expect do
+          user.update_columns(school_year_id: teacher.school_year_id,
+            login_id: "#{user.role}-login", school_role: "member", grade: 4)
+        end.to raise_error(ActiveRecord::StatementInvalid)
+      end
     end
 
     it "rejects an unknown school year at the database boundary" do
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
 
       expect do
         teacher.update_columns(school_year_id: -1)
@@ -52,40 +90,57 @@ RSpec.describe User, type: :model do
 
     it "rejects duplicate login IDs within one school year" do
       school_year = create(:school_year)
-      first_teacher = create(:user, :teacher)
-      second_teacher = create(:user, :teacher)
-      first_teacher.update_columns(school_year_id: school_year.id, login_id: "tara0411")
+      first_teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: school_year.school, school_year: school_year, login_id: "tara0411")
+      second_teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: school_year.school, school_year: school_year)
 
       expect do
         second_teacher.update_columns(school_year_id: school_year.id, login_id: "tara0411")
       end.to raise_error(ActiveRecord::RecordNotUnique)
     end
 
+    it "normalizes login IDs to lowercase canonical storage" do
+      teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school), login_id: " TARA0411 ")
+
+      expect(teacher.login_id).to eq("tara0411")
+    end
+
+    it "rejects uppercase and surrounding whitespace at the database boundary" do
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
+
+      expect { teacher.update_columns(login_id: "TARA0411") }
+        .to raise_error(ActiveRecord::StatementInvalid)
+      expect { teacher.update_columns(login_id: " tara0411 ") }
+        .to raise_error(ActiveRecord::StatementInvalid)
+    end
+
+    it "rejects a normalized duplicate within one school year at the database boundary" do
+      school_year = create(:school_year)
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: school_year.school, school_year: school_year, login_id: "tara0411")
+      teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: school_year.school, school_year: school_year)
+
+      expect { teacher.update_columns(login_id: "TARA0411") }
+        .to raise_error(ActiveRecord::StatementInvalid)
+    end
+
     it "allows the same login ID in different school years" do
       school = create(:school)
       first_year = create(:school_year, :archived, school: school, year: 2025)
       second_year = create(:school_year, :active, school: school, year: 2026)
-      first_teacher = create(:user, :teacher)
-      second_teacher = create(:user, :teacher)
-
-      first_teacher.update_columns(school_year_id: first_year.id, login_id: "tara0411")
-
       expect do
-        second_teacher.update_columns(school_year_id: second_year.id, login_id: "tara0411")
+        create(:user, :teacher, :active_annual_teacher,
+          annual_school: school, school_year: first_year, login_id: "tara0411")
+        create(:user, :teacher, :active_annual_teacher,
+          annual_school: school, school_year: second_year, login_id: "tara0411")
       end.not_to raise_error
     end
 
-    it "allows multiple null login IDs" do
-      school_year = create(:school_year)
-      first_teacher = create(:user, :teacher, school_year: school_year)
-
-      expect { create(:user, :teacher, school_year: school_year) }
-        .to change(described_class.teacher, :count).by(1)
-      expect(first_teacher.login_id).to be_nil
-    end
-
     it "rejects an unsupported school role at the database boundary" do
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
 
       expect do
         teacher.update_columns(school_role: "owner")
@@ -93,7 +148,7 @@ RSpec.describe User, type: :model do
     end
 
     it "rejects grades below the supported range at the database boundary" do
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
 
       expect do
         teacher.update_columns(grade: 0)
@@ -101,7 +156,7 @@ RSpec.describe User, type: :model do
     end
 
     it "rejects grades above the supported range at the database boundary" do
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
 
       expect do
         teacher.update_columns(grade: 7)
@@ -110,9 +165,10 @@ RSpec.describe User, type: :model do
 
     it "rejects a second manager teacher within one school year" do
       school_year = create(:school_year)
-      first_teacher = create(:user, :teacher)
-      second_teacher = create(:user, :teacher)
-      first_teacher.update_columns(school_year_id: school_year.id, school_role: "manager")
+      first_teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: school_year.school, school_year: school_year, annual_school_role: "manager")
+      second_teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: school_year.school, school_year: school_year)
 
       expect do
         second_teacher.update_columns(school_year_id: school_year.id, school_role: "manager")
@@ -122,21 +178,17 @@ RSpec.describe User, type: :model do
     it "allows manager teachers in different school years" do
       first_year = create(:school_year)
       second_year = create(:school_year)
-      first_teacher = create(:user, :teacher)
-      second_teacher = create(:user, :teacher)
-      first_teacher.update_columns(school_year_id: first_year.id, school_role: "manager")
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: first_year.school, school_year: first_year, annual_school_role: "manager")
 
       expect do
-        second_teacher.update_columns(school_year_id: second_year.id, school_role: "manager")
+        create(:user, :teacher, :active_annual_teacher,
+          annual_school: second_year.school, school_year: second_year, annual_school_role: "manager")
       end.not_to raise_error
     end
 
-    it "keeps existing account kinds valid without annual fields" do
-      users = [
-        create(:user, :teacher),
-        create(:user, :admin),
-        create(:user, :student)
-      ]
+    it "keeps admin and student accounts free of annual fields" do
+      users = [create(:user, :admin), create(:user, :student)]
 
       expect(users).to all(
         have_attributes(
@@ -208,8 +260,12 @@ RSpec.describe User, type: :model do
   end
 
   it "allows teacher and admin avatar_key values" do
-    expect(build(:user, :teacher, gender: "male", avatar_key: "teacherM08")).to be_valid
-    expect(build(:user, :teacher, gender: "female", avatar_key: "teacherF06")).to be_valid
+    school = create(:school)
+
+    expect(build(:user, :teacher, :active_annual_teacher,
+      annual_school: school, gender: "male", avatar_key: "teacherM08")).to be_valid
+    expect(build(:user, :teacher, :active_annual_teacher,
+      annual_school: school, gender: "female", avatar_key: "teacherF06")).to be_valid
     expect(build(:user, :admin, gender: nil, avatar_key: "admin")).to be_valid
     expect(build(:user, :admin, gender: nil, avatar_key: "teacherM08")).to be_valid
   end
@@ -221,7 +277,8 @@ RSpec.describe User, type: :model do
   end
 
   it "allows unrelated updates for a legacy role-incompatible avatar_key" do
-    teacher = create(:user, :teacher, avatar_key: "teacherM01")
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: create(:school), avatar_key: "teacherM01")
     teacher.update_column(:avatar_key, "boy01")
 
     expect(teacher.update(name: "Updated Teacher")).to eq(true)
@@ -251,18 +308,21 @@ RSpec.describe User, type: :model do
     end
 
     it "allows teacher email to be absent but requires it for admins" do
-      expect(build(:user, :teacher, email: nil)).to be_valid
+      expect(build(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school), email: nil)).to be_valid
       expect(build(:user, :admin, email: nil)).not_to be_valid
     end
 
     it "requires password for new teachers" do
-      teacher = build(:user, :teacher, password: nil)
+      teacher = build(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school), password: nil)
 
       expect(teacher).not_to be_valid
     end
 
     it "keeps case-insensitive email uniqueness for staff accounts" do
-      create(:user, :teacher, email: "staff@example.com")
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school), email: "staff@example.com")
 
       expect(build(:user, :admin, email: "STAFF@example.com")).not_to be_valid
     end
@@ -277,8 +337,10 @@ RSpec.describe User, type: :model do
 
   describe "teacher account status" do
     it "defaults to active and exposes status scopes and predicates" do
-      teacher = create(:user, :teacher)
-      inactive_teacher = create(:user, :teacher, active: false)
+      school = create(:school)
+      teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+      inactive_teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: school, active: false)
 
       expect(teacher).to be_active
       expect(teacher).to be_active_teacher

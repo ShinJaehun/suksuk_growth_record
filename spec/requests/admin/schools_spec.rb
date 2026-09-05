@@ -71,7 +71,8 @@ RSpec.describe 'Admin schools', type: :request do
 
   it 'deactivates and reactivates a school without removing related data' do
     classroom = create(:classroom, school: school)
-    membership = create(:school_membership, school: school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    membership = create(:school_membership, school: school, user: teacher)
     sign_in admin
 
     patch deactivate_admin_school_path(school)

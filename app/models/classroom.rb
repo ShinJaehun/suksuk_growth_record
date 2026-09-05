@@ -61,6 +61,8 @@ class Classroom < ApplicationRecord
     errors.add(:teacher, :school_membership_required) unless teacher.school_year
     return unless teacher.school_year
 
+    errors.add(:teacher, :inactive_school_year) unless teacher.school_year.active?
+    errors.add(:teacher, :inactive_school) unless teacher.annual_school&.active?
     errors.add(:teacher, :school_mismatch) unless teacher.annual_school&.id == school_id
     errors.add(:teacher, :grade_required) if teacher.grade.nil?
     errors.add(:teacher, :grade_mismatch) unless teacher.grade == grade

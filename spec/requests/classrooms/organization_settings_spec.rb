@@ -253,7 +253,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
   it 'shows the single assigned teacher on the classrooms index' do
     classroom = create(:classroom, school: school, name: '운영 교사 학급')
-    assigned_teacher = create(:user, :teacher, name: '활성 담당 교사')
+    assigned_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school, name: '활성 담당 교사')
     assign_teacher(classroom, assigned_teacher)
     sign_in admin
 
@@ -266,7 +267,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
   it 'does not show a teacher released by deactivation on the classroom page' do
     classroom = create(:classroom, school: school)
-    teacher = create(:user, :teacher, name: '비활성 담임')
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school, name: '비활성 담임')
     assign_teacher(classroom, teacher)
     teacher.update!(active: false)
     sign_in admin

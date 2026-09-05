@@ -81,7 +81,7 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     expect(second.reload.teacher).to be_nil
   end
 
-  it 'changes school atomically and demotes a manager to member' do
+  it 'rejects changing the SchoolYear of a persisted annual teacher' do
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_school_role: 'manager',
@@ -91,17 +91,21 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     sign_in admin
 
     patch admin_teacher_path(teacher), params: {
-      school_id: other_school.id, membership_grade: 5, classroom_id: new_classroom.id
+      school_id: other_school.id,
+      membership_grade: 5,
+      classroom_id: new_classroom.id,
+      user: { name: '변경된 이름' }
     }
 
-    expect(response).to redirect_to(edit_admin_teacher_path(teacher))
+    expect(response).to have_http_status(:unprocessable_content)
     expect(teacher.reload).to have_attributes(
-      school_year: other_school_year,
-      grade: 5,
-      school_role: 'member'
+      school_year: school_year,
+      grade: 4,
+      school_role: 'manager'
     )
-    expect(old_classroom.reload.teacher).to be_nil
-    expect(new_classroom.reload.teacher).to eq(teacher)
+    expect(teacher.name).not_to eq('변경된 이름')
+    expect(old_classroom.reload.teacher).to eq(teacher)
+    expect(new_classroom.reload.teacher).to be_nil
     expect(teacher.school_membership).to be_nil
   end
 

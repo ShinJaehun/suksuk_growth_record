@@ -48,8 +48,6 @@ RSpec.describe 'School workspaces', type: :request do
       annual_school: school,
       name: '비활성 교사',
       active: false)
-    legacy_only_teacher = create(:school_membership, school: school,
-      user: create(:user, :teacher, name: 'Legacy 교사')).user
     create(:school_membership, :manager, school: school, user: active_member)
     create(:school_membership, school: school, user: active_manager)
     sign_in admin
@@ -60,7 +58,7 @@ RSpec.describe 'School workspaces', type: :request do
                    .at_xpath("//h2[normalize-space()='#{school.name}']/ancestor::article[1]")
     expect(card.text).to include('소속 교사 2명')
     expect(card.text).to include(active_manager.name)
-    expect(card.text).not_to include(active_member.name, legacy_only_teacher.name, '소속 교사 3명')
+    expect(card.text).not_to include(active_member.name, '소속 교사 3명')
 
     inactive_teacher.update!(active: true)
     get schools_path

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -146,6 +146,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_020000) do
     t.index ["school_year_id"], name: "index_users_on_school_year_id"
     t.index ["school_year_id"], name: "index_users_on_unique_manager_school_year", unique: true, where: "(((role)::text = 'teacher'::text) AND ((school_role)::text = 'manager'::text) AND (school_year_id IS NOT NULL))"
     t.check_constraint "grade IS NULL OR grade >= 1 AND grade <= 6", name: "chk_users_grade_range"
+    t.check_constraint "login_id IS NULL OR login_id::text <> ''::text AND login_id::text = btrim(login_id::text) AND login_id::text = lower(login_id::text)", name: "chk_users_login_id_canonical"
+    t.check_constraint "role::text = 'teacher'::text AND school_year_id IS NOT NULL AND login_id IS NOT NULL AND school_role IS NOT NULL OR role::text <> 'teacher'::text AND school_year_id IS NULL AND login_id IS NULL AND school_role IS NULL AND grade IS NULL", name: "chk_users_annual_fields_by_role"
     t.check_constraint "school_role IS NULL OR (school_role::text = ANY (ARRAY['member'::character varying, 'manager'::character varying]::text[]))", name: "chk_users_school_role"
   end
 

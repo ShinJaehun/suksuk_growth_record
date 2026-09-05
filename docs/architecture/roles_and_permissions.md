@@ -1,13 +1,13 @@
 # Roles And Permissions
 
-이 문서의 role, policy와 권한 매트릭스는 현재 runtime을 설명한다. 장기 SchoolYear target에서는 manager를 자기 School 전체의 school-level operator로 정의하며 active 운영, planning bootstrap과 archived read-only 권한은 [`school_year_architecture.md`](../specs/school_year_architecture.md)를 따른다. 이는 현재 policy가 이미 그 범위로 구현됐다는 뜻이 아니다.
+이 문서의 role, policy와 권한 매트릭스는 현재 runtime을 설명한다. 아직 구현하지 않은 planning bootstrap과 archived read-only 세부 권한은 [`school_year_architecture.md`](../specs/school_year_architecture.md)를 따른다.
 
 ## 권한 구조 요약
 
 - 서버측 권한 판단의 중심은 Pundit policy와 `policy_scope`다.
 - 모든 비-`index` 액션은 `verify_authorized`, `index` 액션은 `verify_policy_scoped` 대상이다.
 - 전역 역할은 `User.role`의 `admin`, `teacher`, `student`를 유지한다.
-- 학교 소속과 학교별 권한은 `SchoolMembership`의 `member`, `manager`로 표현한다.
+- teacher의 학교는 `User.school_year.school`, 학교별 권한은 `User.school_role`의 `member`, `manager`로 표현한다.
 - 학생의 교실 소속은 `ClassroomMembership`으로 표현한다.
 - canonical teacher assignment는 nullable `Classroom.teacher_id`이며 teacher와 classroom은 각각 상대를 최대 하나만 가진다.
 - UI 숨김은 편의 수단일 뿐이며 policy, scope와 controller/domain validation이 최종 권한 경계다.
@@ -30,7 +30,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 - 다른 학교, global admin 권한, manager role과 manager lifecycle을 변경할 수 없다.
 - 현재 runtime에서는 manager라는 이유만으로 미담당 classroom의 학생 운영 권한을 얻지 않는다. 장기 target의 school-wide manager authority와 구분한다.
 
-학교별 manager는 `SchoolMembership.role == "manager"`로 없거나 한 명만 둔다. `School.manager_id`는 추가하지 않으며 manager 지정·교체·해제는 global admin만 수행한다.
+학교별 manager는 active SchoolYear에서 `User.school_role == "manager"`인 teacher로 없거나 한 명만 둔다. `School.manager_id`는 추가하지 않으며 manager 지정·교체·해제는 global admin만 수행한다.
 
 ### 일반 teacher
 
@@ -63,8 +63,8 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 
 ## Teacher와 Classroom 경계
 
-- teacher는 최대 하나의 `SchoolMembership`을 가진다.
-- `SchoolMembership.grade`는 `nil` 또는 정수 1부터 6이다.
+- teacher는 정확히 하나의 `SchoolYear`에 속한다.
+- `User.grade`는 `nil` 또는 정수 1부터 6이다.
 - teacher는 classroom 없이 학교와 학년만 가질 수 있다.
 - classroom은 담당 teacher 없이 존재할 수 있다.
 - 신규 assignment 시 teacher와 classroom은 같은 school과 grade야 하며 둘 다 active여야 한다.
@@ -74,6 +74,8 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 - classroom grade 변경으로 담당 teacher와 불일치가 생기면 저장을 거부한다.
 
 담당 변경은 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 한 transaction에서 처리한다. 관계를 해제해도 학생 membership이나 과거 서비스 기록을 삭제하지 않는다.
+
+`SchoolMembership`은 compatibility residue로서 mapping, reconciliation, integrity 확인과 cleanup에만 사용하며 runtime policy의 fallback source가 아니다.
 
 ## Student membership 경계
 

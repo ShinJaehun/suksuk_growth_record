@@ -31,8 +31,11 @@ module Teachers
     def call
       User.transaction do
         teacher.lock! if teacher.persisted?
-        teacher.assign_attributes(attributes)
         @current_classroom = teacher.assigned_classroom
+        validate_annual_school_immutability
+        raise ActiveRecord::Rollback if teacher.errors.any?
+
+        teacher.assign_attributes(attributes)
         normalize_inputs
         validate_inactive_assignment_lock
         validate_inputs
@@ -89,6 +92,13 @@ module Teachers
       add_error(:classroom_already_assigned) if classroom.teacher_id.present? && classroom.teacher_id != teacher.id
     end
 
+    def validate_annual_school_immutability
+      return unless teacher.persisted?
+      return if teacher.annual_school == school
+
+      add_error(:annual_school_immutable)
+    end
+
     def validate_inactive_assignment_lock
       return unless current_classroom&.inactive?
       return if school == teacher.annual_school &&
@@ -137,12 +147,6 @@ module Teachers
 
         @temporary_password = credential.temporary_password
       else
-        if teacher.annual_school != school
-          teacher.assign_attributes(
-            school_year: target_school_year,
-            school_role: "member"
-          )
-        end
         teacher.save!
       end
     end

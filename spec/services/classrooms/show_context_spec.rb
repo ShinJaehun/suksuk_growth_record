@@ -29,7 +29,8 @@ RSpec.describe Classrooms::ShowContext do
   end
 
   it "returns the assigned teacher" do
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: classroom.school)
     assign_teacher(classroom, teacher)
 
     expect(described_class.new(classroom: classroom).homeroom_teachers).to eq([teacher])

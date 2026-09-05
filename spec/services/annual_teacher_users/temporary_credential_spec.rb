@@ -1,9 +1,14 @@
 require "rails_helper"
 
 RSpec.describe AnnualTeacherUsers::TemporaryCredential do
+  def annual_teacher(**attributes)
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: create(:school), **attributes)
+  end
+
   it "issues a temporary password and audit event in one transaction" do
     actor = create(:user, :admin)
-    teacher = create(:user, :teacher)
+    teacher = annual_teacher
 
     result = described_class.call(
       teacher:,
@@ -19,7 +24,7 @@ RSpec.describe AnnualTeacherUsers::TemporaryCredential do
   end
 
   it "replaces the old password and records a reissue" do
-    teacher = create(:user, :teacher, password: "old-password")
+    teacher = annual_teacher(password: "old-password")
 
     result = described_class.call(
       teacher:,
@@ -33,7 +38,7 @@ RSpec.describe AnnualTeacherUsers::TemporaryCredential do
   end
 
   it "rolls back the credential when audit persistence fails" do
-    teacher = create(:user, :teacher, password: "old-password")
+    teacher = annual_teacher(password: "old-password")
     allow(TeacherCredentialEvent).to receive(:create!).and_raise(
       ActiveRecord::RecordInvalid.new(TeacherCredentialEvent.new)
     )

@@ -74,6 +74,7 @@ ko:
         unassigned: "미배정"
       errors:
         school_not_found: "선택한 학교를 찾을 수 없습니다."
+        annual_school_immutable: "기존 선생님의 학교는 변경할 수 없습니다. 다른 학교에서는 선생님을 새로 등록해 주세요."
         classroom_not_found: "선택한 학급을 찾을 수 없습니다."
         classroom_school_mismatch: "선택한 학교에 속하지 않은 학급이 포함되어 있습니다."
         classroom_grade_mismatch: "선택한 학년과 다른 학급은 새로 배정할 수 없습니다."

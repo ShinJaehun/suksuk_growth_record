@@ -2,7 +2,11 @@ require 'rails_helper'
 
 RSpec.describe 'Admin teachers', type: :request do
   let(:admin) { create(:user, :admin) }
-  let(:teacher) { create(:user, :teacher, name: '담당 교사') }
+  let(:teacher_school) { create(:school) }
+  let(:teacher) do
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: teacher_school, name: '담당 교사')
+  end
 
   it 'shows the teacher management index to an admin' do
     school = create(:school, name: '새싹초등학교', color_key: 'orange')
@@ -79,15 +83,20 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'filters teachers by status and falls back invalid status to active' do
+    school = create(:school)
     active_teacher = create(
       :user,
       :teacher,
+      :active_annual_teacher,
+      annual_school: school,
       name: '운영중 필터 교사'
     )
 
     inactive_teacher = create(
       :user,
       :teacher,
+      :active_annual_teacher,
+      annual_school: school,
       name: '사용중지 필터 교사',
       active: false
     )
@@ -143,16 +152,18 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'treats an invalid teacher school filter as the full teacher list' do
-    school_teacher = create(:school_membership, school: create(:school),
-                                                user: create(:user, :teacher, name: '소속 선생님')).user
-    unassigned_teacher = create(:user, :teacher, name: '미배정 선생님')
+    first_school = create(:school)
+    second_school = create(:school)
+    school_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: first_school, name: '첫 학교 선생님')
+    other_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: second_school, name: '다른 학교 선생님')
     sign_in admin
 
     get admin_teachers_path, params: { school_id: 'missing' }
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include(school_teacher.name, unassigned_teacher.name)
-    expect(response.body).to include('학교 미지정')
+    expect(response.body).to include(school_teacher.name, other_teacher.name)
     expect(response.body).not_to include('selected="selected" value="missing"')
   end
 
@@ -507,21 +518,23 @@ RSpec.describe 'Admin teachers', type: :request do
 
   it 'filters teacher status and releases the assignment on deactivation' do
     school = create(:school)
-    classroom = create(:classroom, school: school)
-    membership = create(:school_membership, school: school, user: teacher)
-    assign_teacher(classroom, teacher)
+    assigned_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school, annual_grade: 4)
+    classroom = create(:classroom, school: school, grade: assigned_teacher.grade)
+    membership = create(:school_membership, school: school, user: assigned_teacher)
+    assign_teacher(classroom, assigned_teacher)
     sign_in admin
 
-    patch deactivate_admin_teacher_path(teacher)
-    expect(teacher.reload).to be_inactive
+    patch deactivate_admin_teacher_path(assigned_teacher)
+    expect(assigned_teacher.reload).to be_inactive
     expect(membership.reload).to be_present
     expect(classroom.reload.teacher).to be_nil
 
     get admin_teachers_path(status: 'inactive', school_id: school.id)
-    expect(response.body).to include(teacher.name, '비활성')
+    expect(response.body).to include(assigned_teacher.name, '비활성')
 
-    patch reactivate_admin_teacher_path(teacher)
-    expect(teacher.reload).to be_active
+    patch reactivate_admin_teacher_path(assigned_teacher)
+    expect(assigned_teacher.reload).to be_active
   end
 
   it 'does not offer or accept a new assignment to an inactive school' do

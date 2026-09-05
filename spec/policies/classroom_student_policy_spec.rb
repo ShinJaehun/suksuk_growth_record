@@ -14,7 +14,8 @@ RSpec.describe ClassroomStudentPolicy do
     end
 
     it "permits a teacher member of the classroom" do
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: classroom.school)
       assign_teacher(classroom, teacher)
       policy = described_class.new(teacher, record)
 
@@ -23,7 +24,8 @@ RSpec.describe ClassroomStudentPolicy do
     end
 
     it "rejects a teacher outside the classroom" do
-      teacher = create(:user, :teacher)
+      teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: create(:school))
       policy = described_class.new(teacher, record)
 
       expect(policy.create?).to eq(false)

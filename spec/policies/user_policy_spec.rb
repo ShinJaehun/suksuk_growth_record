@@ -27,7 +27,9 @@ RSpec.describe UserPolicy do
   end
 
   describe "#show?" do
-    let(:teacher) { create(:user, :teacher) }
+    let(:teacher) do
+      create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school)
+    end
     let(:student) { create(:user, :student) }
     let(:classroom) { create(:classroom) }
 
@@ -71,7 +73,9 @@ RSpec.describe UserPolicy do
   end
 
   describe "#destroy_student?" do
-    let(:teacher) { create(:user, :teacher) }
+    let(:teacher) do
+      create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school)
+    end
     let(:student) { create(:user, :student) }
     let(:classroom) { create(:classroom) }
 

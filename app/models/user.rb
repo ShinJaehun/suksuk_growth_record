@@ -32,12 +32,21 @@ class User < ApplicationRecord
   validates :avatar_key, inclusion: { in: AVATAR_KEYS }, allow_nil: true, if: :will_save_change_to_avatar_key?
   validate :avatar_key_allowed_for_role, if: :will_save_change_to_avatar_key?
   validates :student_pin, format: { with: /\A\d{4}\z/, message: "must be 4 digits" }, allow_blank: true
+  validates :school_year, :login_id, :school_role, presence: true, if: :teacher?
+  validates :school_role, inclusion: { in: %w[member manager] }, if: :teacher?
+  validates :grade,
+    numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 6 },
+    allow_nil: true,
+    if: :teacher?
+  validates :school_year, :login_id, :school_role, :grade, absence: true, unless: :teacher?
+  validate :annual_school_year_immutable, on: :update, if: :teacher?
 
   enum :role, { student: "student", teacher: "teacher", admin: "admin" }
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
   has_one_attached :avatar
 
+  before_validation :normalize_teacher_login_id, if: :teacher?
   before_validation :clear_student_devise_credentials, if: :student?
   before_update :release_assigned_classroom, if: :deactivating_teacher?
 
@@ -122,6 +131,19 @@ class User < ApplicationRecord
   end
 
   private
+
+  def normalize_teacher_login_id
+    return unless new_record? || will_save_change_to_login_id?
+
+    self.login_id = login_id.to_s.strip.downcase.presence
+  end
+
+  def annual_school_year_immutable
+    return unless will_save_change_to_school_year_id?
+    return if school_year_id_in_database.nil?
+
+    errors.add(:school_year, :immutable)
+  end
 
   def clear_student_devise_credentials
     self.email = nil

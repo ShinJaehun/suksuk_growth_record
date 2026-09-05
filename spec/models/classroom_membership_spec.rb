@@ -251,7 +251,9 @@ RSpec.describe ClassroomMembership, type: :model do
   end
 
   it "rejects new teacher memberships" do
-    membership = build(:classroom_membership, user: create(:user, :teacher),
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: first_classroom.school)
+    membership = build(:classroom_membership, user: teacher,
                                               classroom: first_classroom, role: "teacher")
 
     expect(membership).not_to be_valid
@@ -270,7 +272,8 @@ RSpec.describe ClassroomMembership, type: :model do
 
   it "rejects a student membership for a teacher user" do
     membership = described_class.new(
-      user: create(:user, :teacher),
+      user: create(:user, :teacher, :active_annual_teacher,
+        annual_school: first_classroom.school),
       classroom: first_classroom,
       role: "student"
     )

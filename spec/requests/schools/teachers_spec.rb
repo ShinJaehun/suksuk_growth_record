@@ -28,8 +28,8 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
 
   it 'shows only teachers and their single classroom in the manager school' do
     classroom = create(:classroom, school: school, grade: 4, teacher: member)
-    outsider = create(:school_membership, school: other_school, grade: 4,
-                                          user: create(:user, :teacher, name: '다른 학교 교사')).user
+    outsider = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school, annual_grade: 4, name: '다른 학교 교사')
     sign_in manager
 
     get school_teachers_path(school)

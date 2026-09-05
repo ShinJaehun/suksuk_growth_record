@@ -57,16 +57,6 @@ RSpec.describe "Forced teacher password change", type: :request do
     expect(controller.current_user).to be_nil
   end
 
-  it "fails closed when a signed-in teacher has no annual year" do
-    legacy_teacher = create(:user, :teacher)
-    sign_in legacy_teacher
-
-    get classrooms_path
-
-    expect(response).to redirect_to(new_user_session_path)
-    expect(controller.current_user).to be_nil
-  end
-
   it "loses normal authority through Devise when the annual teacher becomes inactive" do
     teacher.update!(password_change_required: false)
     login_teacher

@@ -1,9 +1,13 @@
 require 'rails_helper'
 
 RSpec.describe SchoolMembership, type: :model do
+  def annual_teacher(school:, **attributes)
+    create(:user, :teacher, :active_annual_teacher, annual_school: school, **attributes)
+  end
+
   it 'is valid for a teacher and exposes its associations' do
     school = create(:school)
-    teacher = create(:user, :teacher)
+    teacher = annual_teacher(school: school)
     membership = build(:school_membership, school: school, user: teacher)
 
     expect(membership).to be_valid
@@ -18,7 +22,8 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'allows a nil grade or an integer grade from 1 through 6' do
-    membership = build(:school_membership)
+    school = create(:school)
+    membership = build(:school_membership, school: school, user: annual_teacher(school: school))
 
     [nil, 1, 6].each do |grade|
       membership.grade = grade
@@ -32,17 +37,21 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'allows a teacher to be a manager' do
-    membership = create(:school_membership, :manager)
+    school = create(:school)
+    membership = create(:school_membership, :manager,
+      school: school, user: annual_teacher(school: school))
 
     expect(membership).to be_manager
     expect(membership.user).to be_teacher
   end
 
   it 'rejects creating a manager membership for an inactive teacher' do
+    school = create(:school)
     membership = build(
       :school_membership,
       :manager,
-      user: create(:user, :teacher, active: false)
+      school: school,
+      user: annual_teacher(school: school, active: false)
     )
 
     expect(membership).not_to be_valid
@@ -51,9 +60,11 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'rejects promoting an inactive member to manager' do
+    school = create(:school)
     membership = create(
       :school_membership,
-      user: create(:user, :teacher, active: false)
+      school: school,
+      user: annual_teacher(school: school, active: false)
     )
 
     expect(membership.update(role: :manager)).to eq(false)
@@ -62,8 +73,10 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'rejects replacing a manager with an inactive teacher' do
-    membership = create(:school_membership, :manager)
-    inactive_teacher = create(:user, :teacher, active: false)
+    school = create(:school)
+    membership = create(:school_membership, :manager,
+      school: school, user: annual_teacher(school: school))
+    inactive_teacher = annual_teacher(school: school, active: false)
 
     membership.user = inactive_teacher
 
@@ -78,7 +91,9 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'allows an existing inactive manager to save an unrelated change' do
-    membership = create(:school_membership, :manager)
+    school = create(:school)
+    membership = create(:school_membership, :manager,
+      school: school, user: annual_teacher(school: school))
     membership.user.update!(active: false)
     membership.reload
 
@@ -89,15 +104,19 @@ RSpec.describe SchoolMembership, type: :model do
   it 'allows different teachers to belong to the same school' do
     school = create(:school)
 
-    expect(create(:school_membership, school: school, user: create(:user, :teacher))).to be_persisted
-    expect(create(:school_membership, school: school, user: create(:user, :teacher))).to be_persisted
+    expect(create(:school_membership, school: school,
+      user: annual_teacher(school: school))).to be_persisted
+    expect(create(:school_membership, school: school,
+      user: annual_teacher(school: school))).to be_persisted
   end
 
   it 'allows at most one manager to belong to the same school' do
     school = create(:school)
 
-    first_manager = create(:school_membership, :manager, school: school)
-    second_manager = build(:school_membership, :manager, school: school)
+    first_manager = create(:school_membership, :manager, school: school,
+      user: annual_teacher(school: school))
+    second_manager = build(:school_membership, :manager, school: school,
+      user: annual_teacher(school: school))
 
     expect(first_manager).to be_manager
     expect(second_manager).not_to be_valid
@@ -105,8 +124,9 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'rejects a second school membership for the same teacher' do
-    teacher = create(:user, :teacher)
-    create(:school_membership, user: teacher)
+    school = create(:school)
+    teacher = annual_teacher(school: school)
+    create(:school_membership, school: school, user: teacher)
 
     duplicate = build(:school_membership, user: teacher)
 
@@ -128,22 +148,27 @@ RSpec.describe SchoolMembership, type: :model do
   end
 
   it 'is deleted with its user' do
-    membership = create(:school_membership)
+    school = create(:school)
+    membership = create(:school_membership, school: school,
+      user: annual_teacher(school: school))
 
     expect { membership.user.destroy! }.to change(described_class, :count).by(-1)
   end
 
   it 'prevents its school from being deleted' do
-    membership = create(:school_membership)
+    school = create(:school)
+    membership = create(:school_membership, school: school,
+      user: annual_teacher(school: school))
 
     expect { membership.school.destroy }.not_to change(School, :count)
     expect(membership.school).not_to be_destroyed
   end
 
-  it 'allows a teacher to exist without a school' do
-    teacher = create(:user, :teacher)
+  it 'does not require compatibility membership for an annual teacher' do
+    school = create(:school)
+    teacher = annual_teacher(school: school)
 
     expect(teacher.school_membership).to be_nil
-    expect(teacher.school).to be_nil
+    expect(teacher.annual_school).to eq(school)
   end
 end

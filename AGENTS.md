@@ -59,9 +59,11 @@
 - 권한 판단은 controller/policy 중심으로 유지한다.
 - view에서 직접 복잡한 권한 조건을 늘리지 않는다.
 - Teacher와 Classroom의 1:1 담당 관계는 `Classroom.teacher_id`를 canonical source로 사용한다.
-- 학생 소속은 student `ClassroomMembership`, 교사 소속과 학년은 `SchoolMembership`을 기준으로 한다.
+- 교사의 현재 학교, 학교 역할과 학년은 각각 `User.school_year.school`, `User.school_role`, `User.grade`를 기준으로 한다.
+- `SchoolMembership`은 mapping, reconciliation, integrity 확인과 향후 cleanup을 위한 compatibility residue이며 normal runtime authority source가 아니다.
+- 학생 소속은 student `ClassroomMembership`을 기준으로 한다.
 - Teacher, Student membership, Classroom lifecycle은 각각의 canonical spec과 상태 source를 따른다.
-- 위 구조는 현재 runtime 기준이다. 승인된 장기 SchoolYear target은 `docs/specs/school_year_architecture.md`를 따르며 현재 구현과 혼동하지 않는다.
+- 위 구조는 현재 runtime 기준이며 후속 `HomeroomAssignment`, `StudentEnrollment` target은 `docs/specs/school_year_architecture.md`와 구분한다.
 - 학생 관련 기능은 교실 사용 맥락을 먼저 고려한다.
 - 공유 태블릿 환경에서는 학생 세션, 로그아웃, PIN, 권한 노출에 특히 주의한다.
 - Turbo 응답과 HTML 응답은 둘 다 깨지지 않도록 주의한다.

@@ -167,16 +167,6 @@ RSpec.describe "Admin school managers", type: :request do
     expect(target.reload.school_membership).to be_nil
   end
 
-  it "rejects an unassigned teacher target" do
-    target = create(:user, :teacher)
-    sign_in admin
-
-    post admin_school_school_managers_path(school), params: { user_id: target.id }
-
-    expect(response).to have_http_status(:not_found)
-    expect(target.reload.school_membership).to be_nil
-  end
-
   it "rejects an other-school teacher target without changing its membership" do
     other_school = create(:school)
     other_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: other_school)

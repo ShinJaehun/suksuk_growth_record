@@ -66,7 +66,7 @@ RSpec.describe School, type: :model do
 
   it "exposes teachers through school memberships" do
     school = create(:school)
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     create(:school_membership, school: school, user: teacher)
 
     expect(school.teachers).to contain_exactly(teacher)
@@ -86,7 +86,8 @@ RSpec.describe School, type: :model do
   it "keeps related records when deactivated" do
     school = create(:school)
     classroom = create(:classroom, school: school)
-    membership = create(:school_membership, school: school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    membership = create(:school_membership, school: school, user: teacher)
 
     school.update!(active: false)
 

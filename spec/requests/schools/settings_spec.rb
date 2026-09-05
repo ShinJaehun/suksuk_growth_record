@@ -22,7 +22,6 @@ RSpec.describe 'School settings', type: :request do
     other_teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: other_school,
       name: '다른 학교 교사')
-    unassigned_teacher = create(:user, :teacher, name: '미소속 교사')
     student = create(:user, :student, name: '학교 관리자 후보 제외 학생')
 
     sign_in admin
@@ -41,7 +40,7 @@ RSpec.describe 'School settings', type: :request do
       current_manager.name,
       candidate.name
     )
-    expect(response.body).not_to include(other_teacher.name, unassigned_teacher.name, student.name)
+    expect(response.body).not_to include(other_teacher.name, student.name)
 
     document = Nokogiri::HTML(response.body)
     modal_frame = document.at_css('turbo-frame#modal')

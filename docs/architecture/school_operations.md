@@ -31,7 +31,7 @@
 - manager 지정과 해제는 초기에는 global admin만 수행한다.
 - manager는 다른 manager를 지정하거나 해제할 수 없다.
 
-manager의 canonical source는 기존 `SchoolMembership.role == "manager"`이며 `School.manager_id`를 추가하지 않는다. 같은 school의 manager membership은 최대 하나이고 global admin은 이 수에 포함하지 않는다.
+manager의 canonical source는 active annual teacher의 `User.school_role == "manager"`이며 `School.manager_id`를 추가하지 않는다. 같은 active SchoolYear의 manager는 최대 하나이고 global admin은 이 수에 포함하지 않는다.
 
 학교 manager는 자신이 manager로 소속된 학교에 한해 다음 기능을 관리한다.
 
@@ -50,18 +50,13 @@ manager의 canonical source는 기존 `SchoolMembership.role == "manager"`이며
 
 ---
 
-## 4. SchoolMembership 역할
+## 4. Annual teacher 역할
 
-`SchoolMembership`은 교사의 학교 소속과 학교 단위 권한을 함께 표현한다.
+교사의 학교는 `User.school_year.school`, 학교 단위 역할은 `User.school_role`, 학년은 `User.grade`가 canonical source다. `school_role`은 `member` 또는 `manager`이며 한 active SchoolYear의 manager는 최대 한 명이다. `SchoolMembership`은 compatibility residue로서 mapping, reconciliation, integrity 확인과 cleanup에만 사용하고 normal runtime authority의 read/write 또는 fallback source로 사용하지 않는다.
 
-- `member`: 일반 소속 교사
-- `manager`: 해당 학교의 관리 권한을 가진 교사
+학급 담당 교사는 학급과 같은 학교와 학년을 가진 active teacher이며 그 `SchoolYear`와 `School`도 active여야 한다. `Classroom.teacher_id`는 한 teacher에게 최대 하나의 classroom만 연결하도록 DB uniqueness를 적용한다. 학교 manager의 운영 화면은 자기 학교의 단일 담당 관계만 변경하고 annual identity나 manager 역할은 변경하지 않는다.
 
-역할은 integer enum으로 구현되어 있으며 기본값은 `member`다. 교사 한 명은 최대 한 학교에만 소속되고 담당 학급은 없거나 하나다. 다른 학교 또는 다른 학년 teacher 배정은 차단하며 여러 학교 소속 지원은 현재 범위가 아니다. 한 학교의 manager는 없거나 한 명이고 global admin과 student는 SchoolMembership을 갖지 않는다.
-
-학급 담당 교사는 학급과 같은 학교 및 같은 학년의 SchoolMembership을 가진 active teacher만 가능하다. `Classroom.teacher_id`는 한 teacher에게 최대 하나의 classroom만 연결하도록 DB uniqueness를 적용한다. 학교 manager의 운영 화면은 자기 학교의 단일 담당 관계만 변경하고 학교 소속과 manager 역할은 변경하지 않는다.
-
-teacher의 담당 classroom을 바꾸면 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 한 transaction에서 처리한다. 학교나 학년 변경 후 유효한 classroom을 선택하지 않으면 미배정으로 저장한다. 같은 학교에서는 manager 역할을 유지하고 학교 변경 시 새 학교의 member가 된다. classroom 자체의 학교는 생성 후 변경할 수 없다.
+teacher의 담당 classroom을 바꾸면 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 한 transaction에서 처리한다. 같은 SchoolYear 안에서 grade를 변경한 뒤 유효한 classroom을 선택하지 않으면 미배정으로 저장한다. persisted annual teacher의 `school_year_id`는 일반 teacher-management operation에서 변경하지 않으며 cross-School transfer는 별도 annual account workflow가 필요하다. classroom 자체의 학교는 생성 후 변경할 수 없다.
 
 현재 teacher assignment는 `Classroom.teacher_id`를 canonical source로 사용하며 teacher와 classroom 양쪽 모두 최대 하나의 상대만 가진다. `ClassroomMembership`은 student membership에 사용한다.
 

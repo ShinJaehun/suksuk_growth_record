@@ -163,6 +163,22 @@ RSpec.describe Classroom, type: :model do
       expect(classroom).to be_valid
     end
 
+    it "rejects planning and archived annual teachers without replacing the assignment" do
+      school = create(:school)
+      current_teacher = annual_teacher(school: school, grade: 4)
+      assigned_classroom = create(:classroom, school: school, grade: 4, teacher: current_teacher)
+
+      %i[planning archived].each_with_index do |status, offset|
+        school_year = create(:school_year, status, school: school, year: 2027 + offset)
+        candidate = create(:user, :teacher, school_year: school_year,
+          login_id: "#{status}-teacher", school_role: "member", grade: 4)
+        classroom = build(:classroom, school: school, grade: 4, teacher: candidate)
+
+        expect(classroom).not_to be_valid
+        expect(assigned_classroom.reload.teacher).to eq(current_teacher)
+      end
+    end
+
     it "rejects assigning one teacher to two classrooms" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)

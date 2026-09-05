@@ -4,12 +4,12 @@
 
 현재 starter에 실제로 존재하는 공통 학교·교실·사용자 구조를 기록한다. 추출 과정에서 제거된 service-specific 도메인은 현재 시스템으로 설명하지 않는다.
 
-이 문서는 현재 runtime을 설명한다. SchoolYear, annual teacher User, HomeroomAssignment와 StudentEnrollment의 승인된 장기 target은 [`school_year_architecture.md`](../specs/school_year_architecture.md)를 따르며 아직 구현된 구조로 서술하지 않는다.
+이 문서는 현재 runtime을 설명한다. annual teacher User와 SchoolYear는 현재 구현이며, 아직 도입하지 않은 HomeroomAssignment와 StudentEnrollment target은 [`school_year_architecture.md`](../specs/school_year_architecture.md)와 구분한다.
 
 ## 핵심 역할
 
 - `admin`: 전체 학교 범위의 관리 권한을 가진다.
-- `teacher`: `SchoolMembership`으로 학교에 속하며 member 또는 manager 역할을 가진다.
+- `teacher`: 하나의 `SchoolYear`에 속하며 `User.school_role`로 member 또는 manager 역할을 가진다.
 - `student`: student `ClassroomMembership`으로 교실에 속한다.
 
 인증 주체는 `User` 하나를 유지한다. teacher, student와 admin을 별도 인증 모델로 분리하지 않는다.
@@ -34,14 +34,15 @@
 
 ## Teacher의 학교와 학년
 
-- teacher는 최대 하나의 `SchoolMembership`을 가진다.
-- `SchoolMembership.role`은 `member` 또는 `manager`다.
-- `SchoolMembership.grade`는 `nil` 또는 정수 1부터 6이다.
+- teacher의 현재 학교는 `User.school_year.school`, 학교 역할은 `User.school_role`, 학년은 `User.grade`가 canonical source다.
+- teacher는 정확히 하나의 `SchoolYear`에 속하고 `User.school_role`은 `member` 또는 `manager`다.
+- `User.grade`는 `nil` 또는 정수 1부터 6이다.
 - teacher는 classroom 없이 school과 grade만 가질 수 있다.
-- `User.grade`와 별도 Grade model은 사용하지 않는다.
-- 한 school의 manager는 없거나 한 명이며 canonical source는 `SchoolMembership.role == "manager"`다.
+- 별도 Grade model은 사용하지 않는다.
+- 한 active SchoolYear의 manager는 없거나 한 명이며 canonical source는 `User.school_role == "manager"`다.
 - manager가 없는 임시 상태는 허용하지만 한 school에 둘 이상을 둘 수 없다. global admin은 manager 수에 포함하지 않는다.
 - manager 지정·교체·해제는 global admin만 수행하고 `School.manager_id`는 추가하지 않는다.
+- `SchoolMembership`은 mapping, reconciliation, integrity 확인과 cleanup을 위한 compatibility residue이며 normal runtime authority source가 아니다.
 
 ## Teacher assignment
 
@@ -62,7 +63,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 - `ClassroomMembership`은 학생 classroom 소속에 사용한다.
 - teacher 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
 - classroom 비활성화 시 현재 `teacher_id`와 student membership을 보존한 채 운영을 잠그며, 재활성화하면 보존된 관계를 다시 사용한다.
-- classroom grade 변경이 teacher의 membership grade와 충돌하면 먼저 assignment를 해제해야 한다.
+- classroom grade 변경이 `User.grade`와 충돌하면 먼저 assignment를 해제해야 한다.
 
 ## Teacher 운영 영역
 
@@ -72,7 +73,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 - teacher form은 학교, 학년, 단일 학급 순서로 구성한다.
 - 학교와 학년이 유효할 때만 같은 school·grade의 active 미배정 classroom을 후보로 조회한다.
 - teacher 생성 시 최초 password를 입력할 수 있지만 기존 teacher update에서는 manager가 password를 변경할 수 없다.
-- teacher 목록은 school, `SchoolMembership.grade`, 단일 classroom과 lifecycle 상태를 표시한다.
+- teacher 목록은 annual school, `User.grade`, 단일 classroom과 lifecycle 상태를 표시한다.
 
 ## 학생 관리
 
