@@ -7,7 +7,8 @@ class ApplicationController < ActionController::Base
   helper_method :navigation_context
   
   before_action :configure_permitted_parameters, if: :devise_controller?
-  before_action :expire_inactive_teacher_session
+  before_action :expire_ineligible_teacher_session
+  before_action :require_teacher_password_change
   before_action :expire_student_session_if_inactive
 
   def after_sign_in_path_for(resource_or_scope)
@@ -71,11 +72,20 @@ class ApplicationController < ActionController::Base
     @teacher_nav_classrooms = classroom&.active? && classroom.school.active? ? [classroom] : []
   end
 
-  def expire_inactive_teacher_session
-    return unless current_user&.teacher? && current_user.inactive?
+  def expire_ineligible_teacher_session
+    return unless current_user&.teacher?
+    return if current_user.active? && current_user.school_year&.active? && current_user.school_year.school.active?
 
+    school = current_user.school_year&.school
+    message_key = current_user.inactive? ? "devise.failure.inactive" : "users.sessions.teacher_ineligible"
     sign_out(:user)
-    redirect_to new_user_session_path, alert: t("devise.failure.inactive")
+    redirect_to school ? school_teacher_login_path(school) : new_user_session_path, alert: t(message_key)
+  end
+
+  def require_teacher_password_change
+    return unless current_user&.teacher? && current_user.password_change_required?
+
+    redirect_to edit_forced_password_path
   end
 
   def expire_student_session_if_inactive

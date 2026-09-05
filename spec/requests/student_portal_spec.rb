@@ -3,8 +3,8 @@ require 'rails_helper'
 RSpec.describe 'Student portal flow', type: :request do
   describe 'student landing and access boundaries' do
     let(:student) { create(:user, :student, student_pin: '1234') }
-    let(:teacher) { create(:user, :teacher) }
     let(:classroom) { create(:classroom) }
+    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
@@ -142,8 +142,8 @@ RSpec.describe 'Student portal flow', type: :request do
 
   describe 'student account deletion boundary' do
     let(:student) { create(:user, :student) }
-    let(:teacher) { create(:user, :teacher) }
     let(:classroom) { create(:classroom) }
+    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
@@ -174,8 +174,8 @@ RSpec.describe 'Student portal flow', type: :request do
 
   describe 'managed student account page' do
     let(:student) { create(:user, :student, student_pin: '1234') }
-    let(:teacher) { create(:user, :teacher) }
     let(:classroom) { create(:classroom) }
+    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')

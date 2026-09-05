@@ -2,7 +2,13 @@ require "rails_helper"
 
 RSpec.describe "Teacher operations", type: :request do
   let(:school) { create(:school) }
-  let(:manager) { create(:school_membership, :manager, school: school, grade: 4).user }
+  let(:manager) do
+    user = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager",
+      annual_grade: 4)
+    create(:school_membership, :manager, school: school, grade: 4, user: user).user
+  end
 
   it "allows admins and managers but rejects regular teachers" do
     sign_in create(:user, :admin)
@@ -13,7 +19,9 @@ RSpec.describe "Teacher operations", type: :request do
     get teachers_path
     expect(response).to have_http_status(:ok)
 
-    sign_in create(:school_membership, school: school).user
+    member = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    create(:school_membership, school: school, user: member)
+    sign_in member
     get teachers_path
     expect(response).to redirect_to(root_path)
   end

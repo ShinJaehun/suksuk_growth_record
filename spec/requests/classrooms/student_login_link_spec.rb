@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Classroom student login link", type: :request do
   let(:classroom) { create(:classroom) }
-  let(:teacher) { create(:user, :teacher) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
   let(:admin) { create(:user, :admin) }
   let(:student) { create(:user, :student) }
 

@@ -5,7 +5,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   let(:classroom) { create(:classroom) }
   let(:student) { create(:user, :student, student_pin: '1234') }
-  let(:teacher) { create(:user, :teacher) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
   let(:remote_ip) { '203.0.113.10' }
 
   before do
@@ -451,12 +451,12 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response.body).to include('학생 로그인 주소를 사용할 수 없습니다.')
   end
 
-  it 'does not affect teacher Devise login' do
+  it 'does not affect school-scoped teacher login' do
     5.times { post_student_pin(pin: '0000') }
 
-    post user_session_path, params: {
-      user: {
-        email: teacher.email,
+    post school_teacher_login_path(classroom.school), params: {
+      teacher: {
+        login_id: teacher.login_id,
         password: 'password123'
       }
     }

@@ -3,8 +3,8 @@ require 'rails_helper'
 RSpec.describe 'Classroom students', type: :request do
   include ActionView::RecordIdentifier
 
-  let(:teacher) { create(:user, :teacher) }
   let(:classroom) { create(:classroom) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
   let(:turbo_headers) { { 'ACCEPT' => 'text/vnd.turbo-stream.html' } }
 
   before do
@@ -17,6 +17,13 @@ RSpec.describe 'Classroom students', type: :request do
       student = create(:user, :student, name: "기존 활성 학생 #{index}")
       create(:classroom_membership, user: student, classroom: classroom, role: 'student', status: 'active')
     end
+  end
+
+  def create_outside_teacher
+    outside_school = create(:school)
+    outsider = create(:user, :teacher, :active_annual_teacher, annual_school: outside_school)
+    create(:school_membership, school: outside_school, user: outsider)
+    outsider
   end
 
   describe 'GET /classrooms/:id roster' do
@@ -238,7 +245,7 @@ RSpec.describe 'Classroom students', type: :request do
     end
 
     it 'rejects a teacher outside the classroom' do
-      outsider = create(:user, :teacher)
+      outsider = create_outside_teacher
       sign_out teacher
       sign_in outsider
 
@@ -1036,7 +1043,7 @@ RSpec.describe 'Classroom students', type: :request do
     end
 
     it 'rejects a teacher outside the classroom' do
-      outsider = create(:user, :teacher)
+      outsider = create_outside_teacher
       sign_out teacher
       sign_in outsider
 
@@ -1106,7 +1113,8 @@ RSpec.describe 'Classroom students', type: :request do
     end
 
     it 'allows the past classroom teacher to view inactive student records' do
-      past_teacher = create(:user, :teacher)
+      past_teacher = create(:user, :teacher, :active_annual_teacher,
+        annual_school: past_classroom.school)
       assign_teacher(past_classroom, past_teacher)
       sign_out teacher
       sign_in past_teacher
@@ -1126,7 +1134,9 @@ RSpec.describe 'Classroom students', type: :request do
     end
 
     it 'rejects an unassigned school manager' do
-      manager = create(:user, :teacher)
+      manager = create(:user, :teacher, :active_annual_teacher,
+        annual_school: past_classroom.school,
+        annual_school_role: "manager")
       create(:school_membership, :manager, school: past_classroom.school, user: manager)
       sign_out teacher
       sign_in manager
@@ -1563,7 +1573,7 @@ RSpec.describe 'Classroom students', type: :request do
     end
 
     it 'rejects a teacher outside the classroom' do
-      outsider = create(:user, :teacher)
+      outsider = create_outside_teacher
       student = create(:user, :student)
       membership = create(:classroom_membership, user: student, classroom: classroom, role: 'student')
       sign_out teacher
@@ -1698,7 +1708,7 @@ RSpec.describe 'Classroom students', type: :request do
     end
 
     it 'rejects a teacher outside the classroom' do
-      outsider = create(:user, :teacher)
+      outsider = create_outside_teacher
       student = create(:user, :student)
       membership = create(:classroom_membership, user: student, classroom: classroom, role: 'student',
                                                  status: 'inactive')

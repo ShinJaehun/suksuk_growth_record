@@ -1,10 +1,10 @@
 require 'rails_helper'
 
 RSpec.describe 'Home', type: :request do
-  let(:teacher) { create(:user, :teacher) }
   let(:admin) { create(:user, :admin) }
   let(:student) { create(:user, :student) }
   let(:classroom) { create(:classroom) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
 
   it 'redirects guests to the teacher and admin sign in page' do
     get root_path
@@ -46,10 +46,10 @@ RSpec.describe 'Home', type: :request do
     expect(response).to redirect_to(user_path(student))
   end
 
-  it 'labels the Devise sign in page as teacher and admin login' do
+  it 'labels the Devise sign in page as admin login' do
     get new_user_session_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include('교사/관리자 로그인')
+    expect(response.body).to include(I18n.t('users.sessions.admin_title'))
   end
 end

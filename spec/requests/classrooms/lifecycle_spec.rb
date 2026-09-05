@@ -20,7 +20,10 @@ RSpec.describe "Classroom lifecycle", type: :request do
   end
 
   it "lets an own-school manager deactivate a classroom" do
-    manager = create(:school_membership, :manager, school: school).user
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: school, user: manager)
     classroom = create(:classroom, school: school)
     sign_in manager
 
@@ -44,7 +47,7 @@ RSpec.describe "Classroom lifecycle", type: :request do
   end
 
   it "rejects an ordinary teacher" do
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     classroom = create(:classroom, school: school)
     assign_teacher(classroom, teacher)
     sign_in teacher
@@ -56,7 +59,11 @@ RSpec.describe "Classroom lifecycle", type: :request do
   end
 
   it "keeps another-school manager outside the classroom scope" do
-    manager = create(:school_membership, :manager, school: create(:school)).user
+    manager_school = create(:school)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: manager_school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: manager_school, user: manager)
     classroom = create(:classroom, school: school)
     sign_in manager
 

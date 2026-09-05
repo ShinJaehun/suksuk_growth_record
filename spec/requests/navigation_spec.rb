@@ -39,7 +39,7 @@ RSpec.describe 'Navigation', type: :request do
   end
 
   it 'links a teacher without classrooms to the classroom index' do
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
     sign_in teacher
 
     get classrooms_path
@@ -48,8 +48,8 @@ RSpec.describe 'Navigation', type: :request do
   end
 
   it 'links a teacher with one classroom directly to that classroom' do
-    teacher = create(:user, :teacher)
     classroom = create(:classroom)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school)
     assign_teacher(classroom, teacher)
     sign_in teacher
 

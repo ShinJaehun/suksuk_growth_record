@@ -1,0 +1,27 @@
+<section class="mx-auto w-full max-w-md pt-8">
+  <div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <h1 class="text-xl font-bold text-slate-900"><%= t("users.forced_passwords.title") %></h1>
+    <p class="mt-2 text-sm text-slate-600"><%= t("users.forced_passwords.description") %></p>
+
+    <%= form_with model: current_user, url: forced_password_path, class: "mt-6 space-y-4" do |form| %>
+      <% if current_user.errors.any? %>
+        <p class="text-sm text-rose-700"><%= current_user.errors.full_messages.to_sentence %></p>
+      <% end %>
+
+      <%= form.label :password, t("users.forced_passwords.password"), class: "block text-sm font-medium" %>
+      <%= form.password_field :password,
+            autocomplete: "new-password",
+            class: "block w-full rounded border px-3 py-2" %>
+
+      <%= form.label :password_confirmation,
+            t("users.forced_passwords.password_confirmation"),
+            class: "block text-sm font-medium" %>
+      <%= form.password_field :password_confirmation,
+            autocomplete: "new-password",
+            class: "block w-full rounded border px-3 py-2" %>
+
+      <%= form.submit t("users.forced_passwords.submit"),
+            class: "w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white" %>
+    <% end %>
+  </div>
+</section>

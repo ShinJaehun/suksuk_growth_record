@@ -2,7 +2,12 @@ require "rails_helper"
 
 RSpec.describe "Users::Registrations", type: :request do
   let(:student) { create(:user, :student) }
-  let(:teacher) { create(:user, :teacher, password: "password123") }
+  let(:teacher_school) { create(:school) }
+  let(:teacher) do
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: teacher_school,
+      password: "password123")
+  end
   let(:admin) { create(:user, :admin, password: "password123") }
 
   describe "GET /users/sign_up" do

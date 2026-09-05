@@ -5,7 +5,7 @@ RSpec.describe 'Classroom deletion', type: :request do
 
   it 'lets an admin delete an unused classroom while preserving the teacher user' do
     admin = create(:user, :admin)
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     classroom = create(:classroom, school: school)
     assign_teacher(classroom, teacher)
     sign_in admin
@@ -21,7 +21,7 @@ RSpec.describe 'Classroom deletion', type: :request do
   end
 
   it 'rejects direct deletion by an assigned teacher' do
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     classroom = create(:classroom, school: school)
     assign_teacher(classroom, teacher)
     sign_in teacher
@@ -37,7 +37,9 @@ RSpec.describe 'Classroom deletion', type: :request do
   end
 
   it 'rejects direct deletion by an unassigned school manager' do
-    manager = create(:user, :teacher)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
     classroom = create(:classroom, school: school)
     create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
@@ -52,7 +54,9 @@ RSpec.describe 'Classroom deletion', type: :request do
   end
 
   it 'rejects direct deletion by a manager who is also an assigned teacher' do
-    manager = create(:user, :teacher)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
     classroom = create(:classroom, school: school)
     create(:school_membership, :manager, school: school, user: manager)
     assign_teacher(classroom, manager)
@@ -86,7 +90,7 @@ RSpec.describe 'Classroom deletion', type: :request do
 
   it 'shows the delete area only on an admin edit page' do
     admin = create(:user, :admin)
-    teacher = create(:user, :teacher)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     classroom = create(:classroom, school: school)
     assign_teacher(classroom, teacher)
     delete_description = I18n.t('classrooms.edit.delete_description')
@@ -115,7 +119,9 @@ RSpec.describe 'Classroom deletion', type: :request do
   end
 
   it 'hides the delete area from school managers, including assigned managers' do
-    manager = create(:user, :teacher)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
     classroom = create(:classroom, school: school)
     create(:school_membership, :manager, school: school, user: manager)
     assign_teacher(classroom, manager)

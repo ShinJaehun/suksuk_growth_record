@@ -11,6 +11,11 @@ Rails.application.routes.draw do
     patch "/account/password", to: "users/registrations#update_password", as: :account_password
   end
 
+  get "/schools/:school_id/teacher_login", to: "teacher_sessions#new", as: :school_teacher_login
+  post "/schools/:school_id/teacher_login", to: "teacher_sessions#create"
+  get "/account/forced_password/edit", to: "users/forced_passwords#edit", as: :edit_forced_password
+  patch "/account/forced_password", to: "users/forced_passwords#update", as: :forced_password
+
   get "/student_login", to: "student_sessions#new", as: :new_student_session
   delete "/student_logout", to: "student_sessions#destroy", as: :destroy_student_session
   get "/c/:student_login_token/login", to: "student_sessions#new", as: :public_student_login

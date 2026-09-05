@@ -10,7 +10,27 @@ ko:
 
   users:
     sessions:
+      admin_title: "관리자 로그인"
+      email: "이메일"
+      password: "비밀번호"
+      remember_me: "로그인 상태 유지"
+      submit: "로그인"
       throttled: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요."
+      admin_only: "관리자 계정으로 로그인해 주세요."
+      teacher_ineligible: "현재 학년도에서 사용할 수 없는 선생님 계정입니다."
+    teacher_sessions:
+      title: "%{school} 선생님 로그인"
+      login_id: "아이디"
+      password: "비밀번호"
+      submit: "로그인"
+      invalid: "아이디 또는 비밀번호를 확인해 주세요."
+    forced_passwords:
+      title: "비밀번호 변경"
+      description: "계속하려면 새 비밀번호를 설정해 주세요."
+      password: "새 비밀번호"
+      password_confirmation: "새 비밀번호 확인"
+      submit: "비밀번호 변경"
+      updated: "비밀번호를 변경했습니다."
     registrations:
       public_registration_disabled: "공개 회원가입은 제공하지 않습니다."
       account_deletion_disabled: "계정 삭제는 제공하지 않습니다."

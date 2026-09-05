@@ -3,7 +3,11 @@ require 'rails_helper'
 RSpec.describe 'School overview', type: :request do
   let(:school) { create(:school, name: '아라초등학교') }
   let(:manager) do
-    create(:school_membership, :manager, school: school, user: create(:user, :teacher, name: '학교 관리자')).user
+    user = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager",
+      name: '학교 관리자')
+    create(:school_membership, :manager, school: school, user: user).user
   end
 
   it 'shows only school summary and settings entry to an admin' do
@@ -47,7 +51,8 @@ RSpec.describe 'School overview', type: :request do
 
   it 'hides school settings from a member teacher while showing manager names' do
     school_manager = manager
-    member = create(:school_membership, school: school, user: create(:user, :teacher)).user
+    member = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    create(:school_membership, school: school, user: member)
     sign_in member
 
     get school_path(school)
@@ -78,7 +83,7 @@ RSpec.describe 'School overview', type: :request do
     expect(overview.text).not_to include('3명')
   end
 
-  it 'keeps an inactive school readable to admins but blocks members until reactivation' do
+  it 'keeps an inactive school readable to admins and expires its manager session' do
     school_manager = manager
     school.update!(active: false)
     sign_in create(:user, :admin)
@@ -89,10 +94,6 @@ RSpec.describe 'School overview', type: :request do
 
     sign_in school_manager
     get school_path(school)
-    expect(response).to have_http_status(:not_found)
-
-    school.update!(active: true)
-    get school_path(school)
-    expect(response).to have_http_status(:ok)
+    expect(response).to redirect_to(school_teacher_login_path(school))
   end
 end

@@ -1,5 +1,6 @@
 class Users::SessionsController < Devise::SessionsController
-  skip_before_action :expire_inactive_teacher_session, only: :create
+  skip_before_action :expire_ineligible_teacher_session, only: :create
+  skip_before_action :require_teacher_password_change, only: :destroy
   skip_before_action :expire_student_session_if_inactive, only: :create
 
   def create
@@ -11,15 +12,7 @@ class Users::SessionsController < Devise::SessionsController
 
     authenticated = false
     failure_payload = catch(:warden) do
-      super do |resource|
-        if resource.student?
-          sign_out(resource_name)
-          redirect_to new_student_session_path, alert: '학생은 교실별 PIN 로그인으로 접속해 주세요.'
-          return
-        end
-
-        limiter.reset
-      end
+      super { limiter.reset }
       authenticated = true
     end
 

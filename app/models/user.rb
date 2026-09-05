@@ -70,6 +70,11 @@ class User < ApplicationRecord
     AVATAR_KEYS_BY_ROLE.fetch(role.to_s, [])
   end
 
+  def self.find_for_database_authentication(warden_conditions)
+    email = warden_conditions[:email].to_s.strip.downcase
+    admin.find_by(email: email)
+  end
+
   def student_pin_configured?
     student_pin_digest.present?
   end
@@ -95,7 +100,7 @@ class User < ApplicationRecord
   end
 
   def email_required?
-    !student?
+    admin?
   end
 
   def password_required?

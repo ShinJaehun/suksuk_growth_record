@@ -4,8 +4,12 @@ RSpec.describe 'School workspaces', type: :request do
   let!(:school) { create(:school, name: '새싹초등학교', color_key: 'sky') }
   let!(:other_school) { create(:school, name: '다른초등학교', color_key: 'violet') }
   let(:admin) { create(:user, :admin) }
-  let(:member) { create(:user, :teacher) }
-  let(:manager) { create(:user, :teacher) }
+  let(:member) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
+  let(:manager) do
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
+  end
 
   before do
     create(:school_membership, school: school, user: member)
@@ -82,23 +86,16 @@ RSpec.describe 'School workspaces', type: :request do
 
     school.update!(active: false)
     get classrooms_path
-    expect(response.body).not_to include(%(href="#{school_path(school)}"))
-    expect(response.body).not_to include(%(href="#{teachers_path}"))
-
-    school.update!(active: true)
-    get classrooms_path
-    expect(response.body.scan(%(href="#{school_path(school)}")).size).to eq(2)
-    expect(response.body.scan(%(href="#{teachers_path}")).size).to eq(2)
+    expect(response).to redirect_to(school_teacher_login_path(school))
   end
 
   it 'does not show school navigation to a member of an inactive school' do
-    school.update!(active: false)
     sign_in member
+    school.update!(active: false)
 
     get classrooms_path
 
-    expect(response.body).not_to include(%(href="#{school_path(school)}"))
-    expect(response.body).not_to include(%(href="#{teachers_path}"))
+    expect(response).to redirect_to(school_teacher_login_path(school))
   end
 
   it 'allows members and managers to view only their school' do
@@ -113,7 +110,11 @@ RSpec.describe 'School workspaces', type: :request do
   end
 
   it 'rejects an unassigned teacher and a student' do
-    [create(:user, :teacher), create(:user, :student)].each do |user|
+    unassigned_school = create(:school)
+    unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: unassigned_school)
+
+    [unassigned_teacher, create(:user, :student)].each do |user|
       sign_in user
       get school_path(school)
       expect(response).to have_http_status(:not_found)

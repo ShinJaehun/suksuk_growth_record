@@ -81,7 +81,10 @@ RSpec.describe "Admin school managers", type: :request do
   end
 
   it "rejects a school manager actor" do
-    actor = create(:school_membership, :manager, school: school).user
+    actor = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: school, user: actor)
     sign_in actor
 
     post admin_school_school_managers_path(school), params: { user_id: teacher.id }
@@ -91,7 +94,8 @@ RSpec.describe "Admin school managers", type: :request do
   end
 
   it "rejects a school member actor" do
-    actor = create(:school_membership, school: school).user
+    actor = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    create(:school_membership, school: school, user: actor)
     sign_in actor
 
     post admin_school_school_managers_path(school), params: { user_id: teacher.id }
@@ -102,7 +106,11 @@ RSpec.describe "Admin school managers", type: :request do
 
   it "rejects a school manager actor demoting a manager" do
     membership = create(:school_membership, :manager, school: school, user: teacher)
-    actor = create(:school_membership, :manager, school: create(:school)).user
+    actor_school = create(:school)
+    actor = create(:user, :teacher, :active_annual_teacher,
+      annual_school: actor_school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: actor_school, user: actor)
     sign_in actor
 
     delete admin_school_manager_path(school, teacher)
@@ -113,7 +121,8 @@ RSpec.describe "Admin school managers", type: :request do
 
   it "rejects a school member actor demoting a manager" do
     membership = create(:school_membership, :manager, school: school, user: teacher)
-    actor = create(:school_membership, school: school).user
+    actor = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    create(:school_membership, school: school, user: actor)
     sign_in actor
 
     delete admin_school_manager_path(school, teacher)

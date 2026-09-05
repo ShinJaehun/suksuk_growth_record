@@ -1,6 +1,19 @@
 require "rails_helper"
 
 RSpec.describe User, type: :model do
+  describe "role-specific email requirements" do
+    it "allows a teacher without email" do
+      expect(build(:user, :teacher, email: nil)).to be_valid
+    end
+
+    it "requires email for a global admin" do
+      admin = build(:user, :admin, email: nil)
+
+      expect(admin).not_to be_valid
+      expect(admin.errors[:email]).to be_present
+    end
+  end
+
   describe "teacher credential foundation" do
     it "defaults users to no forced password change" do
       expect(create(:user, :teacher)).not_to be_password_change_required
@@ -237,8 +250,8 @@ RSpec.describe User, type: :model do
       expect(student).not_to be_valid
     end
 
-    it "requires email for teachers and admins" do
-      expect(build(:user, :teacher, email: nil)).not_to be_valid
+    it "allows teacher email to be absent but requires it for admins" do
+      expect(build(:user, :teacher, email: nil)).to be_valid
       expect(build(:user, :admin, email: nil)).not_to be_valid
     end
 

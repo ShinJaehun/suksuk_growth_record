@@ -5,8 +5,12 @@ class UserPasswordAttemptLimiter
   WINDOW = 10.minutes
   KEY_PREFIX = "user_password_attempts:v1".freeze
 
-  def initialize(email:, remote_ip:, cache: Rails.cache)
-    @email = email.to_s.strip.downcase
+  def initialize(email: nil, school_id: nil, login_id: nil, remote_ip:, cache: Rails.cache)
+    @identity = if school_id
+                  ["teacher", school_id.to_s, login_id.to_s.strip.downcase]
+                else
+                  ["admin", email.to_s.strip.downcase]
+                end
     @remote_ip = remote_ip.to_s
     @cache = cache
   end
@@ -49,9 +53,9 @@ class UserPasswordAttemptLimiter
 
   private
 
-  attr_reader :email, :remote_ip, :cache
+  attr_reader :identity, :remote_ip, :cache
 
   def digest
-    @digest ||= Digest::SHA256.hexdigest([email, remote_ip].join("\0"))
+    @digest ||= Digest::SHA256.hexdigest([*identity, remote_ip].join("\0"))
   end
 end

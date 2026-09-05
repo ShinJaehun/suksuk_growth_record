@@ -2,7 +2,9 @@ require "rails_helper"
 
 RSpec.describe "Classrooms index entry", type: :request do
   it "redirects an ordinary teacher to their active assigned classroom" do
-    membership = create(:school_membership, grade: 4)
+    school = create(:school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school, annual_grade: 4)
+    membership = create(:school_membership, school: school, user: teacher, grade: 4)
     classroom = create(:classroom, school: membership.school, grade: 4)
     assign_teacher(classroom, membership.user)
     sign_in membership.user
@@ -13,7 +15,9 @@ RSpec.describe "Classrooms index entry", type: :request do
   end
 
   it "shows the empty index for an ordinary teacher without an assignment" do
-    membership = create(:school_membership)
+    school = create(:school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
+    membership = create(:school_membership, school: school, user: teacher)
     sign_in membership.user
 
     get classrooms_path
@@ -23,7 +27,9 @@ RSpec.describe "Classrooms index entry", type: :request do
   end
 
   it "does not redirect an ordinary teacher to an inactive assigned classroom" do
-    membership = create(:school_membership, grade: 4)
+    school = create(:school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school, annual_grade: 4)
+    membership = create(:school_membership, school: school, user: teacher, grade: 4)
     classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
     classroom.update!(active: false)
     sign_in membership.user
@@ -34,20 +40,26 @@ RSpec.describe "Classrooms index entry", type: :request do
     expect(response).not_to redirect_to(classroom_path(classroom))
   end
 
-  it "does not redirect an ordinary teacher to a classroom in an inactive school" do
-    membership = create(:school_membership, grade: 4)
+  it "expires an ordinary teacher session when their school becomes inactive" do
+    school = create(:school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school, annual_grade: 4)
+    membership = create(:school_membership, school: school, user: teacher, grade: 4)
     classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
-    membership.school.update!(active: false)
     sign_in membership.user
+    membership.school.update!(active: false)
 
     get classrooms_path
 
-    expect(response).to have_http_status(:ok)
-    expect(response).not_to redirect_to(classroom_path(classroom))
+    expect(response).to redirect_to(school_teacher_login_path(school))
   end
 
   it "keeps the classrooms index for a school manager" do
-    membership = create(:school_membership, :manager, grade: 4)
+    school = create(:school)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager",
+      annual_grade: 4)
+    membership = create(:school_membership, :manager, school: school, user: manager, grade: 4)
     classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
     sign_in membership.user
 

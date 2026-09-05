@@ -4,12 +4,21 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
   let(:school) { create(:school) }
   let(:other_school) { create(:school) }
   let(:manager) do
+    user = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager",
+      annual_grade: 4,
+      name: '학교 관리자')
     create(:school_membership, :manager, school: school, grade: 4,
-                                                 user: create(:user, :teacher, name: '학교 관리자')).user
+                                                 user: user).user
   end
   let(:member) do
+    user = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4,
+      name: '소속 교사')
     create(:school_membership, school: school, grade: 4,
-                               user: create(:user, :teacher, name: '소속 교사')).user
+                               user: user).user
   end
 
   def teacher_params(email: 'new@example.com')
@@ -83,7 +92,10 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
   end
 
   it 'returns not found for a manager outside the school scope' do
-    other_manager = create(:school_membership, :manager, school: other_school).user
+    other_manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: other_school, user: other_manager)
     sign_in other_manager
 
     get school_teachers_path(school)

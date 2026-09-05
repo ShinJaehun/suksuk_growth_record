@@ -23,6 +23,32 @@ RSpec.describe UserPasswordAttemptLimiter, type: :service do
     expect(described_class.new(email: email, remote_ip: "203.0.113.11", cache: cache)).not_to be_blocked
   end
 
+  it "keeps the same teacher login ID in different schools separate" do
+    first = described_class.new(
+      school_id: 1,
+      login_id: " TEACHER1 ",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+    5.times { first.record_failure }
+
+    same_school = described_class.new(
+      school_id: 1,
+      login_id: "teacher1",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+    other_school = described_class.new(
+      school_id: 2,
+      login_id: "teacher1",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+
+    expect(same_school).to be_blocked
+    expect(other_school).not_to be_blocked
+  end
+
   it "resets failure and block records" do
     5.times { limiter.record_failure }
 

@@ -321,8 +321,14 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'blocks non-admin users from the teacher management index' do
-    manager = create(:school_membership, :manager).user
-    regular_teacher = create(:user, :teacher)
+    manager_school = create(:school)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: manager_school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: manager_school, user: manager)
+    teacher_school = create(:school)
+    regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
+    create(:school_membership, school: teacher_school, user: regular_teacher)
     student = create(:user, :student)
 
     [manager, regular_teacher, student].each do |user|
@@ -333,8 +339,14 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'blocks non-admin users from teacher management actions' do
-    manager = create(:school_membership, :manager).user
-    regular_teacher = create(:user, :teacher)
+    manager_school = create(:school)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: manager_school,
+      annual_school_role: "manager")
+    create(:school_membership, :manager, school: manager_school, user: manager)
+    teacher_school = create(:school)
+    regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
+    create(:school_membership, school: teacher_school, user: regular_teacher)
     student = create(:user, :student)
 
     [manager, regular_teacher, student].each do |user|
@@ -392,8 +404,14 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'shows the canonical teacher management navigation link to admins and managers' do
-    manager_membership = create(:school_membership, :manager)
-    regular_teacher = create(:user, :teacher)
+    manager_school = create(:school)
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: manager_school,
+      annual_school_role: "manager")
+    manager_membership = create(:school_membership, :manager, school: manager_school, user: manager)
+    teacher_school = create(:school)
+    regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
+    create(:school_membership, school: teacher_school, user: regular_teacher)
     student = create(:user, :student)
 
     sign_in admin

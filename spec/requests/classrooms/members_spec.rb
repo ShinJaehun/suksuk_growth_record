@@ -3,7 +3,11 @@ require 'rails_helper'
 RSpec.describe 'Classroom members', type: :request do
   let(:classroom) { create(:classroom, name: '2반') }
   let(:admin) { create(:user, :admin) }
-  let(:teacher) { create(:user, :teacher, name: '담당 교사') }
+  let(:teacher) do
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: classroom.school,
+      name: '담당 교사')
+  end
   let(:other_teacher) { create(:user, :teacher, name: '추가 교사') }
 
   def insert_legacy_teacher_membership!(user:, classroom:)

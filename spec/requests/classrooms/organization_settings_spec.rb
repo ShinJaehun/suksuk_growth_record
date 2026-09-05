@@ -2,8 +2,16 @@ require 'rails_helper'
 
 RSpec.describe 'Classroom organization settings', type: :request do
   let(:admin) { create(:user, :admin) }
-  let(:teacher) { create(:user, :teacher) }
   let(:school) { create(:school, name: '새싹초등학교') }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
+
+  def create_annual_manager(school:)
+    manager = create(:user, :teacher, :active_annual_teacher,
+                     annual_school: school,
+                     annual_school_role: 'manager')
+    create(:school_membership, :manager, school: school, user: manager)
+    manager
+  end
 
   it 'shows school and grade fields only to an admin' do
     sign_in admin
@@ -22,8 +30,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'shows a manager their whole school classrooms without other schools' do
-    manager = create(:user, :teacher)
-    create(:school_membership, :manager, school: school, user: manager)
+    manager = create_annual_manager(school: school)
     assigned_classroom = create(:classroom, school: school, name: '담당 학급')
     unassigned_classroom = create(:classroom, school: school, name: '미담당 학급')
     create(:classroom, school: create(:school), name: '다른 학교 학급')
@@ -120,7 +127,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'lets a manager enter an inactive classroom edit page only to reactivate it' do
-    manager = create(:school_membership, :manager, school: school).user
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: school, active: false)
     sign_in manager
 
@@ -185,8 +192,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'filters a manager within their school classrooms' do
-    manager = create(:user, :teacher)
-    create(:school_membership, :manager, school: school, user: manager)
+    manager = create_annual_manager(school: school)
     selected = create(:classroom, school: school, grade: 4, name: '학교 4학년')
     other_grade = create(:classroom, school: school, grade: 5, name: '학교 5학년')
     outside = create(:classroom, school: create(:school), grade: 4, name: '외부 4학년')
@@ -269,11 +275,12 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'hides inactive-school classrooms from index while keeping admin read access' do
-    inactive_school = create(:school, active: false)
+    inactive_school = create(:school)
     classroom = create(:classroom, school: inactive_school, name: '중단된 학교 교실')
-    assigned_teacher = create(:user, :teacher)
+    assigned_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: inactive_school)
     create(:school_membership, school: inactive_school, user: assigned_teacher)
     assign_teacher(classroom, assigned_teacher)
+    inactive_school.update!(active: false)
     sign_in admin
 
     get classrooms_path
@@ -283,11 +290,15 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).not_to include(classroom_members_path(classroom))
 
+    inactive_school.update!(active: true)
     sign_in assigned_teacher
+    inactive_school.update!(active: false)
     get classroom_path(classroom)
-    expect(response).to redirect_to(root_path)
+    expect(response).to redirect_to(school_teacher_login_path(inactive_school))
 
     inactive_school.update!(active: true)
+    sign_in assigned_teacher
+
     get classroom_path(classroom)
     expect(response).to have_http_status(:ok)
   end
@@ -325,9 +336,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'allows a manager to show an unassigned classroom in their school' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: school)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     get classroom_path(classroom)
@@ -340,9 +350,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it "rejects a manager showing another school's classroom" do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: create(:school))
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     get classroom_path(classroom)
@@ -409,9 +418,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'allows a manager to create a classroom fixed to their school' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     other_school = create(:school)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     post classrooms_path, params: {
@@ -430,8 +438,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'rejects manager classroom creation without a grade' do
-    manager = create(:user, :teacher)
-    create(:school_membership, :manager, school: school, user: manager)
+    manager = create_annual_manager(school: school)
     sign_in manager
 
     expect do
@@ -445,8 +452,7 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'rejects manager classroom creation with an out-of-range grade' do
-    manager = create(:user, :teacher)
-    create(:school_membership, :manager, school: school, user: manager)
+    manager = create_annual_manager(school: school)
     sign_in manager
 
     expect do
@@ -505,9 +511,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'allows a manager to update basic classroom fields in their school' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: school, name: '기존 학급', grade: 1)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     patch classroom_path(classroom), params: {
@@ -519,9 +524,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'prevents a manager from deleting a classroom in their school' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: school)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     expect do
@@ -532,10 +536,9 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'prevents a manager from moving a classroom to another school' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     other_school = create(:school)
     classroom = create(:classroom, school: school, name: '기존 학급', grade: 1)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     patch classroom_path(classroom), params: {
@@ -548,9 +551,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'rejects a blank grade submitted by a manager' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: school, grade: 3)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     patch classroom_path(classroom), params: {
@@ -563,9 +565,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'rejects an out-of-range grade submitted by a manager' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: school, grade: 3)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     patch classroom_path(classroom), params: {
@@ -578,9 +579,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
   end
 
   it 'rejects manager updates outside their school' do
-    manager = create(:user, :teacher)
+    manager = create_annual_manager(school: school)
     classroom = create(:classroom, school: create(:school), name: '다른 학교 학급')
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     patch classroom_path(classroom), params: {

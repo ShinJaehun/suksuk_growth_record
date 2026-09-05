@@ -4,9 +4,18 @@ RSpec.describe 'School settings', type: :request do
   let(:school) { create(:school, name: '기존 학교') }
   let(:admin) { create(:user, :admin) }
   let(:manager) do
-    create(:school_membership, :manager, school: school, user: create(:user, :teacher, name: '현재 관리자')).user
+    user = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager",
+      name: '현재 관리자')
+    create(:school_membership, :manager, school: school, user: user).user
   end
-  let(:member) { create(:school_membership, school: school, user: create(:user, :teacher, name: '관리자 후보')).user }
+  let(:member) do
+    user = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '관리자 후보')
+    create(:school_membership, school: school, user: user).user
+  end
 
   it 'renders school settings and color choices for a global admin' do
     current_manager = manager

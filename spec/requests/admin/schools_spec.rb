@@ -2,8 +2,8 @@ require 'rails_helper'
 
 RSpec.describe 'Admin schools', type: :request do
   let(:admin) { create(:user, :admin) }
-  let(:teacher) { create(:user, :teacher) }
   let(:school) { create(:school, name: '새싹초등학교') }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
 
   it 'shows the new school form to an admin' do
     sign_in admin

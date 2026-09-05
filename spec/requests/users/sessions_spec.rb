@@ -3,7 +3,15 @@ require 'rails_helper'
 RSpec.describe 'Users::Sessions', type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:teacher) { create(:user, :teacher, password: 'password123') }
+  let(:teacher_school) { create(:school) }
+  let(:teacher_school_year) { create(:school_year, :active, school: teacher_school) }
+  let(:teacher) do
+    create(:user, :teacher,
+      password: 'password123',
+      school_year: teacher_school_year,
+      login_id: 'teacher1',
+      school_role: 'member')
+  end
   let(:admin) { create(:user, :admin, password: 'password123') }
   let(:student) { create(:user, :student, student_pin: '1234') }
   let(:classroom) { create(:classroom) }
@@ -34,7 +42,7 @@ RSpec.describe 'Users::Sessions', type: :request do
     expect(response.body).not_to include('Forgot your password?')
   end
 
-  it 'signs a teacher in and redirects directly to classrooms index' do
+  it 'does not authenticate a teacher through the admin email flow' do
     post user_session_path, params: {
       user: {
         email: teacher.email,
@@ -42,29 +50,19 @@ RSpec.describe 'Users::Sessions', type: :request do
       }
     }
 
-    expect(response).to redirect_to(classrooms_path)
-    expect(controller.current_user).to eq(teacher)
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(controller.current_user).to be_nil
   end
 
-  it 'rejects an inactive teacher with valid credentials' do
-    teacher.update!(active: false)
+  it 'uses the same admin-auth failure boundary for correct and wrong teacher passwords' do
+    responses = ['password123', 'wrong-password'].map do |password|
+      post user_session_path, params: { user: { email: teacher.email, password: password } }
+      [response.status, response.body]
+    end
 
-    post user_session_path, params: {
-      user: {
-        email: teacher.email,
-        password: 'password123'
-      }
-    }
-
-    expect(response).to redirect_to(new_user_session_path)
-
-    follow_redirect!
-
-    expect(response.body).to include(I18n.t('devise.failure.inactive'))
-
-    get classrooms_path
-
-    expect(response).to redirect_to(new_user_session_path)
+    expect(responses.map(&:first)).to eq([422, 422])
+    expect(responses.first.last).to include(I18n.t('devise.failure.invalid', authentication_keys: 'email'))
+    expect(responses.last.last).to include(I18n.t('devise.failure.invalid', authentication_keys: 'email'))
   end
 
   it 'signs out a teacher on the next request after deactivation' do
@@ -139,19 +137,19 @@ RSpec.describe 'Users::Sessions', type: :request do
     end
 
     travel_to Time.zone.local(2026, 8, 18, 10, 10, 1) do
-      post_password_login(email: teacher.email, password: 'password123')
+      post_password_login(email: admin.email, password: 'password123')
     end
 
-    expect(response).to redirect_to(classrooms_path)
-    expect(controller.current_user).to eq(teacher)
+    expect(response).to redirect_to(schools_path)
+    expect(controller.current_user).to eq(admin)
   end
 
   it 'resets failures after a successful login before throttling' do
-    4.times { post_password_login(email: teacher.email, password: 'wrong-password') }
-    post_password_login(email: teacher.email, password: 'password123')
+    4.times { post_password_login(email: admin.email, password: 'wrong-password') }
+    post_password_login(email: admin.email, password: 'password123')
     delete destroy_user_session_path
 
-    4.times { post_password_login(email: teacher.email, password: 'wrong-password') }
+    4.times { post_password_login(email: admin.email, password: 'wrong-password') }
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(response).not_to have_http_status(:too_many_requests)
@@ -160,8 +158,8 @@ RSpec.describe 'Users::Sessions', type: :request do
   it 'keeps attempts for different IPs and emails separate' do
     5.times { post_password_login(email: teacher.email, password: 'wrong-password') }
 
-    post_password_login(email: teacher.email, password: 'password123', ip: '203.0.113.11')
-    expect(response).to redirect_to(classrooms_path)
+    post_password_login(email: admin.email, password: 'password123', ip: '203.0.113.11')
+    expect(response).to redirect_to(schools_path)
     delete destroy_user_session_path
 
     post_password_login(email: admin.email, password: 'password123')
