@@ -16,8 +16,12 @@ RSpec.describe SchoolStructure::IntegrityAudit do
   end
 
   it 'is clean for a valid teacher assignment' do
-    membership = create(:school_membership, grade: 4)
-    create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+    school = create(:school)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
+    create(:school_membership, school: school, user: teacher, grade: 4)
+    create(:classroom, school: school, grade: 4, teacher: teacher)
 
     result = described_class.call
 

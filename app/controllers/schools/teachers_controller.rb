@@ -16,6 +16,7 @@ class Schools::TeachersController < ApplicationController
 
   def create
     attrs = teacher_params
+    attrs[:email] = attrs[:email].presence
     attrs[:gender] = nil unless %w[male female].include?(attrs[:gender])
     @teacher = User.new(attrs.merge(role: :teacher))
     pool = avatar_keys_for_gender(@teacher.gender)
@@ -30,11 +31,13 @@ class Schools::TeachersController < ApplicationController
           attributes: {},
           school: @school,
           membership_grade: selected_membership_grade,
-          classroom_id: classroom_id
+          classroom_id: classroom_id,
+          actor: current_user
         )
       end
 
     if !assignments_invalid && result.success?
+      expose_temporary_password(result)
       redirect_to school_teachers_path(@school),
         notice: t("schools.teachers.create.success"),
         status: :see_other
@@ -59,7 +62,8 @@ class Schools::TeachersController < ApplicationController
           attributes: {},
           school: @school,
           membership_grade: selected_membership_grade,
-          classroom_id: selected_classroom_id
+          classroom_id: selected_classroom_id,
+          actor: current_user
         )
       end
 
@@ -97,27 +101,22 @@ class Schools::TeachersController < ApplicationController
   end
 
   def set_teacher
-    membership = @school.school_memberships.includes(:user).find_by!(user_id: params[:id])
-    @school_membership = membership
-    @teacher = membership.user
-    raise ActiveRecord::RecordNotFound unless @teacher.teacher?
+    @teacher = active_school_year.users.teacher.find(params[:id])
   end
 
   def teacher_rows
-    @school.school_memberships
-      .includes(user: [{ avatar_attachment: :blob }, :assigned_classroom])
-      .order(:role, :id)
-      .select { |membership| membership.user.teacher? }
-      .select { |membership| @teacher_status == "all" || membership.user.active? == (@teacher_status == "active") }
-      .map do |membership|
-        teacher = membership.user
+    active_school_year.users.teacher
+      .includes({ avatar_attachment: :blob }, :assigned_classroom)
+      .order(:school_role, :id)
+      .select { |teacher| @teacher_status == "all" || teacher.active? == (@teacher_status == "active") }
+      .map do |teacher|
         classrooms = school_teacher_classrooms(teacher)
 
         {
           teacher: teacher,
           school_color_key: @school.color_key,
-          school_role: membership.role,
-          school_role_label: teacher_school_role_label(membership),
+          school_role: teacher.school_role,
+          school_role_label: teacher_school_role_label(teacher),
           classrooms: classrooms
         }
       end
@@ -127,12 +126,12 @@ class Schools::TeachersController < ApplicationController
     [teacher.assigned_classroom].compact.select { |classroom| classroom.school_id == @school.id }
   end
 
-  def teacher_school_role_label(membership)
-    t(membership.manager? ? "admin.teachers.index.manager" : "admin.teachers.index.member")
+  def teacher_school_role_label(teacher)
+    t(teacher.school_manager? ? "admin.teachers.index.manager" : "admin.teachers.index.member")
   end
 
   def teacher_params
-    params.require(:user).permit(:name, :email, :password, :password_confirmation, :gender, :avatar_key)
+    params.require(:user).permit(:name, :email, :login_id, :gender, :avatar_key)
   end
 
   def update_teacher_status(active)
@@ -159,6 +158,10 @@ class Schools::TeachersController < ApplicationController
   def load_new_form
     @classrooms = @school.classrooms.order(:grade, :name, :id).load
     @selected_classroom_id = nil unless defined?(@selected_classroom_id)
+  end
+
+  def active_school_year
+    @active_school_year ||= @school.school_years.active.first!
   end
 
   def selected_classroom_id
@@ -192,6 +195,15 @@ class Schools::TeachersController < ApplicationController
   def load_edit_form
     @classrooms = @school.classrooms.order(:grade, :name, :id).load
     @selected_classroom_id = params.key?(:classroom_id) ? selected_classroom_id : @teacher.assigned_classroom&.id
+  end
+
+  def expose_temporary_password(result)
+    return if result.temporary_password.blank?
+
+    flash[:temporary_password] = t(
+      "admin.teachers.create.temporary_password",
+      password: result.temporary_password
+    )
   end
 
 end

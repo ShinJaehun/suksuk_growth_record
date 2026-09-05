@@ -47,13 +47,8 @@
     </div>
 
     <div>
-      <%= f.label :password, t("schools.teachers.form.password_label"), class: "block text-sm font-medium text-gray-700" %>
-      <%= f.password_field :password, class: "mt-1 block w-full border rounded px-3 py-2" %>
-    </div>
-
-    <div>
-      <%= f.label :password_confirmation, t("schools.teachers.form.password_confirmation_label"), class: "block text-sm font-medium text-gray-700" %>
-      <%= f.password_field :password_confirmation, class: "mt-1 block w-full border rounded px-3 py-2" %>
+      <%= f.label :login_id, t("users.teacher_sessions.login_id"), class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_field :login_id, class: "mt-1 block w-full border rounded px-3 py-2" %>
     </div>
 
     <div>

@@ -10,6 +10,12 @@ RSpec.describe "Teacher operations", type: :request do
     create(:school_membership, :manager, school: school, grade: 4, user: user).user
   end
 
+  def annual_teacher(school:, grade: nil)
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: grade)
+  end
+
   it "allows admins and managers but rejects regular teachers" do
     sign_in create(:user, :admin)
     get teachers_path
@@ -27,9 +33,9 @@ RSpec.describe "Teacher operations", type: :request do
   end
 
   it "limits a manager to teachers and classrooms in their school" do
-    own_teacher = create(:school_membership, school: school, grade: 5).user
+    own_teacher = annual_teacher(school: school, grade: 5)
     other_school = create(:school)
-    other_teacher = create(:school_membership, school: other_school).user
+    other_teacher = annual_teacher(school: other_school)
     own_classroom = create(:classroom, school: school, grade: 5)
     other_classroom = create(:classroom, school: other_school, grade: 5)
     sign_in manager
@@ -83,14 +89,21 @@ RSpec.describe "Teacher operations", type: :request do
       classroom_id: "",
       user: {
         name: "학급 없는 선생님",
-        email: "grade-only@example.com",
-        password: "password123",
-        password_confirmation: "password123"
+        login_id: "gradeonly",
+        email: ""
       }
     }
 
-    teacher = User.teacher.find_by!(email: "grade-only@example.com")
-    expect(teacher.school_membership).to have_attributes(school: school, grade: 5)
+    teacher = User.teacher.find_by!(login_id: "gradeonly")
+    expect(teacher).to have_attributes(
+      school_year: school.school_years.active.first,
+      school_role: "member",
+      grade: 5,
+      email: nil,
+      password_change_required: true
+    )
+    expect(teacher.school_membership).to be_nil
+    expect(teacher.teacher_credential_events.where(action: "temporary_password_issued")).to exist
     expect(teacher.assigned_classroom).to be_nil
   end
 
@@ -102,9 +115,8 @@ RSpec.describe "Teacher operations", type: :request do
       classroom_id: classroom.id,
       user: {
         name: "담임 선생님",
-        email: "assigned@example.com",
-        password: "password123",
-        password_confirmation: "password123"
+        login_id: "assigned",
+        email: "assigned@example.com"
       }
     }
     teacher = User.find_by!(email: "assigned@example.com")
@@ -117,12 +129,12 @@ RSpec.describe "Teacher operations", type: :request do
   end
 
   it "shows and preserves a locked inactive classroom assignment during profile updates" do
-    membership = create(:school_membership, school: school, grade: 5)
-    classroom = create(:classroom, school: school, grade: 5, teacher: membership.user)
+    teacher = annual_teacher(school: school, grade: 5)
+    classroom = create(:classroom, school: school, grade: 5, teacher: teacher)
     classroom.update!(active: false)
     sign_in manager
 
-    get edit_teacher_path(membership.user)
+    get edit_teacher_path(teacher)
 
     document = Nokogiri::HTML(response.body)
     expect(response.body).to include(
@@ -132,21 +144,21 @@ RSpec.describe "Teacher operations", type: :request do
     expect(document.at_css('input[name="classroom_id"]')['value']).to eq(classroom.id.to_s)
     expect(document.css('select[name="membership_grade"], select[name="classroom_id"]')).to be_empty
 
-    patch teacher_path(membership.user), params: {
+    patch teacher_path(teacher), params: {
       school_id: school.id,
       membership_grade: 5,
       classroom_id: classroom.id,
-      user: { name: "변경된 이름", email: membership.user.email }
+      user: { name: "변경된 이름", email: teacher.email }
     }
 
     expect(response).to redirect_to(teachers_path)
-    expect(membership.user.reload.name).to eq("변경된 이름")
-    expect(classroom.reload.teacher).to eq(membership.user)
+    expect(teacher.reload.name).to eq("변경된 이름")
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 
   it "rejects direct assignment of a different-grade or occupied classroom" do
-    teacher = create(:school_membership, school: school, grade: 5).user
-    other_teacher = create(:school_membership, school: school, grade: 5).user
+    teacher = annual_teacher(school: school, grade: 5)
+    other_teacher = annual_teacher(school: school, grade: 5)
     invalid_classrooms = [
       create(:classroom, school: school, grade: 6),
       create(:classroom, school: school, grade: 5, teacher: other_teacher)
@@ -165,16 +177,16 @@ RSpec.describe "Teacher operations", type: :request do
   end
 
   it "releases the classroom when a teacher is deactivated and does not restore it" do
-    membership = create(:school_membership, school: school, grade: 5)
-    classroom = create(:classroom, school: school, grade: 5, teacher: membership.user)
+    teacher = annual_teacher(school: school, grade: 5)
+    classroom = create(:classroom, school: school, grade: 5, teacher: teacher)
     sign_in manager
 
-    patch deactivate_teacher_path(membership.user)
-    expect(membership.user.reload).to be_inactive
+    patch deactivate_teacher_path(teacher)
+    expect(teacher.reload).to be_inactive
     expect(classroom.reload.teacher).to be_nil
 
-    patch reactivate_teacher_path(membership.user)
-    expect(membership.user.reload).to be_active
+    patch reactivate_teacher_path(teacher)
+    expect(teacher.reload).to be_active
     expect(classroom.reload.teacher).to be_nil
   end
 end

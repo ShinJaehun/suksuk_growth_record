@@ -274,7 +274,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'rejects a manager who is not assigned to the classroom' do
-    create(:school_membership, :manager, school: classroom.school, user: teacher)
+    teacher.update!(school_role: "manager")
     sign_in teacher
 
     get classroom_members_path(classroom)
@@ -283,7 +283,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'allows a manager assigned as the classroom teacher to manage members' do
-    create(:school_membership, :manager, school: classroom.school, user: teacher)
+    teacher.update!(school_role: "manager")
     assign_teacher(classroom, teacher)
     student = create(:user, :student, name: '활성 학생')
     create(:classroom_membership, classroom: classroom, user: student, role: :student)
@@ -840,7 +840,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects a manager who is not assigned to the classroom' do
-      create(:school_membership, :manager, school: classroom.school, user: teacher)
+      teacher.update!(school_role: "manager")
       student = create(:user, :student, name: '유지')
       membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
       sign_in teacher

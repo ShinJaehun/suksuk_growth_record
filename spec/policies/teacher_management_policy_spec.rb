@@ -2,9 +2,15 @@ require "rails_helper"
 
 RSpec.describe TeacherManagementPolicy do
   let(:school) { create(:school) }
-  let(:manager) { create(:school_membership, :manager, school: school).user }
-  let(:member) { create(:school_membership, school: school).user }
-  let(:outside_teacher) { create(:school_membership, school: create(:school)).user }
+  let(:manager) do
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
+  end
+  let(:member) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
+  let(:outside_teacher) do
+    create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
+  end
 
   it "allows admins and managers to access and create" do
     admin = create(:user, :admin)

@@ -4,24 +4,24 @@ RSpec.describe 'School settings', type: :request do
   let(:school) { create(:school, name: '기존 학교') }
   let(:admin) { create(:user, :admin) }
   let(:manager) do
-    user = create(:user, :teacher, :active_annual_teacher,
+    create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_school_role: "manager",
       name: '현재 관리자')
-    create(:school_membership, :manager, school: school, user: user).user
   end
   let(:member) do
-    user = create(:user, :teacher, :active_annual_teacher,
+    create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       name: '관리자 후보')
-    create(:school_membership, school: school, user: user).user
   end
 
   it 'renders school settings and color choices for a global admin' do
     current_manager = manager
     candidate = member
-    other_teacher = create(:school_membership, school: create(:school),
-                                               user: create(:user, :teacher, name: '다른 학교 교사')).user
+    other_school = create(:school)
+    other_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: '다른 학교 교사')
     unassigned_teacher = create(:user, :teacher, name: '미소속 교사')
     student = create(:user, :student, name: '학교 관리자 후보 제외 학생')
 
@@ -59,11 +59,10 @@ RSpec.describe 'School settings', type: :request do
 
   it 'excludes inactive teachers from manager candidates' do
     active_candidate = member
-    inactive_candidate = create(
-      :school_membership,
-      school: school,
-      user: create(:user, :teacher, name: '비활성 후보', active: false)
-    ).user
+    inactive_candidate = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '비활성 후보',
+      active: false)
     sign_in admin
 
     get edit_school_path(school)
@@ -83,7 +82,7 @@ RSpec.describe 'School settings', type: :request do
     expect(response).to have_http_status(:see_other)
     expect(response).to redirect_to(edit_school_path(school))
     expect(school.reload.name).to eq('변경 학교')
-    expect(member.reload.school_membership).to be_member
+    expect(member.reload.school_role).to eq('member')
   end
 
   it 'redirects the HTML update to school settings' do

@@ -1,226 +1,162 @@
 require "rails_helper"
 
 RSpec.describe Teachers::SaveWithAssignment do
-  def save(teacher:, school:, grade:, classroom: nil, attributes: {})
-    described_class.call(
-      teacher: teacher,
-      attributes: attributes,
-      school: school,
-      membership_grade: grade,
-      classroom_id: classroom&.id
-    )
+  let(:actor) { create(:user, :admin) }
+
+  def annual_teacher(school:, grade:, school_role: "member", **attributes)
+    create(:user, :teacher, :active_annual_teacher, annual_school: school,
+      annual_school_role: school_role, annual_grade: grade, **attributes)
   end
 
-  it "saves a school and grade without a classroom" do
+  def save(teacher:, school:, grade:, classroom: nil, attributes: {})
+    described_class.call(teacher: teacher, attributes: attributes, school: school,
+      membership_grade: grade, classroom_id: classroom&.id, actor: actor)
+  end
+
+  it "creates an annual member teacher with a temporary credential" do
     school = create(:school)
-    teacher = build(:user, :teacher)
+    create(:school_year, :active, school: school)
+    teacher = build(:user, :teacher, login_id: " NewTeacher ", email: nil)
 
     result = save(teacher: teacher, school: school, grade: 5)
 
     expect(result).to be_success
-    expect(teacher.school_membership).to have_attributes(school: school, grade: 5)
-    expect(teacher.assigned_classroom).to be_nil
+    expect(teacher).to have_attributes(school_year: school.school_years.active.first,
+      login_id: "newteacher", school_role: "member", grade: 5, password_change_required: true)
+    expect(teacher.school_membership).to be_nil
+    expect(result.temporary_password).to be_present
+    expect(teacher.teacher_credential_events.temporary_password_issued).to exist
   end
 
-  it "updates teacher profile attributes" do
-    teacher = create(:user, :teacher, name: "변경 전")
+  it "updates profile attributes while preserving the annual login ID" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: nil, name: "변경 전")
+    login_id = teacher.login_id
 
-    result = save(teacher: teacher, school: nil, grade: nil, attributes: { name: "변경 후" })
+    result = save(teacher: teacher, school: school, grade: nil, attributes: { name: "변경 후" })
+
+    expect(result).to be_success
+    expect(teacher.reload).to have_attributes(name: "변경 후", login_id: login_id)
+  end
+
+  it "preserves an inactive classroom assignment during a profile update" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    classroom.update!(active: false)
+
+    result = save(teacher: teacher, school: school, grade: 4,
+      classroom: classroom, attributes: { name: "변경 후" })
 
     expect(result).to be_success
     expect(teacher.reload.name).to eq("변경 후")
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 
-  it "updates profile attributes while preserving an inactive classroom assignment" do
-    membership = create(:school_membership, grade: 4)
-    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+  it "rejects changing, removing, or moving an inactive classroom assignment" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    destination = create(:classroom, school: school, grade: 4)
     classroom.update!(active: false)
 
-    result = save(teacher: membership.user, school: membership.school, grade: 4,
-                  classroom: classroom, attributes: { name: "변경 후" })
-
-    expect(result).to be_success
-    expect(membership.user.reload.name).to eq("변경 후")
-    expect(classroom.reload.teacher).to eq(membership.user)
-  end
-
-  it "rejects grade changes while preserving an inactive classroom assignment" do
-    membership = create(:school_membership, grade: 4)
-    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
-    classroom.update!(active: false)
-
-    result = save(teacher: membership.user, school: membership.school, grade: 5,
-                  classroom: classroom)
-
-    expect(result).not_to be_success
-    expect(membership.reload.grade).to eq(4)
-    expect(classroom.reload.teacher).to eq(membership.user)
-  end
-
-  it "rejects removing or moving an inactive classroom assignment" do
-    membership = create(:school_membership, grade: 4)
-    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
-    destination = create(:classroom, school: membership.school, grade: 4)
-    classroom.update!(active: false)
-
-    removal = save(teacher: membership.user, school: membership.school, grade: 4)
-    expect(removal).not_to be_success
-    expect(classroom.reload.teacher).to eq(membership.user)
-
-    membership.user.errors.clear
-    move = save(teacher: membership.user, school: membership.school, grade: 4, classroom: destination)
-    expect(move).not_to be_success
-    expect(classroom.reload.teacher).to eq(membership.user)
+    expect(save(teacher: teacher, school: school, grade: 5, classroom: classroom)).not_to be_success
+    expect(teacher.reload.grade).to eq(4)
+    teacher.errors.clear
+    expect(save(teacher: teacher, school: school, grade: 4)).not_to be_success
+    teacher.errors.clear
+    expect(save(teacher: teacher, school: school, grade: 4, classroom: destination)).not_to be_success
+    expect(classroom.reload.teacher).to eq(teacher)
     expect(destination.reload.teacher).to be_nil
   end
 
-  it "allows assignment changes after the classroom is reactivated" do
-    membership = create(:school_membership, grade: 4)
-    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
-    destination = create(:classroom, school: membership.school, grade: 4)
-    classroom.update!(active: false)
-    classroom.update!(active: true)
+  it "assigns, moves, and removes one matching active classroom" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 5)
+    first = create(:classroom, school: school, grade: 5)
+    second = create(:classroom, school: school, grade: 5)
 
-    result = save(teacher: membership.user, school: membership.school, grade: 4,
-                  classroom: destination)
-
-    expect(result).to be_success
-    expect(classroom.reload.teacher).to be_nil
-    expect(destination.reload.teacher).to eq(membership.user)
+    expect(save(teacher: teacher, school: school, grade: 5, classroom: first)).to be_success
+    expect(first.reload.teacher).to eq(teacher)
+    expect(save(teacher: teacher, school: school, grade: 5, classroom: second)).to be_success
+    expect(first.reload.teacher).to be_nil
+    expect(second.reload.teacher).to eq(teacher)
+    expect(save(teacher: teacher, school: school, grade: 5)).to be_success
+    expect(second.reload.teacher).to be_nil
   end
 
-  it "assigns one active classroom from the same school and grade" do
-    membership = create(:school_membership, grade: 5)
-    classroom = create(:classroom, school: membership.school, grade: 5)
-
-    result = save(teacher: membership.user, school: membership.school, grade: 5, classroom: classroom)
-
-    expect(result).to be_success
-    expect(classroom.reload.teacher).to eq(membership.user)
-  end
-
-  it "moves the assignment atomically" do
-    membership = create(:school_membership, grade: 5)
-    old_classroom = create(:classroom, school: membership.school, grade: 5, teacher: membership.user)
-    new_classroom = create(:classroom, school: membership.school, grade: 5)
-
-    result = save(teacher: membership.user, school: membership.school, grade: 5, classroom: new_classroom)
-
-    expect(result).to be_success
-    expect(old_classroom.reload.teacher).to be_nil
-    expect(new_classroom.reload.teacher).to eq(membership.user)
-  end
-
-  it "removes an assignment when no classroom is selected" do
-    membership = create(:school_membership, grade: 5)
-    classroom = create(:classroom, school: membership.school, grade: 5, teacher: membership.user)
-
-    result = save(teacher: membership.user, school: membership.school, grade: 5)
-
-    expect(result).to be_success
-    expect(classroom.reload.teacher).to be_nil
-  end
-
-  it "rejects another school, another grade, inactive classrooms, and occupied classrooms" do
-    membership = create(:school_membership, grade: 5)
-    other_teacher = create(:school_membership, school: membership.school, grade: 5).user
+  it "rejects mismatched, inactive, occupied, and nonexistent classrooms" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 5)
+    other_teacher = annual_teacher(school: school, grade: 5)
     invalid_classrooms = [
       create(:classroom, grade: 5),
-      create(:classroom, school: membership.school, grade: 6),
-      create(:classroom, school: membership.school, grade: 5, active: false),
-      create(:classroom, school: membership.school, grade: 5, teacher: other_teacher)
+      create(:classroom, school: school, grade: 6),
+      create(:classroom, school: school, grade: 5, active: false),
+      create(:classroom, school: school, grade: 5, teacher: other_teacher)
     ]
 
     invalid_classrooms.each do |classroom|
-      result = save(teacher: membership.user, school: membership.school, grade: 5, classroom: classroom)
-      expect(result).not_to be_success
-      expect(membership.user.assigned_classroom).to be_nil
+      expect(save(teacher: teacher, school: school, grade: 5, classroom: classroom)).not_to be_success
+      expect(teacher.assigned_classroom).to be_nil
+      teacher.errors.clear
     end
+
+    missing = described_class.call(teacher: teacher, attributes: {}, school: school,
+      membership_grade: 5, classroom_id: Classroom.maximum(:id).to_i + 10_000, actor: actor)
+    expect(missing).not_to be_success
   end
 
-  it "rejects a non-teacher" do
-    student = create(:user, :student)
+  it "rejects a non-teacher, inactive teacher, and inactive school" do
+    expect(save(teacher: create(:user, :student), school: create(:school), grade: 4)).not_to be_success
 
-    expect(save(teacher: student, school: create(:school), grade: 4)).not_to be_success
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 4)
+    teacher.update!(active: false)
+    classroom = create(:classroom, school: school, grade: 4)
+    expect(save(teacher: teacher, school: school, grade: 4, classroom: classroom)).not_to be_success
+
+    inactive_school = create(:school, active: false)
+    expect(save(teacher: build(:user, :teacher, login_id: "new-teacher"),
+      school: inactive_school, grade: 4)).not_to be_success
   end
 
-  it "rejects a nonexistent classroom" do
-    teacher = build(:user, :teacher)
-    result = described_class.call(teacher: teacher, attributes: {}, school: create(:school),
-                                  membership_grade: 4, classroom_id: Classroom.maximum(:id).to_i + 10_000)
+  it "preserves an annual manager role in the same school" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 4, school_role: "manager")
+
+    expect(save(teacher: teacher, school: school, grade: 4)).to be_success
+    expect(teacher.reload.school_role).to eq("manager")
+  end
+
+  it "rejects moving an existing annual teacher to another school" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 4, school_role: "manager")
+
+    expect(save(teacher: teacher, school: create(:school), grade: 4)).not_to be_success
+    expect(teacher.reload).to have_attributes(school_year: school.school_years.active.first,
+      school_role: "manager", grade: 4)
+  end
+
+  it "rejects detaching an annual teacher when school is nil" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+
+    expect(save(teacher: teacher, school: nil, grade: nil)).not_to be_success
+    expect(teacher.reload).to have_attributes(school_year: school.school_years.active.first, grade: 4)
+    expect(classroom.reload.teacher).to eq(teacher)
+  end
+
+  it "rolls back profile, grade, and assignment changes on failure" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 5)
+    classroom = create(:classroom, school: school, grade: 5, teacher: teacher)
+
+    result = save(teacher: teacher, school: school, grade: 4, attributes: { name: "" })
 
     expect(result).not_to be_success
-  end
-
-  it "rejects a classroom without a school selection" do
-    teacher = build(:user, :teacher)
-    classroom = create(:classroom)
-
-    expect(save(teacher: teacher, school: nil, grade: 4, classroom: classroom)).not_to be_success
-  end
-
-  it "rejects an inactive teacher" do
-    membership = create(:school_membership, grade: 4)
-    membership.user.update!(active: false)
-    classroom = create(:classroom, school: membership.school, grade: 4)
-
-    expect(save(teacher: membership.user, school: membership.school, grade: 4,
-                classroom: classroom)).not_to be_success
-  end
-
-  it "rejects a newly selected inactive school" do
-    teacher = build(:user, :teacher)
-
-    expect(save(teacher: teacher, school: create(:school, active: false), grade: 4)).not_to be_success
-  end
-
-  it "allows a profile update while retaining the existing inactive school" do
-    membership = create(:school_membership, grade: 4)
-    membership.school.update!(active: false)
-
-    result = save(teacher: membership.user, school: membership.school, grade: 4,
-                  attributes: { name: "변경 후" })
-
-    expect(result).to be_success
-    expect(membership.user.reload.name).to eq("변경 후")
-  end
-
-  it "preserves a manager role in the same school" do
-    membership = create(:school_membership, :manager, grade: 4)
-
-    expect(save(teacher: membership.user, school: membership.school, grade: 4)).to be_success
-    expect(membership.reload).to be_manager
-  end
-
-  it "changes a manager to a member when moving schools" do
-    membership = create(:school_membership, :manager, grade: 4)
-
-    expect(save(teacher: membership.user, school: create(:school), grade: 4)).to be_success
-    expect(membership.reload).to be_member
-  end
-
-  it "removes the school membership and assignment when school is nil" do
-    membership = create(:school_membership, grade: 4)
-    classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
-
-    expect(save(teacher: membership.user, school: nil, grade: nil)).to be_success
-    expect(membership.user.reload.school_membership).to be_nil
-    expect(classroom.reload.teacher).to be_nil
-  end
-
-  it "rolls back profile, membership, and assignment changes on failure" do
-    membership = create(:school_membership, grade: 5)
-    classroom = create(:classroom, school: membership.school, grade: 5, teacher: membership.user)
-
-    result = save(
-      teacher: membership.user,
-      school: membership.school,
-      grade: 4,
-      attributes: { name: "" }
-    )
-
-    expect(result).not_to be_success
-    expect(membership.reload.grade).to eq(5)
-    expect(classroom.reload.teacher).to eq(membership.user)
+    expect(teacher.reload.grade).to eq(5)
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 end

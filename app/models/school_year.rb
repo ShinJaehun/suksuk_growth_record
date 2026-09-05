@@ -1,4 +1,8 @@
 class SchoolYear < ApplicationRecord
+  def self.academic_year_for(date)
+    date.month >= 3 ? date.year : date.year - 1
+  end
+
   belongs_to :school
   has_many :users, dependent: :restrict_with_error
 

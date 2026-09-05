@@ -8,9 +8,17 @@ RSpec.describe 'Admin teachers', type: :request do
     school = create(:school, name: '새싹초등학교', color_key: 'orange')
     other_school = create(:school, name: '나래초등학교')
     classroom = create(:classroom, school: school, grade: 4, name: '4학년 1반')
-    manager = create(:school_membership, :manager, school: school, user: teacher).user
-    member_teacher = create(:school_membership, school: school, user: create(:user, :teacher, name: '일반 선생님')).user
-    unassigned_teacher = create(:user, :teacher, name: '미배정 선생님')
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: 'manager',
+      annual_grade: 4,
+      name: '담당 교사')
+    member_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '일반 선생님')
+    unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: '미배정 선생님')
     assign_teacher(classroom, manager)
     sign_in admin
 
@@ -25,7 +33,7 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).to include(school.name, other_school.name)
     expect(response.body).to include('담당 교사', '새싹초등학교', '대표 선생님', '4학년 1반')
     expect(response.body).to include('일반 선생님', '선생님')
-    expect(response.body).to include('미배정 선생님', '학교 미지정', '해당 없음', '담당 교실 없음')
+    expect(response.body).to include('미배정 선생님', other_school.name, '선생님', '담당 교실 없음')
     expect(response.body).not_to include('학교 역할', '학교 관리자', '일반 구성원', '담당 교실 2개')
     expect(response.body).to include(new_admin_teacher_path)
     expect(response.body).to include(edit_admin_teacher_path(manager))
@@ -33,7 +41,7 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).not_to include('data-turbo-frame="modal"')
 
     document = Nokogiri::HTML(response.body)
-    teacher_row = document.at_xpath("//p[normalize-space()='#{teacher.name}']/ancestor::article[1]")
+    teacher_row = document.at_xpath("//p[normalize-space()='#{manager.name}']/ancestor::article[1]")
     member_row = document.at_xpath("//p[normalize-space()='#{member_teacher.name}']/ancestor::article[1]")
     unassigned_row = document.at_xpath("//p[normalize-space()='#{unassigned_teacher.name}']/ancestor::article[1]")
 
@@ -41,18 +49,22 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(teacher_row.at_css('.bg-orange-500')).to be_present
     expect(teacher_row.at_css('.bg-violet-100')&.text).to include('대표 선생님')
     expect(member_row.at_css('.bg-sky-100')&.text).to include('선생님')
-    expect(unassigned_row['class']).to include('border-l-slate-200', 'bg-white')
-    expect(unassigned_row.css('.bg-slate-100').map(&:text)).to include('학교 미지정', '해당 없음', '담당 교실 없음')
-    expect(unassigned_row.css("[class*='bg-orange-500']").to_a).to be_empty
+    expect(unassigned_row.text).to include(other_school.name, '선생님', '담당 교실 없음')
+    expect(unassigned_row.at_css('.bg-sky-100')&.text).to include('선생님')
   end
 
   it 'filters the teacher management index by school' do
     school = create(:school, name: '새싹초등학교')
     other_school = create(:school, name: '나래초등학교')
-    school_teacher = create(:school_membership, school: school, user: create(:user, :teacher, name: '새싹 선생님')).user
-    other_school_teacher = create(:school_membership, school: other_school,
-                                                      user: create(:user, :teacher, name: '나래 선생님')).user
-    unassigned_teacher = create(:user, :teacher, name: '미배정 선생님')
+    school_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '새싹 선생님')
+    other_school_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: '나래 선생님')
+    unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: '미배정 선생님')
     sign_in admin
 
     get admin_teachers_path, params: { school_id: school.id }
@@ -105,12 +117,20 @@ RSpec.describe 'Admin teachers', type: :request do
   it 'combines school and inactive status filters' do
     school = create(:school)
     other_school = create(:school)
-    school_active = create(:school_membership, school: school, user: create(:user, :teacher, name: 'A 활성')).user
-    school_inactive = create(:school_membership, school: school,
-                                                 user: create(:user, :teacher, name: 'A 비활성', active: false)).user
-    other_active = create(:school_membership, school: other_school, user: create(:user, :teacher, name: 'B 활성')).user
-    other_inactive = create(:school_membership, school: other_school,
-                                                user: create(:user, :teacher, name: 'B 비활성', active: false)).user
+    school_active = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: 'A 활성')
+    school_inactive = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: 'A 비활성',
+      active: false)
+    other_active = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: 'B 활성')
+    other_inactive = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: 'B 비활성',
+      active: false)
     sign_in admin
 
     get admin_teachers_path(school_id: school.id, status: 'inactive')
@@ -194,38 +214,50 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'saves a submitted male teacher avatar_key for male gender' do
+    school = create(:school)
+    create(:school_year, :active, school: school)
     sign_in admin
 
     post admin_teachers_path, params: {
       user: {
         name: '남자 교사',
         email: 'male-teacher@example.com',
-        password: 'password123',
+        login_id: 'male-teacher',
         gender: 'male',
         avatar_key: 'teacherM01'
-      }
+      },
+      school_id: school.id,
+      membership_grade: 4,
+      classroom_id: ''
     }
 
     expect(User.teacher.find_by!(email: 'male-teacher@example.com').avatar_key).to eq('teacherM01')
   end
 
   it 'saves a submitted female teacher avatar_key for female gender' do
+    school = create(:school)
+    create(:school_year, :active, school: school)
     sign_in admin
 
     post admin_teachers_path, params: {
       user: {
         name: '여자 교사',
         email: 'female-teacher@example.com',
-        password: 'password123',
+        login_id: 'female-teacher',
         gender: 'female',
         avatar_key: 'teacherF01'
-      }
+      },
+      school_id: school.id,
+      membership_grade: 4,
+      classroom_id: ''
     }
 
     expect(User.teacher.find_by!(email: 'female-teacher@example.com').avatar_key).to eq('teacherF01')
   end
 
   it 'assigns any teacher avatar_key when gender is blank or invalid' do
+    school = create(:school)
+    create(:school_year, :active, school: school)
     sign_in admin
 
     ['', 'unknown'].each_with_index do |gender, index|
@@ -233,9 +265,12 @@ RSpec.describe 'Admin teachers', type: :request do
         user: {
           name: "기본 아바타 교사 #{index}",
           email: "default-avatar-teacher-#{index}@example.com",
-          password: 'password123',
+          login_id: "default-avatar-teacher-#{index}",
           gender: gender
-        }
+        },
+        school_id: school.id,
+        membership_grade: 4,
+        classroom_id: ''
       }
 
       expect(User.teacher.find_by!(email: "default-avatar-teacher-#{index}@example.com").avatar_key).to be_in(User.avatar_keys_for_role('teacher'))
@@ -243,16 +278,21 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'replaces an avatar_key that does not match gender' do
+    school = create(:school)
+    create(:school_year, :active, school: school)
     sign_in admin
 
     post admin_teachers_path, params: {
       user: {
         name: '조작 방지 교사',
         email: 'ignored-avatar-teacher@example.com',
-        password: 'password123',
+        login_id: 'ignored-avatar-teacher',
         gender: 'male',
         avatar_key: 'teacherF01'
-      }
+      },
+      school_id: school.id,
+      membership_grade: 4,
+      classroom_id: ''
     }
 
     expect(User.teacher.find_by!(email: 'ignored-avatar-teacher@example.com').avatar_key).to be_in(User::TEACHER_MALE_AVATAR_KEYS)
@@ -505,16 +545,26 @@ RSpec.describe 'Admin teachers', type: :request do
   end
 
   it 'keeps an existing inactive-school assignment visible while allowing removal' do
-    inactive_school = create(:school, active: false)
-    membership = create(:school_membership, school: inactive_school, user: teacher)
+    inactive_school = create(:school)
+    school_year = create(:school_year, :active, school: inactive_school)
+    assigned_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: inactive_school,
+      annual_grade: 4)
+    classroom = create(:classroom, school: inactive_school, grade: 4, teacher: assigned_teacher)
+    inactive_school.update!(active: false)
     sign_in admin
 
-    get edit_admin_teacher_path(teacher)
+    get edit_admin_teacher_path(assigned_teacher)
     expect(response.body).to include(inactive_school.name)
 
-    patch admin_teacher_path(teacher), params: { school_id: '', classroom_id: '' }
-    expect(response).to redirect_to(edit_admin_teacher_path(teacher))
-    expect { membership.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    patch admin_teacher_path(assigned_teacher), params: {
+      school_id: inactive_school.id,
+      membership_grade: 4,
+      classroom_id: ''
+    }
+    expect(response).to redirect_to(edit_admin_teacher_path(assigned_teacher))
+    expect(assigned_teacher.reload.school_year).to eq(school_year)
+    expect(classroom.reload.teacher).to be_nil
     expect(inactive_school.reload).to be_inactive
   end
 end

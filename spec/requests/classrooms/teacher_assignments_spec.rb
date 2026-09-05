@@ -3,7 +3,11 @@ require "rails_helper"
 RSpec.describe "Classroom teacher assignment boundary", type: :request do
   let(:admin) { create(:user, :admin) }
   let(:school) { create(:school) }
-  let(:teacher_membership) { create(:school_membership, school: school, grade: 4) }
+  let(:teacher) do
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
+  end
 
   it "does not expose teacher assignment inputs on classroom forms" do
     classroom = create(:classroom, school: school)
@@ -17,8 +21,10 @@ RSpec.describe "Classroom teacher assignment boundary", type: :request do
   end
 
   it "ignores a forged teacher assignment while updating a classroom" do
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher_membership.user)
-    other_teacher = create(:school_membership, school: school, grade: 4).user
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    other_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
     sign_in admin
 
     patch classroom_path(classroom), params: {
@@ -26,6 +32,6 @@ RSpec.describe "Classroom teacher assignment boundary", type: :request do
     }
 
     expect(response).to redirect_to(classroom_path(classroom))
-    expect(classroom.reload.teacher).to eq(teacher_membership.user)
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 end

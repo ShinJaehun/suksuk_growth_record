@@ -4,21 +4,39 @@ module Admin
     before_action :authorize_admin
 
     def create
-      membership = @school.school_memberships.includes(:user).find_by!(user_id: params.require(:user_id))
-      raise ActiveRecord::RecordNotFound unless membership.user.teacher?
+      teacher = active_school_year.users.teacher.find(params.require(:user_id))
+      unless teacher.active?
+        return redirect_to edit_school_path(@school),
+          alert: t("school_memberships.errors.inactive_manager"),
+          status: :see_other
+      end
 
-      if membership.update(role: :manager)
+      existing_manager = active_school_year.users.teacher
+        .where(school_role: "manager")
+        .where.not(id: teacher.id)
+        .exists?
+      if existing_manager
+        return redirect_to edit_school_path(@school), status: :see_other
+      end
+
+      User.transaction do
+        active_school_year.lock!
+        if active_school_year.users.teacher.where(school_role: "manager").where.not(id: teacher.id).exists?
+          raise ActiveRecord::Rollback
+        end
+        teacher.update!(school_role: "manager")
+      end
+
+      if teacher.reload.school_manager?
         render_manager_success("admin.school_managers.create.success")
       else
-        redirect_to edit_school_path(@school),
-          alert: membership.errors.full_messages.to_sentence,
-          status: :see_other
+        redirect_to edit_school_path(@school), status: :see_other
       end
     end
 
     def destroy
-      membership = @school.school_memberships.manager.find_by!(user_id: params[:user_id])
-      membership.update!(role: :member)
+      teacher = active_school_year.users.teacher.find_by!(id: params[:user_id], school_role: "manager")
+      teacher.update!(school_role: "member")
       render_manager_success("admin.school_managers.destroy.success")
     end
 
@@ -30,6 +48,10 @@ module Admin
 
     def authorize_admin
       authorize @school, :manage_managers?
+    end
+
+    def active_school_year
+      @active_school_year ||= @school.school_years.active.first!
     end
 
     def render_manager_success(message_key)

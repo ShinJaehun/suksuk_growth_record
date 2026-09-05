@@ -1,19 +1,30 @@
 require 'rails_helper'
 
 RSpec.describe 'Admin schools', type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:admin) { create(:user, :admin) }
   let(:school) { create(:school, name: '새싹초등학교') }
   let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
 
-  it 'shows the new school form to an admin' do
-    sign_in admin
+  it 'shows the academic year containing the current date as the form default' do
+    {
+      Date.new(2026, 9, 5) => 2026,
+      Date.new(2027, 1, 15) => 2026,
+      Date.new(2027, 3, 1) => 2027
+    }.each do |date, expected_year|
+      travel_to(date) do
+        sign_in admin
+        get new_admin_school_path
 
-    get new_admin_school_path
-
-    expect(response).to have_http_status(:ok)
-    expect(response.body).to include(I18n.t('admin.schools.new_title'))
-    expect(response.body).to include('학교 관리로 돌아가기')
-    expect(response.body).to include('name="school[name]"')
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(I18n.t('admin.schools.new_title'))
+        expect(response.body).to include('학교 관리로 돌아가기')
+        expect(response.body).to include('name="school[name]"')
+        expect(response.body).to include('name="school[operational_year]"')
+        expect(response.body).to include(%(value="#{expected_year}"))
+      end
+    end
   end
 
   it 'shows schools and classroom counts in the admin schools index' do
@@ -112,15 +123,21 @@ RSpec.describe 'Admin schools', type: :request do
     expect(response.body).not_to include('translation missing')
   end
 
-  it 'creates a school' do
+  it 'creates a school with exactly one active SchoolYear from the submitted operational year' do
     sign_in admin
 
-    expect do
-      post admin_schools_path, params: { school: { name: '푸른초등학교' } }
-    end.to change(School, :count).by(1)
+    expect {
+      post admin_schools_path,
+        params: { school: { name: '푸른초등학교', operational_year: 2028 } }
+    }.to change(School, :count).by(1)
+      .and change(SchoolYear, :count).by(1)
 
     expect(response).to redirect_to(schools_path)
-    expect(School.find_by!(name: '푸른초등학교')).to be_present
+    created_school = School.find_by!(name: '푸른초등학교')
+    expect(created_school.school_years.sole).to have_attributes(
+      year: 2028,
+      status: 'active'
+    )
   end
 
   it 'redirects the top frame after a successful modal create' do
@@ -128,7 +145,7 @@ RSpec.describe 'Admin schools', type: :request do
 
     expect do
       post admin_schools_path,
-           params: { school: { name: '모달초등학교' } },
+           params: { school: { name: '모달초등학교', operational_year: 2028 } },
            headers: { 'Accept' => Mime[:turbo_stream].to_s }
     end.to change(School, :count).by(1)
 
@@ -143,7 +160,7 @@ RSpec.describe 'Admin schools', type: :request do
 
     expect do
       post admin_schools_path,
-           params: { school: { name: ' ' } },
+           params: { school: { name: ' ', operational_year: 2028 } },
            headers: { 'Accept' => Mime[:turbo_stream].to_s }
     end.not_to change(School, :count)
 
@@ -160,12 +177,46 @@ RSpec.describe 'Admin schools', type: :request do
   it 'renders blank name validation errors in the standalone fallback' do
     sign_in admin
 
-    post admin_schools_path, params: { school: { name: '' } }
+    post admin_schools_path, params: { school: { name: '', operational_year: 2028 } }
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(response.body).to include('<!DOCTYPE html>')
     expect(response.body).to include('학교 이름을 입력해 주세요.')
     expect(response.body).to include('학교 관리로 돌아가기')
+  end
+
+  it 'rejects a blank operational year without persisting either record' do
+    sign_in admin
+
+    expect {
+      post admin_schools_path,
+        params: { school: { name: '연도 없음 학교', operational_year: '' } }
+    }.not_to change { [School.count, SchoolYear.count] }
+
+    expect(response).to have_http_status(:unprocessable_content)
+  end
+
+  it 'rejects an invalid operational year without persisting either record' do
+    sign_in admin
+
+    expect {
+      post admin_schools_path,
+        params: { school: { name: '잘못된 연도 학교', operational_year: 'invalid' } }
+    }.not_to change { [School.count, SchoolYear.count] }
+
+    expect(response).to have_http_status(:unprocessable_content)
+  end
+
+  it 'rolls back the school when initial SchoolYear validation fails' do
+    sign_in admin
+
+    expect {
+      post admin_schools_path,
+        params: { school: { name: '원자성 학교', operational_year: 999 } }
+    }.not_to change { [School.count, SchoolYear.count] }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(School.find_by(name: '원자성 학교')).to be_nil
   end
 
   it 'redirects the top frame after a successful modal update' do
@@ -227,6 +278,17 @@ RSpec.describe 'Admin schools', type: :request do
     expect(school.reload.name).to eq('새싹초등학교')
 
     patch deactivate_admin_school_path(school)
+    expect(response).to redirect_to(root_path)
+  end
+
+  it 'keeps the admin namespace closed to an annual manager without a membership' do
+    manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
+    sign_in manager
+
+    get new_admin_school_path
+
     expect(response).to redirect_to(root_path)
   end
 

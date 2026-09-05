@@ -11,11 +11,6 @@ RSpec.describe 'School workspaces', type: :request do
       annual_school_role: "manager")
   end
 
-  before do
-    create(:school_membership, school: school, user: member)
-    create(:school_membership, :manager, school: school, user: manager)
-  end
-
   it 'allows an admin to view every school workspace' do
     sign_in admin
 
@@ -44,12 +39,19 @@ RSpec.describe 'School workspaces', type: :request do
     expect(other_school_card.at_css('.bg-violet-500')).to be_present
   end
 
-  it 'counts and names only active teachers on the school index' do
+  it 'uses annual teachers for counts and manager identity despite conflicting legacy memberships' do
     active_manager = manager
-    inactive_teacher = create(:school_membership, school: school,
-                                                  user: create(:user, :teacher, name: '비활성 교사')).user
-    inactive_teacher.update!(active: false)
-    create(:school_membership, school: school, user: create(:user, :teacher, active: false))
+    active_member = member
+    active_manager.update!(name: '연간 관리자')
+    active_member.update!(name: '연간 일반 교사')
+    inactive_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '비활성 교사',
+      active: false)
+    legacy_only_teacher = create(:school_membership, school: school,
+      user: create(:user, :teacher, name: 'Legacy 교사')).user
+    create(:school_membership, :manager, school: school, user: active_member)
+    create(:school_membership, school: school, user: active_manager)
     sign_in admin
 
     get schools_path
@@ -57,7 +59,8 @@ RSpec.describe 'School workspaces', type: :request do
     card = Nokogiri::HTML(response.body)
                    .at_xpath("//h2[normalize-space()='#{school.name}']/ancestor::article[1]")
     expect(card.text).to include('소속 교사 2명')
-    expect(card.text).not_to include('소속 교사 3명', '소속 교사 4명')
+    expect(card.text).to include(active_manager.name)
+    expect(card.text).not_to include(active_member.name, legacy_only_teacher.name, '소속 교사 3명')
 
     inactive_teacher.update!(active: true)
     get schools_path

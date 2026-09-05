@@ -58,13 +58,12 @@ class Classroom < ApplicationRecord
     errors.add(:teacher, :inactive) unless teacher.active?
     errors.add(:teacher, :inactive_classroom) if !active? && will_save_change_to_teacher_id?
 
-    membership = teacher.school_membership
-    errors.add(:teacher, :school_membership_required) unless membership
-    return unless membership
+    errors.add(:teacher, :school_membership_required) unless teacher.school_year
+    return unless teacher.school_year
 
-    errors.add(:teacher, :school_mismatch) unless membership.school_id == school_id
-    errors.add(:teacher, :grade_required) if membership.grade.nil?
-    errors.add(:teacher, :grade_mismatch) unless membership.grade == grade
+    errors.add(:teacher, :school_mismatch) unless teacher.annual_school&.id == school_id
+    errors.add(:teacher, :grade_required) if teacher.grade.nil?
+    errors.add(:teacher, :grade_mismatch) unless teacher.grade == grade
   end
 
   def teacher_assignment_must_not_replace_existing_teacher

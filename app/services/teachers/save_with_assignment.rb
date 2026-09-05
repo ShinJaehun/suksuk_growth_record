@@ -2,28 +2,30 @@ module Teachers
   class SaveWithAssignment
     UNCHANGED_MEMBERSHIP_GRADE = Object.new.freeze
 
-    Result = Data.define(:teacher, :error_messages) do
+    Result = Data.define(:teacher, :error_messages, :temporary_password) do
       def success?
         error_messages.empty?
       end
     end
 
-    def self.call(teacher:, attributes:, school:, classroom_id:, membership_grade: UNCHANGED_MEMBERSHIP_GRADE)
+    def self.call(teacher:, attributes:, school:, classroom_id:, actor:, membership_grade: UNCHANGED_MEMBERSHIP_GRADE)
       new(
         teacher: teacher,
         attributes: attributes,
         school: school,
         classroom_id: classroom_id,
-        membership_grade: membership_grade
+        membership_grade: membership_grade,
+        actor: actor
       ).call
     end
 
-    def initialize(teacher:, attributes:, school:, classroom_id:, membership_grade:)
+    def initialize(teacher:, attributes:, school:, classroom_id:, membership_grade:, actor:)
       @teacher = teacher
       @attributes = attributes
       @school = school
       @raw_classroom_id = classroom_id
       @membership_grade = membership_grade
+      @actor = actor
     end
 
     def call
@@ -38,14 +40,14 @@ module Teachers
 
         [current_classroom, classroom].compact.uniq.sort_by(&:id).each(&:lock!)
 
-        teacher.save!
-        sync_school_membership!
+        persist_teacher!
         current_classroom.update!(teacher: nil) if current_classroom && current_classroom != classroom
         classroom.update!(teacher: teacher) if classroom && classroom.teacher_id != teacher.id
       end
 
       result
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
+      @temporary_password = nil
       copy_persistence_errors(error)
       result
     end
@@ -53,19 +55,28 @@ module Teachers
     private
 
     attr_reader :teacher, :attributes, :school, :raw_classroom_id, :membership_grade, :classroom, :grade,
-                :current_classroom
+                :current_classroom, :actor, :temporary_password
 
     def normalize_inputs
+      normalize_login_id
       @grade = normalized_grade
       @classroom = normalized_classroom
     end
 
+    def normalize_login_id
+      return unless teacher.new_record? || teacher.will_save_change_to_login_id?
+
+      teacher.login_id = teacher.login_id.to_s.strip.downcase
+    end
+
     def validate_inputs
       add_error(:teacher_required) unless teacher.teacher?
-      add_error(:school_not_found) unless school.nil? || school.is_a?(School)
+      add_error(:school_not_found) unless school.is_a?(School)
+      add_error(:school_not_found) if school && target_school_year.nil?
+      add_error(:login_id_required) if teacher.login_id.blank?
       add_error(:membership_grade_invalid) if invalid_grade?
       add_error(:classroom_not_found) if invalid_classroom_id?
-      if school&.inactive? && (teacher.school_membership&.school_id != school.id || classroom)
+      if school&.inactive? && (teacher.annual_school != school || classroom)
         add_inactive_school_error
       end
       return if teacher.errors.any? || classroom.nil?
@@ -80,15 +91,15 @@ module Teachers
 
     def validate_inactive_assignment_lock
       return unless current_classroom&.inactive?
-      return if school&.id == teacher.school_membership&.school_id &&
-                grade == teacher.school_membership&.grade &&
+      return if school == teacher.annual_school &&
+                grade == teacher.grade &&
                 classroom == current_classroom
 
       add_error(:inactive_classroom_assignment_locked)
     end
 
     def normalized_grade
-      return teacher.school_membership&.grade if membership_grade.equal?(UNCHANGED_MEMBERSHIP_GRADE)
+      return teacher.grade if membership_grade.equal?(UNCHANGED_MEMBERSHIP_GRADE)
       return nil if membership_grade.blank?
 
       membership_grade.to_i if membership_grade.to_s.match?(/\A[1-6]\z/)
@@ -109,18 +120,38 @@ module Teachers
       raw_classroom_id.present? && classroom.nil?
     end
 
-    def sync_school_membership!
-      membership = teacher.school_membership
-      if school.nil?
-        membership&.destroy!
-      elsif membership
-        changes = { school: school }
-        changes[:grade] = grade unless membership_grade.equal?(UNCHANGED_MEMBERSHIP_GRADE)
-        changes[:role] = :member if membership.school_id != school.id
-        membership.update!(changes)
+    def persist_teacher!
+      teacher.assign_attributes(grade: grade)
+      if teacher.new_record?
+        teacher.assign_attributes(
+          school_year: target_school_year,
+          login_id: teacher.login_id.to_s.strip.downcase,
+          school_role: "member"
+        )
+        credential = AnnualTeacherUsers::TemporaryCredential.call(
+          teacher: teacher,
+          actor: actor,
+          action: :temporary_password_issued
+        )
+        raise ActiveRecord::Rollback unless credential.success?
+
+        @temporary_password = credential.temporary_password
       else
-        teacher.create_school_membership!(school: school, grade: grade)
+        if teacher.annual_school != school
+          teacher.assign_attributes(
+            school_year: target_school_year,
+            school_role: "member"
+          )
+        end
+        teacher.save!
       end
+    end
+
+    def target_school_year
+      return @target_school_year if defined?(@target_school_year)
+
+      active_school_years = school&.school_years&.active&.limit(2)&.to_a || []
+      @target_school_year = active_school_years.one? ? active_school_years.first : nil
     end
 
     def add_error(key)
@@ -141,7 +172,11 @@ module Teachers
     end
 
     def result
-      Result.new(teacher: teacher, error_messages: teacher.errors.full_messages)
+      Result.new(
+        teacher: teacher,
+        error_messages: teacher.errors.full_messages,
+        temporary_password: temporary_password
+      )
     end
   end
 end

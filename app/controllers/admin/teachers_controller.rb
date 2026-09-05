@@ -15,6 +15,7 @@ class Admin::TeachersController < Admin::BaseController
 
   def create
     attrs = teacher_params
+    attrs[:email] = attrs[:email].presence
     attrs[:gender] = nil unless %w[male female].include?(attrs[:gender])
     @teacher = User.new(attrs.merge(role: :teacher))
     pool = avatar_keys_for_gender(@teacher.gender)
@@ -30,11 +31,13 @@ class Admin::TeachersController < Admin::BaseController
           attributes: {},
           school: school,
           membership_grade: selected_membership_grade,
-          classroom_id: classroom_id
+          classroom_id: classroom_id,
+          actor: current_user
         )
       end
 
     if result&.success?
+      expose_temporary_password(result)
       redirect_to admin_teachers_path,
                   notice: t('admin.teachers.create.success'),
                   status: :see_other
@@ -76,7 +79,8 @@ class Admin::TeachersController < Admin::BaseController
           attributes: {},
           school: school,
           membership_grade: selected_membership_grade,
-          classroom_id: classroom_id
+          classroom_id: classroom_id,
+          actor: current_user
         )
       end
 
@@ -106,24 +110,23 @@ class Admin::TeachersController < Admin::BaseController
     scope = policy_scope(User)
             .teacher
             .with_attached_avatar
-            .includes(school_membership: :school, assigned_classroom: :school)
+            .includes(school_year: :school, assigned_classroom: :school)
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
 
     if @selected_school
-      scope = scope.joins(:school_membership)
-                   .where(school_memberships: { school_id: @selected_school.id })
+      scope = scope.joins(:school_year)
+                   .where(school_years: { school_id: @selected_school.id })
     end
 
     scope.order(:created_at)
          .map do |teacher|
-           school = teacher.school_membership&.school
-           membership = teacher.school_membership
+           school = teacher.annual_school
 
            {
              teacher: teacher,
              school_name: school&.name || t('admin.teachers.index.unassigned_school'),
              school_color_key: school&.color_key,
-             school_role: membership&.role,
+             school_role: teacher.school_role,
              school_role_label: teacher_school_role_label(teacher),
              classrooms: [teacher.assigned_classroom].compact
            }
@@ -144,10 +147,9 @@ class Admin::TeachersController < Admin::BaseController
   end
 
   def teacher_school_role_label(teacher)
-    membership = teacher.school_membership
-    return t('admin.teachers.index.unassigned_role') unless membership
+    return t('admin.teachers.index.unassigned_role') if teacher.school_role.blank?
 
-    t(membership.manager? ? 'admin.teachers.index.manager' : 'admin.teachers.index.member')
+    t(teacher.school_manager? ? 'admin.teachers.index.manager' : 'admin.teachers.index.member')
   end
 
   def set_teacher
@@ -171,7 +173,7 @@ class Admin::TeachersController < Admin::BaseController
   end
 
   def teacher_params
-    params.require(:user).permit(:name, :email, :password, :gender, :avatar_key)
+    params.require(:user).permit(:name, :email, :login_id, :gender, :avatar_key)
   end
 
   def avatar_keys_for_gender(gender)
@@ -191,7 +193,7 @@ class Admin::TeachersController < Admin::BaseController
 
     @selected_school = School.find_by(id: teacher_assignment_params[:school_id])
     if @selected_school&.active? ||
-        @selected_school&.id == @teacher.school_membership&.school_id
+        @selected_school&.id == @teacher.annual_school&.id
       return @selected_school
     end
 
@@ -249,7 +251,7 @@ class Admin::TeachersController < Admin::BaseController
   end
 
   def load_school_assignment_form
-    current_school_id = @teacher.school_membership&.school_id
+    current_school_id = @teacher.annual_school&.id
     @schools = School.active.or(School.where(id: current_school_id)).order(:name, :id).load
     @classrooms_by_school = Classroom.where(school_id: @schools.map(&:id)).order(:grade, :name, :id).group_by(&:school_id)
     load_selected_school
@@ -262,12 +264,21 @@ class Admin::TeachersController < Admin::BaseController
       if school_selection_submitted?
         teacher_assignment_params[:school_id].presence&.to_i
       else
-        @teacher.school_membership&.school_id
+        @teacher.annual_school&.id
       end
   end
 
   def teacher_assignment_params
     @teacher_assignment_params ||= params.permit(:school_id, :membership_grade, :classroom_id)
+  end
+
+  def expose_temporary_password(result)
+    return if result.temporary_password.blank?
+
+    flash[:temporary_password] = t(
+      'admin.teachers.create.temporary_password',
+      password: result.temporary_password
+    )
   end
 
 end

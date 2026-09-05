@@ -169,8 +169,8 @@ class ClassroomsController < ApplicationController
 
   def current_user_school_manager?
     current_user&.active_teacher? &&
-      current_user.school_membership&.manager? &&
-      current_user.school_membership.school.active?
+      current_user.school_manager? &&
+      current_user.annual_school&.active?
   end
 
   def prepare_school_filter
@@ -195,7 +195,7 @@ class ClassroomsController < ApplicationController
   def assign_manager_school
     return unless current_user_school_manager?
 
-    @classroom.school = current_user.school_membership.school
+    @classroom.school = current_user.annual_school
   end
 
   def redirect_students_to_mypage!

@@ -9,7 +9,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
                      annual_school: school,
                      annual_school_role: 'manager')
-    create(:school_membership, :manager, school: school, user: manager)
     manager
   end
 
@@ -154,8 +153,12 @@ RSpec.describe 'Classroom organization settings', type: :request do
     other_school = create(:school, name: '나래초등학교')
     classroom = create(:classroom, school: school, name: '새싹 학급')
     other_classroom = create(:classroom, school: other_school, name: '나래 학급')
-    teacher = create(:school_membership, school: school, user: create(:user, :teacher, name: '새싹 선생님')).user
-    other_teacher = create(:school_membership, school: other_school, user: create(:user, :teacher, name: '나래 선생님')).user
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '새싹 선생님')
+    other_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: other_school,
+      name: '나래 선생님')
     student = create(:user, :student, name: '새싹 학생')
     other_student = create(:user, :student, name: '나래 학생')
     assign_teacher(classroom, teacher)
@@ -278,7 +281,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     inactive_school = create(:school)
     classroom = create(:classroom, school: inactive_school, name: '중단된 학교 교실')
     assigned_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: inactive_school)
-    create(:school_membership, school: inactive_school, user: assigned_teacher)
     assign_teacher(classroom, assigned_teacher)
     inactive_school.update!(active: false)
     sign_in admin
@@ -593,7 +595,9 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
   it 'keeps classroom identification while removing school and teacher management sections' do
     classroom = create(:classroom, name: '2학년 지정 교실', school: school, grade: 2)
-    homeroom = create(:school_membership, school: school, user: create(:user, :teacher, name: '담당 선생님')).user
+    homeroom = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '담당 선생님')
     assign_teacher(classroom, homeroom)
     sign_in admin
 

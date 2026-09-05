@@ -1,6 +1,12 @@
 require "rails_helper"
 
 RSpec.describe Classroom, type: :model do
+  def annual_teacher(school:, grade:, **attributes)
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: grade,
+      **attributes)
+  end
   it "generates a student login token" do
     classroom = create(:classroom, name: "토큰 교실")
 
@@ -116,12 +122,13 @@ RSpec.describe Classroom, type: :model do
 
   describe "hard delete safety" do
     it "allows deletion when a teacher is assigned and there are no students" do
-      membership = create(:school_membership, grade: 4)
-      classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      school = create(:school)
+      teacher = annual_teacher(school: school, grade: 4)
+      classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
 
       expect(classroom.destroy).to be_truthy
       expect(Classroom.exists?(classroom.id)).to eq(false)
-      expect(User.exists?(membership.user_id)).to eq(true)
+      expect(User.exists?(teacher.id)).to eq(true)
       expect(ClassroomMembership.where(classroom_id: classroom.id)).to be_empty
     end
 
@@ -149,26 +156,29 @@ RSpec.describe Classroom, type: :model do
 
   describe "teacher assignment" do
     it "allows one active teacher from the same school and grade" do
-      membership = create(:school_membership, grade: 4)
-      classroom = build(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      school = create(:school)
+      teacher = annual_teacher(school: school, grade: 4)
+      classroom = build(:classroom, school: school, grade: 4, teacher: teacher)
 
       expect(classroom).to be_valid
     end
 
     it "rejects assigning one teacher to two classrooms" do
-      membership = create(:school_membership, grade: 4)
-      create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      school = create(:school)
+      teacher = annual_teacher(school: school, grade: 4)
+      create(:classroom, school: school, grade: 4, teacher: teacher)
 
-      duplicate = build(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      duplicate = build(:classroom, school: school, grade: 4, teacher: teacher)
       expect(duplicate).not_to be_valid
     end
 
     it "rejects school, grade, lifecycle, and role mismatches" do
-      membership = create(:school_membership, grade: 4)
+      school = create(:school)
+      teacher = annual_teacher(school: school, grade: 4)
       invalid = [
-        build(:classroom, school: create(:school), grade: 4, teacher: membership.user),
-        build(:classroom, school: membership.school, grade: 5, teacher: membership.user),
-        build(:classroom, school: membership.school, grade: 4, active: false, teacher: membership.user),
+        build(:classroom, school: create(:school), grade: 4, teacher: teacher),
+        build(:classroom, school: school, grade: 5, teacher: teacher),
+        build(:classroom, school: school, grade: 4, active: false, teacher: teacher),
         build(:classroom, teacher: create(:user, :student))
       ]
 
@@ -176,35 +186,38 @@ RSpec.describe Classroom, type: :model do
     end
 
     it "preserves its teacher through deactivation and reactivation" do
-      membership = create(:school_membership, grade: 4)
-      classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      school = create(:school)
+      teacher = annual_teacher(school: school, grade: 4)
+      classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
 
       classroom.update!(active: false)
-      expect(classroom.reload.teacher).to eq(membership.user)
+      expect(classroom.reload.teacher).to eq(teacher)
 
       classroom.update!(active: true)
 
-      expect(classroom.reload.teacher).to eq(membership.user)
+      expect(classroom.reload.teacher).to eq(teacher)
     end
 
     it "rejects assigning or replacing a teacher while inactive" do
-      first_membership = create(:school_membership, grade: 4)
-      second_membership = create(:school_membership, school: first_membership.school, grade: 4)
-      unassigned = create(:classroom, school: first_membership.school, grade: 4, active: false)
-      assigned = create(:classroom, school: first_membership.school, grade: 4, teacher: first_membership.user)
+      school = create(:school)
+      first_teacher = annual_teacher(school: school, grade: 4)
+      second_teacher = annual_teacher(school: school, grade: 4)
+      unassigned = create(:classroom, school: school, grade: 4, active: false)
+      assigned = create(:classroom, school: school, grade: 4, teacher: first_teacher)
       assigned.update!(active: false)
 
-      expect(unassigned.update(teacher: second_membership.user)).to eq(false)
-      expect(assigned.update(teacher: second_membership.user)).to eq(false)
-      expect(assigned.reload.teacher).to eq(first_membership.user)
+      expect(unassigned.update(teacher: second_teacher)).to eq(false)
+      expect(assigned.update(teacher: second_teacher)).to eq(false)
+      expect(assigned.reload.teacher).to eq(first_teacher)
     end
 
     it "releases an inactive classroom assignment when its teacher is deactivated" do
-      membership = create(:school_membership, grade: 4)
-      classroom = create(:classroom, school: membership.school, grade: 4, teacher: membership.user)
+      school = create(:school)
+      teacher = annual_teacher(school: school, grade: 4)
+      classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
       classroom.update!(active: false)
 
-      membership.user.update!(active: false)
+      teacher.update!(active: false)
 
       expect(classroom.reload.teacher).to be_nil
     end

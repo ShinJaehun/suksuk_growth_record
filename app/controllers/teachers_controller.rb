@@ -25,6 +25,7 @@ class TeachersController < ApplicationController
     end
 
     if result&.success?
+      expose_temporary_password(result)
       redirect_to teachers_path, notice: t('admin.teachers.create.success'), status: :see_other
     else
       prepare_form
@@ -96,11 +97,11 @@ class TeachersController < ApplicationController
                        else
                          manager_school
                        end
-    scope = teacher_management_scope.with_attached_avatar.includes(school_membership: :school,
+    scope = teacher_management_scope.with_attached_avatar.includes(school_year: :school,
                                                                    assigned_classroom: :school)
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
     if @selected_school
-      scope = scope.joins(:school_membership).where(school_memberships: { school_id: @selected_school.id })
+      scope = scope.joins(:school_year).where(school_years: { school_id: @selected_school.id })
     end
     @teacher_rows = scope.order(:created_at).map { |teacher| teacher_row(teacher) }
   end
@@ -110,7 +111,7 @@ class TeachersController < ApplicationController
     @locked_classroom = assigned_classroom if assigned_classroom&.inactive?
     @schools = manageable_schools
     @selected_school_id = managed_school&.id
-    @membership_grade = @locked_classroom ? @teacher.school_membership&.grade : membership_grade_for_form
+    @membership_grade = @locked_classroom ? @teacher.grade : membership_grade_for_form
     @classroom_selection_ready = @selected_school_id.present? && selected_membership_grade.present?
     @classroom_selection_prompt_key = classroom_selection_prompt_key
     @classroom_candidates = @locked_classroom ? Classroom.none : classroom_candidates(managed_school)
@@ -146,7 +147,7 @@ class TeachersController < ApplicationController
     value = if params.key?(:membership_grade)
               params[:membership_grade]
             else
-              @teacher&.school_membership&.grade
+              @teacher&.grade
             end
 
     value = value.to_s
@@ -168,13 +169,13 @@ class TeachersController < ApplicationController
   def membership_grade_for_form
     return params[:membership_grade] if params.key?(:membership_grade)
 
-    @teacher.school_membership&.grade
+    @teacher.grade
   end
 
   def manageable_schools
     @manageable_schools ||=
       if current_user.admin?
-        current_school_id = @teacher&.school_membership&.school_id
+        current_school_id = @teacher&.annual_school&.id
         policy_scope(School).active
                             .or(School.where(id: current_school_id))
                             .order(:name, :id)
@@ -185,7 +186,7 @@ class TeachersController < ApplicationController
   end
 
   def manager_school
-    current_user.school_membership&.school
+    current_user.annual_school
   end
 
   def managed_school
@@ -193,7 +194,7 @@ class TeachersController < ApplicationController
     return @managed_school if defined?(@managed_school)
 
     unless params.key?(:school_id)
-      @managed_school = @teacher.school_membership&.school if @teacher&.persisted?
+      @managed_school = @teacher.annual_school if @teacher&.persisted?
       return @managed_school
     end
 
@@ -236,20 +237,22 @@ class TeachersController < ApplicationController
       attributes: attributes,
       school: school,
       membership_grade: membership_grade,
-      classroom_id: classroom_id
+      classroom_id: classroom_id,
+      actor: current_user
     )
   end
 
   def create_params
-    params.require(:user).permit(:name, :email, :password, :password_confirmation, :gender, :avatar_key)
+    params.require(:user).permit(:name, :email, :login_id, :gender, :avatar_key)
   end
 
   def update_params
-    params.require(:user).permit(:name, :email, :gender, :avatar_key)
+    params.require(:user).permit(:name, :email, :login_id, :gender, :avatar_key)
   end
 
   def normalized_profile_attributes(permitted_params, current_avatar_key: nil)
     attributes = permitted_params.to_h.symbolize_keys
+    attributes[:email] = attributes[:email].presence if attributes.key?(:email)
     attributes[:gender] = nil if attributes.key?(:gender) && !%w[male female].include?(attributes[:gender])
     gender = attributes.key?(:gender) ? attributes[:gender] : @teacher&.gender
     avatar_key = attributes[:avatar_key].presence || current_avatar_key
@@ -277,13 +280,21 @@ class TeachersController < ApplicationController
   end
 
   def teacher_row(teacher)
-    membership = teacher.school_membership
     {
       teacher: teacher,
-      school: membership&.school,
-      membership_grade: membership&.grade,
-      role: membership&.role,
+      school: teacher.annual_school,
+      membership_grade: teacher.grade,
+      role: teacher.school_role,
       classroom: teacher.assigned_classroom
     }
+  end
+
+  def expose_temporary_password(result)
+    return if result.temporary_password.blank?
+
+    flash[:temporary_password] = t(
+      "admin.teachers.create.temporary_password",
+      password: result.temporary_password
+    )
   end
 end

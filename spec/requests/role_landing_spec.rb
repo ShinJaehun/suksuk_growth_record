@@ -18,16 +18,14 @@ RSpec.describe "Role landing pages", type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_school_role: "manager")
-    membership = create(:school_membership, :manager, school:, user: manager)
     sign_in manager
     get root_path
-    expect(response).to redirect_to(school_path(membership.school))
+    expect(response).to redirect_to(school_path(school))
   end
 
   it "routes a regular teacher without assigned classrooms to classrooms" do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
-    create(:school_membership, school:, user: teacher)
     sign_in teacher
     get root_path
     expect(response).to redirect_to(classrooms_path)
@@ -37,7 +35,6 @@ RSpec.describe "Role landing pages", type: :request do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     classroom = create(:classroom, school: school)
-    create(:school_membership, school: school, user: teacher)
     assign_teacher(classroom, teacher)
     sign_in teacher
 

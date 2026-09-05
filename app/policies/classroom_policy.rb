@@ -3,9 +3,9 @@ class ClassroomPolicy < ApplicationPolicy
     def resolve
       return scope.all if user&.admin?
 
-      if user&.active_teacher? && user.school_membership&.manager?
+      if user&.active_teacher? && user.school_manager?
         return scope.joins(:school).merge(School.active)
-          .where(school_id: user.school_membership.school_id)
+          .where(school_id: user.annual_school&.id)
       end
 
       # Teachers can see only their classrooms
@@ -39,7 +39,7 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def create?
-    admin? || (school_manager? && user.school_membership.school.active?)
+    admin? || (school_manager? && user.annual_school&.active?)
   end
 
   def new?
@@ -105,11 +105,11 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def school_manager?
-    teacher? && user.school_membership&.manager?
+    teacher? && user.school_manager?
   end
 
   def school_manager_of?(classroom)
-    school_manager? && classroom.school_id == user.school_membership.school_id
+    school_manager? && classroom.school_id == user.annual_school&.id
   end
 
   def teacher_of?(classroom)

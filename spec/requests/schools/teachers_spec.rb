@@ -44,15 +44,38 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
     sign_in manager
 
     post school_teachers_path(school), params: {
-      user: teacher_params,
+      user: teacher_params.except(:password, :password_confirmation).merge(
+        login_id: " NewTeacher ",
+        email: ""
+      ),
       membership_grade: 4,
       classroom_id: classroom.id
     }
 
-    teacher = User.find_by!(email: 'new@example.com')
+    teacher = User.find_by!(login_id: "newteacher")
     expect(response).to redirect_to(school_teachers_path(school))
-    expect(teacher.school_membership).to have_attributes(school: school, grade: 4, role: 'member')
+    expect(teacher).to have_attributes(
+      school_year: school.school_years.active.first,
+      school_role: "member",
+      grade: 4,
+      email: nil,
+      password_change_required: true
+    )
+    expect(teacher.school_membership).to be_nil
+    expect(teacher.teacher_credential_events.where(action: "temporary_password_issued")).to exist
     expect(teacher.assigned_classroom).to eq(classroom)
+  end
+
+
+  it 'allows an annual manager without a membership to manage own-school teachers' do
+    annual_manager = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: "manager")
+    sign_in annual_manager
+
+    get school_teachers_path(school)
+
+    expect(response).to have_http_status(:ok)
   end
 
   it 'moves and removes the single classroom assignment' do

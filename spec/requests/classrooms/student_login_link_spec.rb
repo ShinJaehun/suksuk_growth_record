@@ -120,7 +120,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "does not allow an unassigned school manager to access token management" do
-    create(:school_membership, :manager, school: classroom.school, user: teacher)
+    teacher.update!(school_role: "manager")
     sign_in teacher
 
     get student_login_info_classroom_path(classroom)
@@ -289,7 +289,7 @@ RSpec.describe "Classroom student login link", type: :request do
   end
 
   it "does not allow an unassigned school manager to regenerate the token" do
-    create(:school_membership, :manager, school: classroom.school, user: teacher)
+    teacher.update!(school_role: "manager")
     old_token = classroom.student_login_token
     sign_in teacher
 

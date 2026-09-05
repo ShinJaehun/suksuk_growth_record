@@ -6,14 +6,16 @@ class Admin::SchoolsController < Admin::BaseController
 
   def new
     @school = School.new
+    @operational_year = SchoolYear.academic_year_for(Date.current)
     authorize @school
   end
 
   def create
-    @school = School.new(school_params)
+    @operational_year = school_params[:operational_year]
+    @school = School.new(school_params.except(:operational_year))
     authorize @school
 
-    if @school.save
+    if create_school_with_initial_year
       redirect_to schools_path,
         notice: t("admin.schools.create.success"),
         status: :see_other
@@ -55,7 +57,20 @@ class Admin::SchoolsController < Admin::BaseController
   end
 
   def school_params
-    params.require(:school).permit(:name)
+    params.require(:school).permit(:name, :operational_year)
+  end
+
+  def create_school_with_initial_year
+    School.transaction do
+      @school.save!
+      @school.school_years.create!(year: @operational_year, status: :active)
+    end
+    true
+  rescue ActiveRecord::RecordInvalid => error
+    if error.record.is_a?(SchoolYear)
+      error.record.errors.full_messages.each { |message| @school.errors.add(:base, message) }
+    end
+    false
   end
 
   def update_school_status(active)

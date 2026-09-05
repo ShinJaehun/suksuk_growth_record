@@ -75,12 +75,9 @@ class UserPolicy < ApplicationPolicy
     return false unless user&.active_teacher?
     return false if user.id == record.id
 
-    manager_membership = user.school_membership
-    target_membership = record.school_membership
+    return false unless user.school_manager?
+    return false unless record.school_member?
 
-    return false unless manager_membership&.manager?
-    return false unless target_membership&.member?
-
-    manager_membership.school_id == target_membership.school_id
+    user.school_year_id == record.school_year_id
   end
 end

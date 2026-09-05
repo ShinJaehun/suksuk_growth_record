@@ -2,14 +2,14 @@ class SchoolPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.all if user&.admin?
-      return scope.active.where(id: user.school_membership.school_id) if user&.active_teacher? && user.school_membership
+      return scope.active.where(id: user.annual_school.id) if user&.active_teacher? && user.annual_school
 
       scope.none
     end
   end
 
   def index?
-    admin? || (teacher? && user.school_membership.present?)
+    admin? || (teacher? && user.annual_school.present?)
   end
 
   def show?
@@ -51,10 +51,10 @@ class SchoolPolicy < ApplicationPolicy
   private
 
   def school_member?
-    teacher? && user.school_membership&.school_id == record.id
+    teacher? && user.annual_school&.id == record.id
   end
 
   def school_manager?
-    school_member? && user.school_membership.manager?
+    school_member? && user.school_manager?
   end
 end

@@ -127,6 +127,27 @@ lookup하거나 인증하지 않는 것이 보안 invariant다. Global `find_by(
 금지한다. Phase 2C에서는 별도 School slug/token/public identifier schema를 추가하지 않는다.
 향후 사람이 읽기 좋은 public slug가 필요하면 별도 feature/spec으로 도입한다.
 
+### 신규 운영 School의 initial active SchoolYear
+
+Global admin이 운영용 School을 신규 등록할 때 School 이름과 initial 운영 연도를 함께
+명시적으로 제출한다. `SchoolYear.year`는 학년도가 시작하는 연도이며, 등록 form 기본값은
+3월부터 12월까지 `date.year`, 1월부터 2월까지 `date.year - 1`로 계산한다. Server는
+제출값이 없을 때 이 기본값을 추론하거나 저장하지 않는다. 저장되는
+`SchoolYear.year`의 canonical source는 admin이 제출한 값이다.
+
+School과 initial SchoolYear는 하나의 transaction에서 생성한다. Initial SchoolYear는 생성된
+School에 속하고 제출된 year와 `active` status를 가진다. 어느 한 record라도 유효하지 않거나
+저장에 실패하면 둘 다 남기지 않는다. 이 workflow는 운영 School 등록을 위한 명시적
+예외이며, 일반 `SchoolYear` 생성의 default status가 `planning`인 lifecycle 정책은 유지한다.
+
+### 기존 운영 School의 SchoolYear 보정
+
+위 workflow 도입 전에 생성되어 SchoolYear가 없는 기존 운영 School은 배포와 전환 전에 관리자가
+실제 학년도를 확인한 뒤 명시적으로 SchoolYear를 보정한다. 현재 날짜, School 생성일 또는 다른
+School에서 year를 자동 추론하지 않는다. 이 보정은 teacher User, SchoolMembership, Classroom 또는
+Student를 자동 변경하지 않으며, legacy teacher annualization과 readiness는 기존의 별도 절차를
+따른다.
+
 ## login_id semantics
 
 Phase 2C canonical은 case-insensitive login과 lowercase canonical storage다.
@@ -520,6 +541,13 @@ SchoolMembership은 compatibility residue일 뿐 teacher runtime source나 fallb
 20. Admin/student annual field absence와 teacher annual field completeness를 role-dependent
     model/DB invariant가 보호한다.
 21. Rate limiter는 admin email context와 active teacher School/login ID context를 분리한다.
+22. Global admin의 신규 운영 School 등록은 명시적으로 제출된 운영 연도로 정확히 하나의
+    active SchoolYear를 School과 같은 transaction에서 생성한다.
+23. 운영 연도 form 기본값은 3월부터 12월까지 현재 calendar year, 1월부터 2월까지 직전
+    calendar year다. Blank/invalid 제출을 server가 이 기본값으로 보정하지 않으며, initial
+    SchoolYear 저장 실패 시 School도 남지 않는다.
+24. 기존 운영 School에 SchoolYear가 없으면 배포와 전환 전에 관리자가 실제 학년도를 확인해
+    명시적으로 보정하며, year나 관련 teacher/Classroom/Student data를 자동 추론·변경하지 않는다.
 
 ## Verification expectations
 

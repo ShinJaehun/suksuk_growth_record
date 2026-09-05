@@ -1,6 +1,13 @@
 require "rails_helper"
 
 RSpec.describe ClassroomPolicy do
+  def annual_teacher(school:, school_role: "member", grade: nil)
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: school_role,
+      annual_grade: grade)
+  end
+
   describe "Scope" do
     let(:school) { create(:school) }
     let(:other_school) { create(:school) }
@@ -14,16 +21,14 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "returns every classroom in the manager school" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager")
 
       expect(Pundit.policy_scope!(manager, Classroom)).to contain_exactly(classroom)
     end
 
     it "returns only assigned classrooms for a regular teacher" do
-      teacher = create(:user, :teacher)
-      create(:school_membership, school: school, user: teacher)
       assigned_classroom = create(:classroom, school: school)
+      teacher = annual_teacher(school: school, grade: assigned_classroom.grade)
       assign_teacher(assigned_classroom, teacher)
       expect(Pundit.policy_scope!(teacher, Classroom)).to contain_exactly(assigned_classroom)
     end
@@ -46,17 +51,15 @@ RSpec.describe ClassroomPolicy do
   describe "#show?" do
     it "permits a manager to view an unassigned classroom in their school" do
       school = create(:school)
-      manager = create(:user, :teacher)
       classroom = create(:classroom, school: school)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager")
 
       expect(described_class.new(manager, classroom).show?).to eq(true)
     end
 
     it "rejects a manager outside the classroom school" do
-      manager = create(:user, :teacher)
       classroom = create(:classroom)
-      create(:school_membership, :manager, school: create(:school), user: manager)
+      manager = annual_teacher(school: create(:school), school_role: "manager")
 
       expect(described_class.new(manager, classroom).show?).to eq(false)
     end
@@ -71,25 +74,24 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "permits a teacher assigned to the classroom" do
-      teacher = create(:user, :teacher)
+      teacher = annual_teacher(school: school, grade: classroom.grade)
       assign_teacher(classroom, teacher)
       expect(described_class.new(teacher, classroom).view_student_data?).to eq(true)
     end
 
     it "rejects a teacher outside the classroom" do
-      expect(described_class.new(create(:user, :teacher), classroom).view_student_data?).to eq(false)
+      teacher = annual_teacher(school: school)
+      expect(described_class.new(teacher, classroom).view_student_data?).to eq(false)
     end
 
     it "rejects an unassigned school manager" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager")
 
       expect(described_class.new(manager, classroom).view_student_data?).to eq(false)
     end
 
     it "permits a manager who is also assigned to the classroom" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager", grade: classroom.grade)
       assign_teacher(classroom, manager)
       expect(described_class.new(manager, classroom).view_student_data?).to eq(true)
     end
@@ -105,10 +107,8 @@ RSpec.describe ClassroomPolicy do
   describe "classroom operation permissions" do
     let(:school) { create(:school) }
     let(:classroom) { create(:classroom, school: school) }
-    let(:manager) { create(:user, :teacher) }
-
-    before do
-      create(:school_membership, :manager, school: school, user: manager)
+    let(:manager) do
+      annual_teacher(school: school, school_role: "manager", grade: classroom.grade)
     end
 
     it "keeps settings update access for an unassigned manager but blocks teacher operations" do
@@ -150,8 +150,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "allows an unassigned school manager to manage only structure" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager")
       policy = described_class.new(manager, classroom)
 
       expect(policy.manage_structure?).to eq(true)
@@ -161,8 +160,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "combines structure and teacher permissions for an assigned school manager" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager", grade: classroom.grade)
       assign_teacher(classroom, manager)
       policy = described_class.new(manager, classroom)
 
@@ -173,7 +171,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "allows an assigned regular teacher to manage operations and members only" do
-      teacher = create(:user, :teacher)
+      teacher = annual_teacher(school: school, grade: classroom.grade)
       assign_teacher(classroom, teacher)
       policy = described_class.new(teacher, classroom)
 
@@ -185,7 +183,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "rejects an unassigned teacher, student, and guest" do
-      users = [create(:user, :teacher), create(:user, :student), nil]
+      users = [annual_teacher(school: school), create(:user, :student), nil]
 
       users.each do |user|
         policy = described_class.new(user, classroom)
@@ -211,8 +209,8 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "allows only the classroom school's manager" do
-      manager = create(:school_membership, :manager, school: school).user
-      other_manager = create(:school_membership, :manager, school: create(:school)).user
+      manager = annual_teacher(school: school, school_role: "manager")
+      other_manager = annual_teacher(school: create(:school), school_role: "manager")
 
       expect(described_class.new(manager, active_classroom).deactivate?).to eq(true)
       expect(described_class.new(manager, inactive_classroom).reactivate?).to eq(true)
@@ -221,7 +219,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "rejects ordinary teachers and students" do
-      teacher = create(:user, :teacher)
+      teacher = annual_teacher(school: school, grade: active_classroom.grade)
       student = create(:user, :student)
       assign_teacher(active_classroom, teacher)
       create(:classroom_membership, classroom: active_classroom, user: student, role: :student)
@@ -260,25 +258,24 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "rejects an assigned teacher" do
-      teacher = create(:user, :teacher)
+      teacher = annual_teacher(school: school, grade: classroom.grade)
       assign_teacher(classroom, teacher)
       expect(described_class.new(teacher, classroom).destroy?).to eq(false)
     end
 
     it "rejects an unassigned teacher" do
-      expect(described_class.new(create(:user, :teacher), classroom).destroy?).to eq(false)
+      teacher = annual_teacher(school: school)
+      expect(described_class.new(teacher, classroom).destroy?).to eq(false)
     end
 
     it "rejects an unassigned school manager" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager")
 
       expect(described_class.new(manager, classroom).destroy?).to eq(false)
     end
 
     it "rejects a school manager who is also an assigned teacher" do
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager", grade: classroom.grade)
       assign_teacher(classroom, manager)
       expect(described_class.new(manager, classroom).destroy?).to eq(false)
     end

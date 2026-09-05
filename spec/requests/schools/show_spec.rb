@@ -3,16 +3,17 @@ require 'rails_helper'
 RSpec.describe 'School overview', type: :request do
   let(:school) { create(:school, name: '아라초등학교') }
   let(:manager) do
-    user = create(:user, :teacher, :active_annual_teacher,
+    create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_school_role: "manager",
       name: '학교 관리자')
-    create(:school_membership, :manager, school: school, user: user).user
   end
 
   it 'shows only school summary and settings entry to an admin' do
     classroom = create(:classroom, school: school, name: '상세 학급 이름')
-    teacher = create(:school_membership, school: school, user: create(:user, :teacher, name: '상세 교사 이름')).user
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '상세 교사 이름')
     school_manager = manager
     sign_in create(:user, :admin)
 
@@ -52,7 +53,6 @@ RSpec.describe 'School overview', type: :request do
   it 'hides school settings from a member teacher while showing manager names' do
     school_manager = manager
     member = create(:user, :teacher, :active_annual_teacher, annual_school: school)
-    create(:school_membership, school: school, user: member)
     sign_in member
 
     get school_path(school)
@@ -66,10 +66,13 @@ RSpec.describe 'School overview', type: :request do
   it 'excludes inactive teachers and managers from the overview' do
     inactive_manager = manager
     inactive_manager.update!(active: false)
-    active_teacher = create(:school_membership, school: school,
-                                                user: create(:user, :teacher, name: '활성 교사')).user
-    inactive_teacher = create(:school_membership, school: school,
-                                                  user: create(:user, :teacher, name: '비활성 교사', active: false)).user
+    active_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '활성 교사')
+    inactive_teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      name: '비활성 교사',
+      active: false)
     sign_in create(:user, :admin)
 
     get school_path(school)

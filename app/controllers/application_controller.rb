@@ -52,15 +52,13 @@ class ApplicationController < ActionController::Base
     @navigation_context = { user: current_user }
     return @navigation_context unless current_user.active_teacher?
 
-    school_membership = current_user.school_membership
-    school = school_membership&.school
+    school = current_user.annual_school
     active_school = school if school&.active?
-    manager_membership =
-      school_membership if active_school && school_membership.manager?
+    manager = current_user if active_school && current_user.school_manager?
 
     @navigation_context.merge!(
-      manager_membership: manager_membership,
-      classrooms: manager_membership ? [] : teacher_nav_classrooms
+      manager: manager,
+      classrooms: manager ? [] : teacher_nav_classrooms
     )
   end
 
@@ -146,11 +144,7 @@ class ApplicationController < ActionController::Base
     return user_path(user) if user.student?
     return schools_path if user.admin?
 
-    managed_membership =
-      if user.school_membership&.manager? && user.school_membership.school.active?
-        user.school_membership
-      end
-    return school_path(managed_membership.school) if managed_membership
+    return school_path(user.annual_school) if user.school_manager? && user.annual_school&.active?
 
     regular_teacher_landing_path_for(user)
   end

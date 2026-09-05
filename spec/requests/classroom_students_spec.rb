@@ -22,7 +22,6 @@ RSpec.describe 'Classroom students', type: :request do
   def create_outside_teacher
     outside_school = create(:school)
     outsider = create(:user, :teacher, :active_annual_teacher, annual_school: outside_school)
-    create(:school_membership, school: outside_school, user: outsider)
     outsider
   end
 
@@ -1137,7 +1136,6 @@ RSpec.describe 'Classroom students', type: :request do
       manager = create(:user, :teacher, :active_annual_teacher,
         annual_school: past_classroom.school,
         annual_school_role: "manager")
-      create(:school_membership, :manager, school: past_classroom.school, user: manager)
       sign_out teacher
       sign_in manager
 

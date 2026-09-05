@@ -3,12 +3,10 @@ class TeacherManagementPolicy < ApplicationPolicy
     def resolve
       return scope.teacher if user&.admin?
 
-      membership = user&.school_membership
-      return scope.none unless user&.active_teacher? && membership&.manager? && membership.school.active?
+      return scope.none unless user&.active_teacher? && user.school_manager? && user.annual_school&.active?
 
       scope.teacher
-        .joins(:school_membership)
-        .where(school_memberships: { school_id: membership.school_id })
+        .where(school_year_id: user.school_year_id)
     end
   end
 
@@ -24,12 +22,12 @@ class TeacherManagementPolicy < ApplicationPolicy
     return false unless record.teacher?
     return true if user&.admin?
 
-    school_manager? && record.school_membership&.school_id == user.school_membership.school_id
+    school_manager? && record.school_year_id == user.school_year_id
   end
 
   private
 
   def school_manager?
-    user&.active_teacher? && user.school_membership&.manager? && user.school.active?
+    user&.active_teacher? && user.school_manager? && user.annual_school&.active?
   end
 end

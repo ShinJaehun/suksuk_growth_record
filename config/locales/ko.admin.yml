@@ -10,6 +10,7 @@ ko:
       edit_title: "학교 이름 수정"
       form:
         name_label: "학교 이름"
+        operational_year_label: "운영 연도"
         create_submit: "학교 등록"
         update_submit: "변경 저장"
         creating: "등록 중..."
@@ -88,6 +89,7 @@ ko:
       create:
         success: "선생님 계정이 생성되었습니다."
         failure: "선생님 계정 생성에 실패했습니다."
+        temporary_password: "임시 비밀번호: %{password}"
       update:
         success: "학교와 담당 학급을 저장했습니다."
       account_status:

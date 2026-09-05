@@ -4,9 +4,11 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
   let(:admin) { create(:user, :admin) }
   let(:school) { create(:school) }
   let(:other_school) { create(:school) }
+  let!(:school_year) { create(:school_year, :active, school: school) }
+  let!(:other_school_year) { create(:school_year, :active, school: other_school) }
 
-  def teacher_params(email: 'teacher@example.com')
-    { name: '교사', email: email, password: 'password123', gender: 'female', avatar_key: 'teacherF01' }
+  def teacher_params(email: 'teacher@example.com', login_id: ' AnnualTeacher ')
+    { name: '교사', email: email, login_id: login_id, gender: 'female', avatar_key: 'teacherF01' }
   end
 
   it 'creates a teacher with school, grade, and one classroom' do
@@ -22,7 +24,16 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
 
     teacher = User.find_by!(email: 'teacher@example.com')
     expect(response).to redirect_to(admin_teachers_path)
-    expect(teacher.school_membership).to have_attributes(school: school, grade: 4, role: 'member')
+    expect(teacher).to have_attributes(
+      role: 'teacher',
+      school_year: school_year,
+      login_id: 'annualteacher',
+      school_role: 'member',
+      grade: 4,
+      password_change_required: true
+    )
+    expect(teacher.annual_school).to eq(school)
+    expect(teacher.school_membership).to be_nil
     expect(teacher.assigned_classroom).to eq(classroom)
   end
 
@@ -37,72 +48,98 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     }
 
     teacher = User.find_by!(email: 'teacher@example.com')
-    expect(teacher.school_membership).to have_attributes(school: school, grade: 4)
+    expect(teacher).to have_attributes(
+      school_year: school_year,
+      login_id: 'annualteacher',
+      school_role: 'member',
+      grade: 4
+    )
+    expect(teacher.school_membership).to be_nil
     expect(teacher.assigned_classroom).to be_nil
   end
 
   it 'moves and removes a single classroom assignment' do
-    membership = create(:school_membership, :manager, school: school, grade: 4)
-    first = create(:classroom, school: school, grade: 4, teacher: membership.user)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: 'manager',
+      annual_grade: 4)
+    first = create(:classroom, school: school, grade: 4, teacher: teacher)
     second = create(:classroom, school: school, grade: 4)
     sign_in admin
 
-    patch admin_teacher_path(membership.user), params: {
+    patch admin_teacher_path(teacher), params: {
       school_id: school.id, membership_grade: 4, classroom_id: second.id
     }
 
     expect(first.reload.teacher).to be_nil
-    expect(second.reload.teacher).to eq(membership.user)
-    expect(membership.reload).to be_manager
+    expect(second.reload.teacher).to eq(teacher)
+    expect(teacher.reload.school_role).to eq('manager')
 
-    patch admin_teacher_path(membership.user), params: {
+    patch admin_teacher_path(teacher), params: {
       school_id: school.id, membership_grade: 4, classroom_id: ''
     }
     expect(second.reload.teacher).to be_nil
   end
 
   it 'changes school atomically and demotes a manager to member' do
-    membership = create(:school_membership, :manager, school: school, grade: 4)
-    old_classroom = create(:classroom, school: school, grade: 4, teacher: membership.user)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: 'manager',
+      annual_grade: 4)
+    old_classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
     new_classroom = create(:classroom, school: other_school, grade: 5)
     sign_in admin
 
-    patch admin_teacher_path(membership.user), params: {
+    patch admin_teacher_path(teacher), params: {
       school_id: other_school.id, membership_grade: 5, classroom_id: new_classroom.id
     }
 
-    expect(response).to redirect_to(edit_admin_teacher_path(membership.user))
-    expect(membership.reload).to have_attributes(school: other_school, grade: 5, role: 'member')
+    expect(response).to redirect_to(edit_admin_teacher_path(teacher))
+    expect(teacher.reload).to have_attributes(
+      school_year: other_school_year,
+      grade: 5,
+      school_role: 'member'
+    )
     expect(old_classroom.reload.teacher).to be_nil
-    expect(new_classroom.reload.teacher).to eq(membership.user)
+    expect(new_classroom.reload.teacher).to eq(teacher)
+    expect(teacher.school_membership).to be_nil
   end
 
   it 'rejects invalid classroom choices without partial changes' do
-    membership = create(:school_membership, school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: membership.user)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
     sign_in admin
 
-    patch admin_teacher_path(membership.user), params: {
+    patch admin_teacher_path(teacher), params: {
       school_id: school.id,
       membership_grade: 4,
       classroom_id: create(:classroom, school: other_school, grade: 4).id
     }
 
     expect(response).to have_http_status(:unprocessable_content)
-    expect(membership.reload.school).to eq(school)
-    expect(classroom.reload.teacher).to eq(membership.user)
+    expect(teacher.reload).to have_attributes(school_year: school_year, grade: 4)
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 
-  it 'removes school membership and assignment when school is blank' do
-    membership = create(:school_membership, school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: membership.user)
+  it 'rejects removing the annual school and preserves the assignment' do
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
     sign_in admin
 
-    patch admin_teacher_path(membership.user), params: {
+    patch admin_teacher_path(teacher), params: {
       school_id: '', membership_grade: '', classroom_id: ''
     }
 
-    expect(membership.user.reload.school_membership).to be_nil
-    expect(classroom.reload.teacher).to be_nil
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(teacher.reload).to have_attributes(
+      school_year: school_year,
+      grade: 4,
+      school_role: 'member'
+    )
+    expect(classroom.reload.teacher).to eq(teacher)
   end
 end

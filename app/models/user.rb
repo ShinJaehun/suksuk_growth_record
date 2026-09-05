@@ -87,6 +87,18 @@ class User < ApplicationRecord
     teacher? && active?
   end
 
+  def annual_school
+    school_year&.school
+  end
+
+  def school_manager?
+    teacher? && school_role == "manager"
+  end
+
+  def school_member?
+    teacher? && school_role == "member"
+  end
+
   def active_for_authentication?
     super && (!teacher? || active?)
   end

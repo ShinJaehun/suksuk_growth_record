@@ -9,9 +9,9 @@ module NavigationHelper
         navigation_item("navigation.classrooms", classrooms_path),
         (navigation_item("navigation.teacher_management", teachers_path) if can_manage_teachers?)
       ].compact
-    elsif context[:manager_membership]
+    elsif context[:manager]
       [
-        navigation_item("navigation.school_operations", school_path(context[:manager_membership].school)),
+        navigation_item("navigation.school_operations", school_path(context[:manager].annual_school)),
         navigation_item("navigation.classrooms", classrooms_path),
         navigation_item("navigation.teacher_management", teachers_path)
       ]
@@ -25,7 +25,7 @@ module NavigationHelper
   end
 
   def teacher_classroom_navigation(context)
-    return unless context[:user]&.teacher? && !context[:manager_membership]
+    return unless context[:user]&.teacher? && !context[:manager]
 
     classrooms = context.fetch(:classrooms, [])
     {

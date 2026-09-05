@@ -48,11 +48,11 @@
   <h2 class="text-base font-bold text-slate-900"><%= t("schools.settings.managers_title") %></h2>
   <div class="mt-3 space-y-2">
     <% if @managers.any? %>
-      <% @managers.each do |membership| %>
+      <% @managers.each do |manager| %>
         <div class="flex items-center justify-between gap-3">
-          <%= render "schools/manager_identity", user: membership.user %>
+          <%= render "schools/manager_identity", user: manager %>
           <%= link_to t("schools.settings.manager_remove"),
-                admin_school_manager_path(@school, membership.user),
+                admin_school_manager_path(@school, manager),
                 data: { turbo_method: :delete, turbo_confirm: t("schools.settings.manager_remove_confirm") },
                 class: "text-sm font-semibold text-rose-700" %>
         </div>

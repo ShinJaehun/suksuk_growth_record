@@ -17,8 +17,19 @@ class SchoolsController < ApplicationController
 
     school_ids = @schools.map(&:id)
     @classroom_counts = Classroom.where(school_id: school_ids).group(:school_id).count
-    @teacher_counts = SchoolMembership.joins(:user).where(school_id: school_ids, users: { active: true }).group(:school_id).count
-    @managers_by_school_id = SchoolMembership.manager.joins(:user).includes(:user).where(school_id: school_ids, users: { active: true }).group_by(&:school_id)
+    active_year_ids = SchoolYear.active
+      .where(school_id: school_ids)
+      .pluck(:school_id, :id)
+      .group_by(&:first)
+      .filter_map { |_school_id, rows| rows.first.last if rows.one? }
+    annual_teachers = User.teacher.active
+      .where(school_year_id: active_year_ids)
+      .includes(:school_year)
+      .to_a
+    @teacher_counts = annual_teachers.group_by { |teacher| teacher.school_year.school_id }.transform_values(&:count)
+    @managers_by_school_id = annual_teachers
+      .select(&:school_manager?)
+      .group_by { |teacher| teacher.school_year.school_id }
   end
 
   def show

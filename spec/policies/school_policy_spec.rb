@@ -4,6 +4,12 @@ RSpec.describe SchoolPolicy do
   let!(:school) { create(:school) }
   let!(:other_school) { create(:school) }
 
+  def annual_teacher(school:, school_role: "member")
+    create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_school_role: school_role)
+  end
+
   describe "Scope" do
     it "returns all schools for an admin" do
       admin = create(:user, :admin)
@@ -12,22 +18,19 @@ RSpec.describe SchoolPolicy do
     end
 
     it "returns only the member teacher's school" do
-      teacher = create(:user, :teacher)
-      create(:school_membership, school: school, user: teacher)
+      teacher = annual_teacher(school: school)
 
       expect(described_class::Scope.new(teacher, School).resolve).to contain_exactly(school)
     end
 
     it "returns only the manager teacher's school" do
-      teacher = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: teacher)
+      teacher = annual_teacher(school: school, school_role: "manager")
 
       expect(described_class::Scope.new(teacher, School).resolve).to contain_exactly(school)
     end
 
     it "hides an inactive member school from teachers but not admins" do
-      teacher = create(:user, :teacher)
-      create(:school_membership, school: school, user: teacher)
+      teacher = annual_teacher(school: school)
       school.update!(active: false)
 
       expect(described_class::Scope.new(teacher, School).resolve).to be_empty
@@ -57,8 +60,7 @@ RSpec.describe SchoolPolicy do
     end
 
     it "allows a member to view only their school without managing operations" do
-      teacher = create(:user, :teacher)
-      create(:school_membership, school: school, user: teacher)
+      teacher = annual_teacher(school: school)
 
       own_policy = described_class.new(teacher, school)
       other_policy = described_class.new(teacher, other_school)
@@ -71,8 +73,7 @@ RSpec.describe SchoolPolicy do
     end
 
     it "allows a manager to view and manage operations only for their school" do
-      teacher = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: teacher)
+      teacher = annual_teacher(school: school, school_role: "manager")
 
       own_policy = described_class.new(teacher, school)
       other_policy = described_class.new(teacher, other_school)
@@ -86,8 +87,8 @@ RSpec.describe SchoolPolicy do
 
     it "allows only an admin to manage school managers" do
       admin = create(:user, :admin)
-      manager = create(:school_membership, :manager, school: school).user
-      member = create(:school_membership, school: other_school).user
+      manager = annual_teacher(school: school, school_role: "manager")
+      member = annual_teacher(school: other_school)
       student = create(:user, :student)
 
       expect(described_class.new(admin, school).manage_managers?).to eq(true)
@@ -109,13 +110,10 @@ RSpec.describe SchoolPolicy do
 
     it "allows only managers of the record school to manage school teachers" do
       admin = create(:user, :admin)
-      manager = create(:user, :teacher)
-      member = create(:user, :teacher)
-      other_manager = create(:user, :teacher)
+      manager = annual_teacher(school: school, school_role: "manager")
+      member = annual_teacher(school: school)
+      other_manager = annual_teacher(school: other_school, school_role: "manager")
       student = create(:user, :student)
-      create(:school_membership, :manager, school: school, user: manager)
-      create(:school_membership, school: school, user: member)
-      create(:school_membership, :manager, school: other_school, user: other_manager)
 
       expect(described_class.new(admin, school).manage_teachers?).to eq(false)
       expect(described_class.new(manager, school).manage_teachers?).to eq(true)
@@ -127,8 +125,7 @@ RSpec.describe SchoolPolicy do
 
     it "keeps school creation, updates, and deletion admin-only" do
       admin_policy = described_class.new(create(:user, :admin), school)
-      manager = create(:user, :teacher)
-      create(:school_membership, :manager, school: school, user: manager)
+      manager = annual_teacher(school: school, school_role: "manager")
       manager_policy = described_class.new(manager, school)
 
       expect(admin_policy.create?).to eq(true)
@@ -141,7 +138,7 @@ RSpec.describe SchoolPolicy do
 
     it "allows only admins to change school lifecycle state" do
       admin = create(:user, :admin)
-      manager = create(:school_membership, :manager, school: school).user
+      manager = annual_teacher(school: school, school_role: "manager")
 
       expect(described_class.new(admin, school).deactivate?).to eq(true)
       expect(described_class.new(manager, school).deactivate?).to eq(false)

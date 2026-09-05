@@ -41,7 +41,6 @@ RSpec.describe 'Classroom deletion', type: :request do
       annual_school: school,
       annual_school_role: "manager")
     classroom = create(:classroom, school: school)
-    create(:school_membership, :manager, school: school, user: manager)
     sign_in manager
 
     expect do
@@ -58,7 +57,6 @@ RSpec.describe 'Classroom deletion', type: :request do
       annual_school: school,
       annual_school_role: "manager")
     classroom = create(:classroom, school: school)
-    create(:school_membership, :manager, school: school, user: manager)
     assign_teacher(classroom, manager)
     sign_in manager
 
@@ -123,7 +121,6 @@ RSpec.describe 'Classroom deletion', type: :request do
       annual_school: school,
       annual_school_role: "manager")
     classroom = create(:classroom, school: school)
-    create(:school_membership, :manager, school: school, user: manager)
     assign_teacher(classroom, manager)
     sign_in manager
 

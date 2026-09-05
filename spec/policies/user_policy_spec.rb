@@ -3,8 +3,16 @@ require "rails_helper"
 RSpec.describe UserPolicy do
   describe "generic user authorization" do
     let(:school) { create(:school) }
-    let(:manager) { create(:school_membership, :manager, school: school).user }
-    let(:member) { create(:school_membership, school: school).user }
+    let(:manager) do
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: school,
+        annual_school_role: "manager")
+    end
+    let(:member) do
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: school,
+        annual_school_role: "member")
+    end
 
     it "keeps index, create, update, and scope admin-only" do
       admin = create(:user, :admin)
@@ -102,12 +110,15 @@ RSpec.describe UserPolicy do
 
   describe "teacher status actions" do
     let(:school) { create(:school) }
-    let(:manager) { create(:user, :teacher) }
-    let(:member) { create(:user, :teacher) }
-
-    before do
-      create(:school_membership, :manager, school: school, user: manager)
-      create(:school_membership, school: school, user: member)
+    let(:manager) do
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: school,
+        annual_school_role: "manager")
+    end
+    let(:member) do
+      create(:user, :teacher, :active_annual_teacher,
+        annual_school: school,
+        annual_school_role: "member")
     end
 
     it "allows admins to change teacher status" do
@@ -121,7 +132,10 @@ RSpec.describe UserPolicy do
       expect(described_class.new(manager, member).deactivate_teacher?).to eq(true)
       expect(described_class.new(manager, manager).deactivate_teacher?).to eq(false)
       expect(described_class.new(member, manager).deactivate_teacher?).to eq(false)
-      expect(described_class.new(manager, create(:user, :teacher)).deactivate_teacher?).to eq(false)
+      other_school = create(:school)
+      other_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: other_school)
+
+      expect(described_class.new(manager, other_teacher).deactivate_teacher?).to eq(false)
       expect(described_class.new(manager, create(:user, :student)).deactivate_teacher?).to eq(false)
     end
   end

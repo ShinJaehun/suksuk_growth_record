@@ -14,10 +14,14 @@ require 'devise'
 
 module TeacherAssignmentHelpers
   def assign_teacher(classroom, teacher)
-    membership = teacher.school_membership || teacher.build_school_membership
-    unless membership.persisted? && membership.school_id == classroom.school_id && membership.grade == classroom.grade
-      membership.update!(school: classroom.school, grade: classroom.grade)
+    attributes = { grade: classroom.grade }
+    if teacher.school_year.nil?
+      attributes[:school_year] = classroom.school.school_years.active.first ||
+        FactoryBot.create(:school_year, :active, school: classroom.school)
     end
+    attributes[:login_id] = FactoryBot.generate(:annual_teacher_login_id) if teacher.login_id.blank?
+    attributes[:school_role] = "member" if teacher.school_role.blank?
+    teacher.update!(attributes)
     classroom.update!(teacher: teacher)
   end
 end

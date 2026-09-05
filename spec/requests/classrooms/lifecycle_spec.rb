@@ -5,8 +5,10 @@ RSpec.describe "Classroom lifecycle", type: :request do
   let(:admin) { create(:user, :admin) }
 
   it "lets an admin deactivate while preserving students and the teacher" do
-    teacher_membership = create(:school_membership, school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher_membership.user)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
     student_membership = create(:classroom_membership, classroom: classroom, role: :student,
                                                        status: :active, student_number: 7)
     sign_in admin
@@ -15,7 +17,7 @@ RSpec.describe "Classroom lifecycle", type: :request do
 
     expect(response).to redirect_to(classrooms_path)
     expect(classroom.reload).not_to be_active
-    expect(classroom.teacher).to eq(teacher_membership.user)
+    expect(classroom.teacher).to eq(teacher)
     expect(student_membership.reload).to have_attributes(status: "active", student_number: 7)
   end
 
@@ -23,7 +25,6 @@ RSpec.describe "Classroom lifecycle", type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_school_role: "manager")
-    create(:school_membership, :manager, school: school, user: manager)
     classroom = create(:classroom, school: school)
     sign_in manager
 
@@ -34,8 +35,10 @@ RSpec.describe "Classroom lifecycle", type: :request do
   end
 
   it "reactivates with the preserved teacher assignment" do
-    teacher_membership = create(:school_membership, school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher_membership.user)
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: school,
+      annual_grade: 4)
+    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
     classroom.update!(active: false)
     sign_in admin
 
@@ -43,7 +46,7 @@ RSpec.describe "Classroom lifecycle", type: :request do
 
     expect(response).to redirect_to(classrooms_path)
     expect(classroom.reload).to be_active
-    expect(classroom.teacher).to eq(teacher_membership.user)
+    expect(classroom.teacher).to eq(teacher)
   end
 
   it "rejects an ordinary teacher" do
@@ -63,7 +66,6 @@ RSpec.describe "Classroom lifecycle", type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: manager_school,
       annual_school_role: "manager")
-    create(:school_membership, :manager, school: manager_school, user: manager)
     classroom = create(:classroom, school: school)
     sign_in manager
 
