@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_021000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -86,6 +86,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_021000) do
     t.index ["user_id"], name: "index_school_memberships_on_user_id", unique: true
   end
 
+  create_table "school_years", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "school_id", null: false
+    t.string "status", default: "planning", null: false
+    t.datetime "updated_at", null: false
+    t.integer "year", null: false
+    t.index ["school_id", "year"], name: "index_school_years_on_school_id_and_year", unique: true
+    t.index ["school_id"], name: "index_school_years_on_school_id"
+    t.index ["school_id"], name: "index_school_years_on_unique_active_school", unique: true, where: "((status)::text = 'active'::text)"
+    t.index ["school_id"], name: "index_school_years_on_unique_planning_school", unique: true, where: "((status)::text = 'planning'::text)"
+    t.check_constraint "status::text = ANY (ARRAY['planning'::character varying, 'active'::character varying, 'archived'::character varying]::text[])", name: "chk_school_years_status"
+    t.check_constraint "year >= 1000 AND year <= 9999", name: "chk_school_years_year_range"
+  end
+
   create_table "schools", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.string "color_key", null: false
@@ -122,4 +136,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_021000) do
   add_foreign_key "classrooms", "users", column: "teacher_id"
   add_foreign_key "school_memberships", "schools"
   add_foreign_key "school_memberships", "users", on_delete: :cascade
+  add_foreign_key "school_years", "schools"
 end
