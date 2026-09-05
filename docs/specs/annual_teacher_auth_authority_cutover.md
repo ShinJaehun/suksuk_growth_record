@@ -103,11 +103,13 @@ Legacy 여부와 무관하게 모든 annual teacher User에는 다음을 감사�
 
 ## Active SchoolYear resolution
 
-Normal teacher login entry point는 요청 전에 School context를 확정해야 한다. Account
-lookup은 다음 순서만 사용한다.
+Normal teacher login entry point는 URL의 기존 숫자 `School.id`로 School context를 먼저
+확정한다. 개념적인 entry는 `/schools/:school_id/teacher_login`이며 정확한 Rails route
+helper와 controller 이름은 implementation detail이다. Account lookup은 다음 순서만
+사용한다.
 
 ```text
-explicit School context
+URL school_id로 resolve한 School
 -> 그 School의 정확히 하나인 active SchoolYear
 -> normalized login_id가 일치하는 teacher User
 ```
@@ -115,14 +117,15 @@ explicit School context
 - 사용자는 normal login에서 SchoolYear를 선택하지 않는다.
 - Active SchoolYear가 없으면 fail closed한다.
 - Planning 또는 archived year를 fallback으로 검색하지 않는다.
-- 현재 날짜, 가장 최근 year 또는 teacher profile로 year를 추론하지 않는다.
+- School name, 현재 날짜, 가장 최근 year 또는 teacher profile로 context를 추론하지 않는다.
 - 요청에서 받은 School context 밖의 User를 인증하지 않는다.
+- 다른 School로 fallback하지 않는다.
 
-School-specific URL, stable public School identifier 또는 동등한 scoped entry point 중
-어떤 route shape를 사용할지는 authentication UI implementation spec에서 정할 수 있다.
-그러나 controller가 신뢰할 수 있는 School record를 먼저 resolve하고 그 scope 안에서만
-account를 조회한다는 contract는 변경할 수 없다. Global `find_by(login_id:)` lookup은
-금지한다.
+`School.id`는 authentication secret이 아니다. 다른 숫자 ID로 URL을 조작할 수 있다는
+사실 자체는 취약점이 아니며, server가 resolve된 School scope 밖의 teacher를 절대
+lookup하거나 인증하지 않는 것이 보안 invariant다. Global `find_by(login_id:)` lookup은
+금지한다. Phase 2C에서는 별도 School slug/token/public identifier schema를 추가하지 않는다.
+향후 사람이 읽기 좋은 public slug가 필요하면 별도 feature/spec으로 도입한다.
 
 ## login_id semantics
 
@@ -572,7 +575,7 @@ SchoolMembership은 compatibility residue일 뿐 teacher runtime source나 fallb
 
 ## Open Questions
 
-현재 Phase 2C product-policy 수준의 미해결 질문은 없다. School-specific login URL/public
-School identifier, password random format/length, limiter 수치와 cache key 이름은 승인된
-contract 안에서 implementation spec이 정할 세부사항이다. Devise 기본 semantics가 session
-revocation outcome을 충족하지 못하면 persistent state 설계 전에 human approval로 돌아온다.
+현재 Phase 2C product-policy 수준의 미해결 질문은 없다. Password random format/length,
+limiter 수치와 cache key 이름, 정확한 Rails route helper/controller 이름은 승인된 contract
+안에서 implementation spec이 정할 세부사항이다. Devise 기본 semantics가 session revocation
+outcome을 충족하지 못하면 persistent state 설계 전에 human approval로 돌아온다.
