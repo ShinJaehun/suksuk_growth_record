@@ -1,0 +1,409 @@
+# School Year Architecture
+
+## 목적
+
+이 문서는 학교 기반 서비스를 여러 학년도에 걸쳐 운영하고 과거 자료를 보존하기 위한 장기 canonical architecture를 정의한다. 특정 서비스 도메인은 포함하지 않으며, 현재 starter의 `School`, `User`, `SchoolMembership`, `Classroom`, `ClassroomMembership`을 안전하게 발전시키는 기준으로 사용한다.
+
+이 문서는 목표 구조를 정의한다. migration, route, controller, view와 데이터 이전 절차는 각 구현 단계의 별도 승인 대상이다.
+
+## 핵심 원칙
+
+- `SchoolYear`는 한 `School`의 특정 학년도 운영 context다.
+- global admin, teacher와 student의 authentication identity를 구분한다.
+- teacher login account는 SchoolYear에 종속되며 `login_id + password`로 인증한다.
+- School manager는 자기 Classroom이 아니라 자기 School 전체를 운영하는 school-level operator다.
+- 정상 운영은 active SchoolYear에서만 이루어진다.
+- archived SchoolYear는 하위 운영 데이터를 보존하는 read-only 경계다.
+- 상위 SchoolYear 상태를 하위 row마다 중복 저장하지 않는다.
+- account lifecycle, `SchoolYear.status`, `Classroom.active`, enrollment status는 서로 다른 lifecycle이다.
+- 현재 학년도 화면에는 학년도를 반복 표시하지 않고 context가 바뀌거나 여러 연도를 구별할 때만 표시한다.
+- 다음 학년도 구성은 planning 단계에서 명시적으로 준비하며 자동 복사·진급하지 않는다.
+
+## 현재 구조와 전환 방향
+
+현재 구조는 다음과 같다.
+
+```text
+School
+├── SchoolMembership ── User
+└── Classroom
+    ├── teacher_id ── User
+    └── ClassroomMembership ── student User
+```
+
+현재 제약은 teacher당 `SchoolMembership` 하나, `Classroom.teacher_id` 기반 현재 담임 1:1, student User당 active `ClassroomMembership` 하나다. 이는 단일 현재 학년도 운영에는 맞지만 연도별 이력과 학년도 중 담임 교체를 충분히 표현하지 못한다.
+
+목표 구조는 다음과 같다.
+
+```text
+User
+├── global admin (SchoolYear 비종속)
+└── teacher (정확히 하나의 SchoolYear에 귀속)
+
+School
+└── SchoolYear
+    ├── teacher Users
+    └── Classroom
+        ├── HomeroomAssignment ── teacher User
+        └── StudentEnrollment ── Student
+```
+
+현재 `SchoolMembership`, `Classroom.teacher_id`와 student `ClassroomMembership`은 전환 기간의 source이며 장기 canonical은 아니다. 목표 관계로 안전하게 이전된 뒤 연도별 teacher authority, 현재 담임과 학생 재학 관계의 책임을 각각 teacher User, HomeroomAssignment와 StudentEnrollment에 넘긴다.
+
+## SchoolYear lifecycle
+
+`SchoolYear`는 최소한 다음 속성을 가진다.
+
+```text
+school_id
+year: integer
+status: planning | active | archived
+```
+
+한 School 안에서 같은 `year`는 하나만 존재한다. `school_id + year`에 DB unique invariant를 둔다. 한 School에는 active SchoolYear와 planning SchoolYear가 각각 최대 하나만 존재하며 DB partial unique invariant로 방어한다. archived SchoolYear는 여러 개 존재할 수 있다.
+
+`year`는 네 자리 integer `1000..9999`로 검증한다. 현재 연도 주변으로 범위를 좁히는 시간 의존 validation은 두지 않는다.
+
+School 생성이나 초기 bootstrap 중에는 active year가 0개일 수 있다. 정상 학생·교실 운영을 시작하려면 정확히 하나의 active SchoolYear가 필요하다. planning year는 현재 active year를 중단하지 않고 다음 구성을 준비하는 context이며 active year와 함께 존재할 수 있다.
+
+### planning
+
+- teacher User, classroom, 담임과 학생 편성을 준비할 수 있다.
+- 일반 학생 운영, token/PIN login과 운영 기록 생성은 허용하지 않는다.
+- planning SchoolYear는 global admin 또는 현재 active SchoolYear의 manager가 자기 School에 생성하고 준비할 수 있다.
+- SchoolYear 생성은 manager 지정 권한을 포함하지 않으며 manager 지정·해제는 global admin만 수행한다.
+- planning teacher User는 생성·구성할 수 있지만 정상 teacher runtime login에는 사용할 수 없다.
+- 실제 운영 데이터는 자동 복사하지 않고 명시적으로 구성한다.
+
+### active
+
+- 해당 학교의 현재 정상 운영 context다.
+- active School, active Classroom과 active enrollment 등 하위 lifecycle 조건을 함께 만족해야 실제 운영할 수 있다.
+- active year가 있다는 이유만으로 inactive School이나 Classroom을 우회하지 않는다.
+
+### archived
+
+- 종료된 과거 학년도다.
+- 하위 운영 row와 당시 상태를 보존한다.
+- 하위 school-operation data는 read-only다.
+- archived teacher User는 명시적인 SchoolYear context로 인증할 수 있고, 그 User에 저장된 당시 role과 scope에서 자료를 읽을 수 있다.
+- 현재 학년도의 역할로 archived account 권한을 다시 계산하지 않는다.
+- application의 정상 operation에서는 archived year를 planning이나 active로 되돌리지 않는다. 재해 복구는 product lifecycle이 아닌 별도 운영 절차로 다룬다.
+
+## 현재·다음·과거 학년도
+
+- 현재: School의 유일한 active SchoolYear
+- 다음: bootstrap 중인 planning SchoolYear
+- 과거: archived SchoolYear
+
+현재 운영 화면은 active year를 기본 context로 사용한다. planning이나 archived year를 선택한 화면은 상위에 `2027학년도 · 준비 중`, `2025학년도 · 읽기 전용`처럼 context와 상태를 한 번 명확히 표시한다.
+
+## Classroom과 반 식별
+
+Classroom은 `SchoolYear`에 속한다. 목표 구조에서는 School이 `classroom.school_year.school`로 결정되므로 `Classroom.school_id`를 영구 중복 source로 유지하지 않는다. 전환 중에는 backfill과 기존 query 호환을 위해 일시적으로 두 FK가 공존할 수 있지만, 검증 완료 후 `school_year_id`만 canonical school path로 남기는 것을 권장한다. 이는 두 school pointer의 불일치 가능성을 제거하며 query는 association과 적절한 index로 단순화한다.
+
+Classroom의 목표 식별 정보는 다음과 같다.
+
+```text
+school_year_id
+grade: integer (1..6)
+class_label: string
+active: boolean
+```
+
+`class_label`은 숫자로 제한하지 않는다. `"1"`, `"가"`, `"햇살"`처럼 저장하고 presentation layer에서 `반`을 붙인다.
+
+입력은 다음 순서로 normalize한다.
+
+1. 앞뒤 공백을 제거한다.
+2. 끝의 단일 `반` suffix가 있으면 그 한 글자만 제거한다.
+3. suffix 제거 뒤 생긴 앞뒤 공백을 다시 제거한다.
+4. 결과가 비어 있으면 거부한다.
+
+문자열 내부나 시작 부분의 `반`은 제거하지 않는다. 따라서 `반디`는 그대로 저장하고 `햇살반`은 `햇살`로 저장한다. 같은 SchoolYear 안에서 `grade + class_label`은 유일해야 하며 DB unique invariant로 방어한다. 다른 SchoolYear의 같은 조합은 허용한다.
+
+`Classroom.active`는 해당 학년도 안에서 그 교실 자체의 운영 상태다. SchoolYear를 archive해도 Classroom을 inactive로 바꾸지 않는다. archived year 아래의 `active: true` classroom은 당시 정상 운영됐으나 지금은 과거 context라 read-only라는 뜻이다.
+
+## Teacher User와 인증 context
+
+현재 구현은 teacher와 global admin을 하나의 Devise `User`에서 email/password로 인증한다. 이는 현행 상태이며 장기 target은 다음 세 인증 경계를 분리한다.
+
+```text
+Global admin User → SchoolYear 비종속 시스템 계정
+Teacher User      → SchoolYear별 account, login_id + password
+Student           → 별도 Student identity, classroom token + 학생 선택 + PIN
+```
+
+Global admin의 최종 login identifier는 이 문서에서 변경하지 않는다. Teacher의 email은 optional contact profile이 될 수 있지만 authentication identifier가 아니다. Student를 분리한 뒤 `User`는 global admin과 teacher를 표현하되 두 role의 SchoolYear 귀속과 lifecycle은 서로 다르다.
+
+Global admin User는 SchoolYear에 종속되지 않는다. Teacher User 하나는 정확히 한 SchoolYear의 annual login account 하나를 의미한다. School scope는 `teacher.school_year.school`을 통해 결정하는 것을 target으로 하며 중복 `school_id` 필요 여부는 migration과 query 설계 단계에서 검토한다.
+
+Teacher User는 개념적으로 다음 annual 정보를 가진다. 정확한 column 이름은 구현 spec에서 정한다.
+
+```text
+school_year
+login_id / encrypted credential / password_change_required
+annual role: member | manager
+grade
+name
+avatar/profile
+account active/inactive state
+```
+
+`login_id`는 사람 identity나 영구 username이 아니며 같은 값은 서로 다른 SchoolYear에서 재사용할 수 있다. 같은 SchoolYear 안에서는 중복될 수 없으므로 개념적으로 다음 DB invariant가 필요하다.
+
+```text
+UNIQUE (school_year_id, login_id)
+```
+
+예를 들어 다음 두 User는 서로 다른 사람이어도 정상이다.
+
+```text
+2025 / tara0411 / 김교사 / 4학년 11반
+2026 / tara0411 / 박교사 / 4학년 11반
+```
+
+같은 사람이 다음 학년도에도 근무하면 다음 학년도용 teacher User를 새로 발급한다. 이름, `login_id`, avatar나 profile 일치로 연도간 동일인을 자동 추론하거나 연결하지 않는다. 영구 Teacher identity와 annual account의 2계층은 starter target에 두지 않으며, 장기 동일인 연결은 이를 필요로 하는 downstream 서비스의 별도 확장이다.
+
+현재 `SchoolMembership`의 school, role과 grade 책임은 migration 기간에 compatibility structure로 남을 수 있지만 장기 target에서는 annual teacher User와 SchoolYear relation으로 흡수한다. Teacher User와 사실상 1:1인 annual membership model을 중복 유지하지 않는다.
+
+따라서 authentication code가 `find_by(login_id: "tara0411")`처럼 SchoolYear context 없는 global lookup을 해서는 안 된다. Teacher login entry point가 School context를 식별하고, active login에서는 그 School의 active SchoolYear를 자동으로 resolve한다.
+
+### Annual role과 account lifecycle
+
+Teacher User의 role, grade, school scope와 login credential은 해당 SchoolYear context에 속한다. 연도별 User는 독립된 account이므로 같은 사람이 2025에는 manager이고 2026에는 member일 수 있다.
+
+```text
+2025 account login → 2025 manager scope, archived read-only
+2026 account login → 2026 member scope, active-year 허용 범위에서 read/write
+```
+
+현재 역할로 과거 권한을 덮어쓰지 않는다. SchoolYear archive는 teacher User의 credential을 삭제하거나 account를 자동 inactive로 만들지 않는다. 반대로 account가 인증 가능하더라도 SchoolYear 상태가 허용하는 operation 범위를 넘을 수 없다. Teacher User 자체의 active/inactive account lifecycle은 SchoolYear status와 별개이며 구체 field 이전은 후속 spec에서 정한다.
+
+Annual role이 manager이면 자기 School 전체가 authority scope다. Manager가 담임을 함께 맡을 수는 있지만 school-wide authority는 자신의 Classroom authority보다 넓다. Archived manager account는 당시 자기 School 전체를 read-only로 열람하고, archived ordinary teacher account는 HomeroomAssignment로 확인되는 당시 담당 Classroom 범위만 read-only로 열람한다.
+
+과거 Classroom, HomeroomAssignment와 작성 기록은 해당 학년도의 teacher User를 그대로 참조한다. SchoolYear를 archive해도 그 User를 삭제하거나 다른 연도의 User로 교체하지 않으므로 당시 이름, annual role, grade, login account와 담임 이력을 그 학년도 context 안에서 보존한다.
+
+### 임시 비밀번호 lifecycle
+
+관리 권한이 있는 주체가 teacher User를 만들 때 예측하기 어려운 임시 비밀번호를 발급하고 강제 변경 상태를 설정한다.
+
+```text
+login_id
+temporary password
+password_change_required = true
+```
+
+교사는 최초 인증 성공 후 정상 application 사용 전에 본인 비밀번호를 변경해야 한다. 성공하면 강제 변경 상태를 해제하고 session fixation 방지를 위해 session을 rotation한다. planning teacher User는 credential 준비가 가능하지만 SchoolYear가 active가 되기 전에는 정상 runtime login을 허용하지 않는다.
+
+Active 또는 planning year의 teacher가 비밀번호를 잊으면 global admin 또는 자기 School의 current active-year manager가 허용된 범위에서 새 임시 비밀번호를 재발급할 수 있다. Archived teacher User도 global admin 또는 현재 해당 School의 active-year manager가 재발급할 수 있다. Manager는 다른 School의 account를 재발급할 수 없다.
+
+재발급은 기존 credential을 즉시 무효화하고 새 temporary credential과 강제 변경 상태로 교체한다. 기존 비밀번호는 누구도 조회할 수 없고 평문 temporary password는 DB에 저장하지 않는다. 누가, 언제, 어떤 account를 재발급했는지 감사 가능한 기록을 남긴다.
+
+임시 비밀번호와 재발급은 다음 보안 원칙을 따른다.
+
+- 평문 비밀번호를 DB column에 저장하지 않는다.
+- 일반 비밀번호와 동일하게 digest/encrypted credential만 저장한다.
+- 생성된 평문 임시 비밀번호는 발급 성공 시점에만 표시한다.
+- 기존 또는 현재 비밀번호를 조회하는 기능을 제공하지 않는다.
+- 충분히 예측하기 어려운 random 값을 사용하며 구체 형식은 authentication 구현 spec에서 정한다.
+- login brute-force/rate limiting을 적용한다.
+- password 발급·재발급을 민감한 운영 action으로 authorize하고 감사 가능하게 한다.
+
+Archived account의 본인 password 변경은 school-operation data mutation과 구분한다. 이를 SchoolYear가 archived라는 이유만으로 일괄 금지하지 않으며 구체 정책은 authentication spec에서 확정한다.
+
+### Authentication routing
+
+`UNIQUE (school_year_id, login_id)`만으로는 전역 login form이 account를 유일하게 찾을 수 없다. 서로 다른 School의 active year에도 같은 `login_id`가 존재할 수 있기 때문이다. 정상 lookup은 반드시 School context와 SchoolYear context를 포함해야 한다.
+
+Active-year login entry point는 School context를 이미 알고 있어야 한다. Server는 다음 순서로 account를 resolve한다.
+
+```text
+School → active SchoolYear → teacher User(login_id)
+```
+
+사용자는 `login_id + password`만 입력하며 SchoolYear를 선택하지 않는다. 예를 들어 active year가 2026이면 `tara0411`은 2026 account를 의미한다. 현재 학년도를 매번 선택시키거나 일상 login 화면에 반복 노출하지 않는다.
+
+Archived account login에는 School과 SchoolYear context를 명시한다. 기본 UX는 active login과 분리된 `지난 학년도 자료 보기` 진입점에서 과거 SchoolYear를 선택한 뒤 `login_id + password`를 입력하는 형태다. 앞선 예의 2025 `tara0411`을 사용하려면 이 archived flow에서 2025를 명시한다. 동등한 school/year-specific entry point도 가능하다.
+
+정확한 public School identifier와 URL 형식은 구현 단계에서 정한다. 이는 active login에서 SchoolYear를 선택할지에 관한 정책 문제가 아니라, entry point가 School scope를 안전하게 전달하는 routing 세부사항이다.
+
+현재의 전역 `/users/sign_in`과 Devise email lookup은 현행 구현이며 이 target을 그대로 만족하지 않는다. scoped Devise customization 또는 분리된 teacher authentication flow는 별도 구현 spec과 threat review 뒤 선택한다.
+
+## 담임 assignment history
+
+장기적으로 현재 담임과 과거 담임을 `HomeroomAssignment`로 표현한다.
+
+```text
+HomeroomAssignment
+├── classroom_id
+├── teacher_id
+├── started_on
+└── ended_on (nullable)
+```
+
+`teacher_id`는 Classroom과 같은 SchoolYear에 속한 teacher User를 참조한다. 영구 Teacher identity나 legacy SchoolMembership을 참조하지 않으며 teacher role User만 assignment할 수 있다.
+
+`ended_on IS NULL`인 row가 current assignment다. 다음 invariant를 model과 DB가 함께 방어한다.
+
+- 같은 Classroom에는 current assignment가 최대 하나다.
+- 같은 teacher User에는 current classroom이 최대 하나다.
+- Classroom과 teacher User는 같은 SchoolYear에 속한다.
+- `ended_on`은 `started_on`보다 빠를 수 없다.
+- 종료된 assignment는 보존하며 새 assignment가 과거 row를 덮어쓰지 않는다.
+- 담임 교체는 기존 assignment 종료와 새 assignment 시작을 한 transaction에서 수행한다.
+
+현재 `Classroom.teacher_id`는 HomeroomAssignment 이전 완료 후 제거 대상이다.
+
+## Student identity와 enrollment 방향
+
+장기적으로 학생 identity는 staff `User`에서 별도 `Student` 모델로 분리한다. Student는 Devise email/password credential이나 staff role을 갖지 않는다. 학생 선택, PIN, token과 session 안전장치는 Student 분리 뒤에도 유지한다. Student의 상세 identity/auth canonical은 별도 spec에서 확정한다.
+
+연도별 교실 소속은 `StudentEnrollment`가 담당한다.
+
+```text
+StudentEnrollment
+├── student_id
+├── classroom_id
+├── student_number
+└── status: active | inactive
+```
+
+Student 자체에 school year, grade나 classroom을 중복 저장하지 않는다. Classroom의 SchoolYear가 enrollment의 학년도 context다. 현재 student `ClassroomMembership`의 책임은 데이터 보존 검증 뒤 StudentEnrollment로 이전한다.
+
+한 Student는 같은 SchoolYear에 active enrollment를 최대 하나만 가진다. 같은 Classroom의 active enrollment 사이에서는 `student_number`가 중복될 수 없다. 번호는 교사가 관리하는 운영 정보이며 자동 증가값이나 immutable history identifier가 아니다.
+
+Enrollment의 `inactive`는 해당 학년도 중 전출 또는 운영 제외를 뜻한다. 학년도 종료는 enrollment에 `archived`를 반복 기록하지 않고 `SchoolYear.status == archived`로 표현한다.
+
+## Archive와 read-only
+
+SchoolYear archive는 하위 row를 삭제하거나 일괄 inactive로 바꾸는 작업이 아니다. archived year 아래에서 다음 mutation은 기본적으로 금지한다.
+
+- Classroom 생성·수정·삭제와 lifecycle 변경
+- grade와 class_label 변경
+- HomeroomAssignment 추가·교체·종료
+- StudentEnrollment 생성·수정·status 및 student_number 변경
+- 학생 login token 재발급
+- teacher User의 annual authority와 manager role 변경
+
+정책과 domain operation이 SchoolYear 상태를 서버에서 최종 확인한다. UI를 숨기는 것만으로 read-only를 보장하지 않는다.
+
+Teacher User의 인증 credential과 account profile은 SchoolYear 하위 school-operation data와 구분한다. Archived account의 당시 role/scope는 read-only 열람 권한을 결정하지만 classroom, student, 담임이나 manager data를 변경할 권한은 주지 않는다.
+
+## 학년도 rollover
+
+정상 rollover는 하나의 명시적 domain operation이다.
+
+```text
+기존 active SchoolYear  → archived
+준비된 planning SchoolYear → active
+```
+
+Rollover는 global admin만 수행한다. 명시적 confirmation, 적절한 aggregate locking과 active/planning invariant 재검증 뒤 두 상태를 한 transaction에서 원자적으로 변경한다. 실패하면 기존 active year를 유지한다. 일반 operation에서는 destination planning year 없이 active year만 archive하여 정상 학교가 current year를 잃게 하지 않는다.
+
+Rollover는 다음을 자동 수행하지 않는다.
+
+- 학생 진급이나 enrollment 복사
+- 이전 SchoolYear teacher User의 다음 SchoolYear 자동 복제·자동 승계
+- classroom 복사
+- 담임 재배정
+- Student identity 복제
+
+필요한 다음 학년도 구성은 planning 단계에서 명시적으로 준비한다. 다음 SchoolYear의 teacher User도 이 단계에서 별도로 생성한다. Classroom이나 담임이 없는 planning year도 준비 중에는 허용한다. active 전환 전 최소 readiness validation은 active School, destination planning year의 유효성 및 source active year 일치를 포함하며, 모든 반·담임·학생이 채워졌음을 강제하지 않는다.
+
+전환이 성공하면 old-year teacher User는 archived read-only login context가 되고, planning에서 준비한 new-year teacher User는 active runtime login 대상이 된다. School manager는 planning data를 준비할 수 있어도 rollover를 실행할 수 없다.
+
+## 권한과 접근 경계
+
+권한은 `role × School scope × SchoolYear status`로 판단한다. Role만으로 다른 School이나 다른 상태의 mutation 권한을 얻을 수 없다.
+
+- global admin은 모든 School의 SchoolYear를 관리하고 archived 자료를 열람한다. SchoolYear 최종 rollover, manager 지정·교체·해제와 cross-school/system recovery는 global admin만 수행한다.
+- current active-year manager는 자기 School 전체의 Classroom, teacher User, StudentEnrollment와 운영 현황을 조회하고 각 기능 spec이 허용한 mutation을 수행한다. 담임 assignment 관리와 학교 전체 집계·통계·보고서도 이 school-wide scope에 포함된다.
+- current active-year manager는 자기 School의 planning SchoolYear를 생성·준비할 수 있다. Teacher User와 임시 비밀번호 준비, bulk bootstrap, Classroom 및 grade/class_label 구성, 담임과 StudentEnrollment 편성을 포함할 수 있지만 planning teacher/student runtime operation과 rollover는 수행할 수 없다.
+- current active-year manager는 자기 School의 archived SchoolYears를 school-wide read-only로 조회할 수 있다. 이는 과거 role이 아니라 현재 학교 운영 책임에서 나오는 authority이며 다른 School에는 적용되지 않는다.
+- archived manager User는 명시적인 year login context에서 당시 자기 School 전체를 read-only로 열람한다. Archived ordinary teacher User는 당시 실제 담당했던 Classroom 범위만 read-only로 열람한다.
+- 같은 사람이 2025 manager, 2026 ordinary teacher인 경우 각 annual account는 독립된 scope를 가진다. 2026 account의 현재 role로 2025 account의 historical authority를 덮어쓰지 않는다.
+- archived account는 teacher·student·classroom·담임·manager 등 school-operation data를 변경할 수 없다.
+- archived 자료의 화면 조회, 필터·검색, 집계·통계·보고서와 source data를 변경하지 않는 export는 read operation이다. Starter는 학급·teacher·student·enrollment 현황 같은 공통 지표만 정의하며 서비스별 metric은 downstream domain이 추가한다.
+- 학생 login은 active School, active SchoolYear, active Classroom, active StudentEnrollment를 모두 요구한다.
+- planning/archived year에서는 학생 token/PIN login을 허용하지 않는다. Teacher archived login과 혼동하지 않는다.
+- 기존 PIN throttling, classroom token과 student session TTL 경계를 유지한다.
+- manager에게 `/admin/*`를 개방하지 않으며 URL과 parameter 조작으로 school/year scope를 넓힐 수 없다.
+
+## Bulk bootstrap 영역
+
+`/teachers`와 `/classrooms`는 현재 active year의 일상적인 개별 운영 surface다.
+
+`/admin/teachers`는 장기적으로 global admin의 planning SchoolYear teacher User bulk bootstrap을 담당한다. 이름과 `login_id`, 임시 비밀번호, annual grade/role과 구성 상태를 관리하며 manager 지정은 global admin authority로 유지한다. 각 새 User는 임시 credential과 강제 password 변경 상태로 시작한다.
+
+`/admin/classrooms`는 장기적으로 global admin의 planning-year classroom bootstrap을 담당한다. grade와 class_label 일괄 구성, 담임 배정과 중복·누락 검증을 지원할 수 있다.
+
+학교 manager에게 `/admin/*` 권한을 주지 않는다. Manager용 active-year school-wide operation과 planning bootstrap은 일반 school-operations namespace 안에서 자기 School로 제한한다. 두 surface가 같은 backend operation을 공유할 수 있지만 authorization entry point는 분리한다. 구체 route와 UI는 후속 spec에서 정한다.
+
+## 데이터 무결성 invariants
+
+- School 안의 `SchoolYear.year`는 유일하다.
+- School당 active SchoolYear는 최대 하나다.
+- School당 planning SchoolYear는 최대 하나다.
+- 같은 SchoolYear의 `login_id`는 중복될 수 없고 다른 SchoolYear에서는 재사용할 수 있다.
+- SchoolYear당 manager role의 teacher User는 최대 하나다.
+- Classroom은 정확히 하나의 SchoolYear에 속한다.
+- 같은 SchoolYear의 `grade + normalized class_label`은 유일하다.
+- current HomeroomAssignment는 Classroom당 최대 하나, teacher User당 최대 하나다.
+- HomeroomAssignment의 teacher User와 Classroom은 같은 SchoolYear다.
+- Student는 같은 SchoolYear에 active StudentEnrollment를 최대 하나 가진다.
+- 같은 Classroom의 active enrollment끼리 student_number가 중복될 수 없다.
+- archived SchoolYear 하위 운영 data는 mutation할 수 없다.
+- 학생 정상 login은 School, SchoolYear, Classroom과 enrollment가 모두 active여야 한다.
+- planning teacher User는 정상 runtime login에 사용할 수 없다.
+- archived teacher User의 school-operation 권한은 당시 role/scope 안의 read-only로 제한한다.
+- current active-year manager는 자기 School의 archived SchoolYears를 school-wide read-only로 열람할 수 있다.
+- rollover는 global admin만 원자적으로 수행한다.
+
+## UI/context 원칙
+
+- active year 안의 일상 화면에서는 학년도를 이름마다 반복하지 않는다.
+- active-year teacher login은 SchoolYear selector 없이 `login_id + password`만 받는다.
+- archived login은 SchoolYear context를 명시하고 archived 화면 상위에 해당 학년도와 읽기 전용 상태를 표시한다.
+- year selector, planning 구성, archived 조회와 여러 연도 비교처럼 필요한 context에서만 학년도를 표시한다.
+- planning과 archived 화면은 상위 context에 학년도와 상태를 명확히 표시한다.
+- archived 화면은 읽기 전용임을 한 번 분명히 표시하고 mutation control을 노출하지 않는다.
+- `class_label` 저장값에는 `반`을 포함하지 않고 presentation layer가 suffix를 붙인다.
+- 과거 자료의 표시 가능성과 실제 접근 권한을 혼동하지 않는다.
+
+## Non-goals
+
+- migration과 backfill 구현
+- Student 분리와 인증 구현
+- SchoolYear, HomeroomAssignment, StudentEnrollment model 구현
+- route, controller, view와 bulk UI 구현
+- 자동 진급, 자동 복사와 다음 학년 계산
+- 학기 모델
+- 학교 이동, 졸업과 상세 학생 history 정책
+- 연도간 동일 teacher identity 연결
+- 특정 성장·칭찬·투표 서비스 도메인
+- archived data의 물리 삭제
+
+## Open questions
+
+현재 SchoolYear architecture 수준에서 미해결된 핵심 정책은 없다.
+
+Migration ordering, 정확한 column 이름, authentication controller와 route, temporary password 형식, rate-limit 수치, audit event schema와 historical UI 세부사항은 각 implementation phase의 별도 spec에서 결정한다.
+
+## 예상 구현 단계
+
+1. Phase 1 — SchoolYear foundation: model, status와 school/year 및 active-year DB invariant
+2. Phase 2 — annual teacher User schema와 scoped authentication migration spec
+3. Phase 3 — `login_id`, temporary-password login, 강제 변경, 재발급과 rate limiting
+4. Phase 4 — Classroom의 `school_year_id`, `class_label`과 연도별 uniqueness
+5. Phase 5 — HomeroomAssignment history 도입과 `Classroom.teacher_id` 이전
+6. Phase 6 — Student/User identity 분리와 별도 Student authentication
+7. Phase 7 — StudentEnrollment 도입과 student ClassroomMembership 이전
+8. Phase 8 — planning-year teacher/classroom bulk bootstrap
+9. Phase 9 — manager의 school-wide authorization
+10. Phase 10 — global-admin rollover와 archived read-only enforcement
+11. Phase 11 — archived account login, historical reporting과 context UI
+12. Phase 12 — legacy SchoolMembership과 teacher ClassroomMembership residue 제거
+13. Phase 13 — authorization/security와 fresh-DB audit
+
+SchoolYear foundation을 먼저 두어 이후 annual teacher User, Classroom과 enrollment가 최종 FK를 한 번만 도입하게 한다. Teacher User schema와 scoped authentication을 Classroom/Homeroom 이전보다 먼저 확정해 credential과 authorization FK를 다시 옮기지 않는다. Temporary-password flow를 bulk bootstrap보다 먼저 구현해 생성된 User가 즉시 안전한 lifecycle을 따르게 한다. Classroom을 SchoolYear에 귀속한 뒤 HomeroomAssignment와 StudentEnrollment를 연결하며, rollover는 모든 하위 read-only 경계가 준비된 마지막 단계에서 활성화한다.
