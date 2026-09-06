@@ -459,7 +459,8 @@ RSpec.describe 'Admin teachers', type: :request do
                      annual_school_role: 'manager')
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
-    student = create(:user, :student)
+    student_classroom = create(:classroom)
+    student = create(:student, classroom: student_classroom, student_pin: '1234')
 
     sign_in admin
     get schools_path
@@ -488,8 +489,14 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).not_to include(school_teachers_path(manager_school))
     expect(response.body).not_to include(school_path(manager_school))
 
-    sign_in student
-    get user_path(student)
+    post public_student_login_path(student_login_token: student_classroom.student_login_token),
+         params: {
+           student_id: student.id,
+           student_pin: '1234'
+         }
+    get student_profile_path
+
+    expect(response).to have_http_status(:ok)
     expect(response.body).not_to include(admin_teachers_path)
   end
 

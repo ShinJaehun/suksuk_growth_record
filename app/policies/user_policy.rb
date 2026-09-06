@@ -14,19 +14,7 @@ class UserPolicy < ApplicationPolicy
   end
 
   def show?
-    return true if user&.admin?
-
-    if user&.active_teacher?
-      return true if user == record
-
-      # 담임인 반 학생들 정보만 조회 가능
-      classroom = user.assigned_classroom
-      return classroom&.active? && classroom.school_year.active? &&
-        classroom.school_year.school.active? &&
-        ClassroomMembership.exists?(user_id: record.id, classroom_id: classroom.id, role: "student")
-    end
-    # 학생은 본인만
-    user&.student? && user.id == record.id
+    user&.admin? || (user&.active_teacher? && user == record)
   end
 
   # Admin 영역에서 교사 계정 수정 권한
@@ -36,29 +24,6 @@ class UserPolicy < ApplicationPolicy
 
   def update?
     user&.admin? && record.teacher?
-  end
-
-  def manage_own_student_pin?
-    user&.student? && record.student? && user.id == record.id
-  end
-
-  def destroy_student?
-    return false unless record.student?
-    return true if user&.admin?
-    return false unless user&.active_teacher?
-
-    classroom = user.assigned_classroom
-    classroom&.active? && classroom.school_year.active? &&
-      classroom.school_year.school.active? &&
-      ClassroomMembership.exists?(user_id: record.id, classroom_id: classroom.id, role: "student")
-  end
-
-  def manage_student_account?
-    destroy_student?
-  end
-
-  def manage_student_password?
-    destroy_student?
   end
 
   def deactivate_teacher?

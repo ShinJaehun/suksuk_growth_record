@@ -1,6 +1,5 @@
 class Users::RegistrationsController < Devise::RegistrationsController
   before_action :disable_public_registration!, only: %i[new create]
-  before_action :redirect_student_self_account_edit!, only: [:edit, :update, :edit_password, :update_password]
   before_action :set_account_avatar_keys, only: [:edit, :update]
   before_action :authenticate_scope!, only: [:edit_password, :update_password]
 
@@ -56,12 +55,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
     redirect_to new_user_session_path,
       alert: I18n.t("users.registrations.public_registration_disabled"),
       status: :see_other
-  end
-
-  def redirect_student_self_account_edit!
-    return unless current_user&.student?
-
-    redirect_to user_path(current_user), alert: "학생 계정 정보는 선생님에게 요청해 주세요. PIN은 PIN 변경 페이지에서 바꿀 수 있습니다."
   end
 
   def set_account_avatar_keys
