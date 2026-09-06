@@ -2,18 +2,16 @@ class ClassroomPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
       active_scope = scope.joins(school_year: :school)
-        .merge(SchoolYear.active)
-        .merge(School.active)
+                          .merge(SchoolYear.active)
+                          .merge(School.active)
       return active_scope if admin?
 
-      if teacher? && user.school_manager?
-        return active_scope.where(school_year_id: user.school_year_id)
-      end
+      return active_scope.where(school_year_id: user.school_year_id) if teacher? && user.school_manager?
 
       # Teachers can see only their classrooms
       if teacher?
         return active_scope.joins(:current_homeroom_assignment)
-          .where(homeroom_assignments: { teacher_id: user.id }, active: true)
+                           .where(homeroom_assignments: { teacher_id: user.id }, active: true)
       end
 
       # Students can see only their classrooms
@@ -21,12 +19,6 @@ class ClassroomPolicy < ApplicationPolicy
         return scope.none unless user.active?
 
         return active_scope.where(id: user.classroom_id, active: true)
-      end
-
-      if student?
-        return active_scope.joins(:classroom_memberships)
-                    .where(classroom_memberships: { user_id: user.id, role: 'student', status: 'active' })
-                    .distinct
       end
 
       scope.none
@@ -120,7 +112,7 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def teacher_of?(classroom)
-    return false unless user&.active_teacher?
+    return false unless user.is_a?(User) && user.active_teacher?
 
     classroom.teacher == user
   end
@@ -135,13 +127,7 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def student_of?(classroom)
-    if user.is_a?(Student)
-      return user.active? && classroom.id == user.classroom_id && classroom.active? &&
-        classroom.school_year.active? && classroom.school_year.school.active?
-    end
-
-    return false unless user.is_a?(User) && user.student?
-
-    classroom.classroom_memberships.exists?(user_id: user.id, role: 'student', status: 'active')
+    user.is_a?(Student) && user.active? && classroom.id == user.classroom_id && classroom.active? &&
+      classroom.school_year.active? && classroom.school_year.school.active?
   end
 end

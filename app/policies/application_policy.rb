@@ -43,7 +43,7 @@ class ApplicationPolicy
   end
 
   def student?
-    user.is_a?(Student) || (user.is_a?(User) && user.student?)
+    user.is_a?(Student)
   end
 
   class Scope
@@ -69,7 +69,7 @@ class ApplicationPolicy
     end
 
     def student?
-      user.is_a?(Student) || (user.is_a?(User) && user.student?)
+      user.is_a?(Student)
     end
   end
 end

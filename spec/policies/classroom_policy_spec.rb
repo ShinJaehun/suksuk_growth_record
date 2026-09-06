@@ -33,11 +33,11 @@ RSpec.describe ClassroomPolicy do
       expect(Pundit.policy_scope!(teacher, Classroom)).to contain_exactly(assigned_classroom)
     end
 
-    it "keeps the student membership scope" do
+    it "does not grant classroom scope to a legacy student User" do
       student = create(:user, :student)
       create(:classroom_membership, classroom: classroom, user: student, role: :student)
 
-      expect(Pundit.policy_scope!(student, Classroom)).to contain_exactly(classroom)
+      expect(Pundit.policy_scope!(student, Classroom)).to be_empty
     end
 
     it "returns only the Student actor's active classroom" do
@@ -52,7 +52,7 @@ RSpec.describe ClassroomPolicy do
       expect(Pundit.policy_scope!(student, Classroom)).to be_empty
     end
 
-    it "excludes classrooms with only an inactive student membership" do
+    it "does not grant classroom scope to a legacy student User with an inactive membership" do
       student = create(:user, :student)
       create(:classroom_membership, classroom: classroom, user: student, role: :student, status: :inactive)
 
@@ -108,11 +108,11 @@ RSpec.describe ClassroomPolicy do
       expect(described_class.new(manager, classroom).view_student_data?).to eq(true)
     end
 
-    it "permits a student member of the classroom" do
+    it "does not grant student-data access to a legacy student User" do
       student = create(:user, :student)
       create(:classroom_membership, classroom: classroom, user: student, role: "student")
 
-      expect(described_class.new(student, classroom).view_student_data?).to eq(true)
+      expect(described_class.new(student, classroom).view_student_data?).to eq(false)
     end
 
     it "permits an active Student actor only in its operational classroom" do
@@ -202,7 +202,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "rejects an unassigned teacher, student, and guest" do
-      users = [annual_teacher(school: school), create(:user, :student), nil]
+      users = [annual_teacher(school: school), create(:student, classroom: classroom), nil]
 
       users.each do |user|
         policy = described_class.new(user, classroom)
@@ -239,9 +239,8 @@ RSpec.describe ClassroomPolicy do
 
     it "rejects ordinary teachers and students" do
       teacher = annual_teacher(school: school, grade: active_classroom.grade)
-      student = create(:user, :student)
+      student = create(:student, classroom: active_classroom)
       assign_teacher(active_classroom, teacher)
-      create(:classroom_membership, classroom: active_classroom, user: student, role: :student)
 
       [teacher, student].each do |user|
         expect(described_class.new(user, active_classroom).deactivate?).to eq(false)
@@ -300,7 +299,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "rejects a student" do
-      expect(described_class.new(create(:user, :student), classroom).destroy?).to eq(false)
+      expect(described_class.new(create(:student, classroom: classroom), classroom).destroy?).to eq(false)
     end
 
     it "rejects a guest" do
