@@ -15,7 +15,7 @@
 - 정상 운영은 active SchoolYear에서만 이루어진다.
 - archived SchoolYear는 하위 운영 데이터를 보존하는 read-only 경계다.
 - 상위 SchoolYear 상태를 하위 row마다 중복 저장하지 않는다.
-- account lifecycle, `SchoolYear.status`, `Classroom.active`, enrollment status는 서로 다른 lifecycle이다.
+- account lifecycle, `SchoolYear.status`, `Classroom.active`, `Student.active`는 서로 다른 lifecycle이다.
 - 현재 학년도 화면에는 학년도를 반복 표시하지 않고 context가 바뀌거나 여러 연도를 구별할 때만 표시한다.
 - 다음 학년도 구성은 planning 단계에서 명시적으로 준비하며 자동 복사·진급하지 않는다.
 
@@ -45,10 +45,10 @@ School
     ├── teacher Users
     └── Classroom
         ├── HomeroomAssignment ── teacher User
-        └── StudentEnrollment ── Student
+        └── Student
 ```
 
-현재 `SchoolMembership`, `Classroom.teacher_id`와 student `ClassroomMembership`은 전환 기간의 source이며 장기 canonical은 아니다. 목표 관계로 안전하게 이전된 뒤 연도별 teacher authority, 현재 담임과 학생 재학 관계의 책임을 각각 teacher User, HomeroomAssignment와 StudentEnrollment에 넘긴다.
+현재 student `ClassroomMembership`은 전환 기간의 source이며 장기 canonical은 아니다. 이전 뒤 학생 소속과 lifecycle 책임은 Classroom에 직접 속한 Student가 가진다.
 
 ## SchoolYear lifecycle
 
@@ -78,7 +78,7 @@ School 생성이나 초기 bootstrap 중에는 active year가 0개일 수 있다
 ### active
 
 - 해당 학교의 현재 정상 운영 context다.
-- active School, active Classroom과 active enrollment 등 하위 lifecycle 조건을 함께 만족해야 실제 운영할 수 있다.
+- active School, active Classroom과 active Student 등 하위 lifecycle 조건을 함께 만족해야 실제 운영할 수 있다.
 - active year가 있다는 이유만으로 inactive School이나 Classroom을 우회하지 않는다.
 
 ### archived
@@ -255,25 +255,11 @@ HomeroomAssignment
 
 현재 `Classroom.teacher_id`는 HomeroomAssignment 이전 완료 후 제거 대상이다.
 
-## Student identity와 enrollment 방향
+## Student identity와 소속 방향
 
-장기적으로 학생 identity는 staff `User`에서 별도 `Student` 모델로 분리한다. Student는 Devise email/password credential이나 staff role을 갖지 않는다. 학생 선택, PIN, token과 session 안전장치는 Student 분리 뒤에도 유지한다. Student의 상세 identity/auth canonical은 별도 spec에서 확정한다.
+학생은 staff `User`에서 분리된 별도 `Student`이며 특정 Classroom에 직접 속한다. Devise credential이나 staff role을 갖지 않고 Classroom token, 학생 선택, PIN과 별도 Rails session context로 인증한다.
 
-연도별 교실 소속은 `StudentEnrollment`가 담당한다.
-
-```text
-StudentEnrollment
-├── student_id
-├── classroom_id
-├── student_number
-└── status: active | inactive
-```
-
-Student 자체에 school year, grade나 classroom을 중복 저장하지 않는다. Classroom의 SchoolYear가 enrollment의 학년도 context다. 현재 student `ClassroomMembership`의 책임은 데이터 보존 검증 뒤 StudentEnrollment로 이전한다.
-
-한 Student는 같은 SchoolYear에 active enrollment를 최대 하나만 가진다. 같은 Classroom의 active enrollment 사이에서는 `student_number`가 중복될 수 없다. 번호는 교사가 관리하는 운영 정보이며 자동 증가값이나 immutable history identifier가 아니다.
-
-Enrollment의 `inactive`는 해당 학년도 중 전출 또는 운영 제외를 뜻한다. 학년도 종료는 enrollment에 `archived`를 반복 기록하지 않고 `SchoolYear.status == archived`로 표현한다.
+Student는 학년도 간 이어지는 장기 identity가 아니다. 다음 학년도에는 새 Classroom에 새 Student를 등록하며 서로 연결하지 않는다. `student_number`, active/inactive와 PIN digest도 Student가 직접 가진다. `StudentEnrollment`는 만들지 않는다. 상세 계약은 [`student_model_migration.md`](student_model_migration.md)를 따른다.
 
 ## Archive와 read-only
 
@@ -282,7 +268,7 @@ SchoolYear archive는 하위 row를 삭제하거나 일괄 inactive로 바꾸는
 - Classroom 생성·수정·삭제와 lifecycle 변경
 - grade와 class_label 변경
 - HomeroomAssignment 추가·교체·종료
-- StudentEnrollment 생성·수정·status 및 student_number 변경
+- Student 생성·수정, active 상태 및 student_number 변경
 - 학생 login token 재발급
 - teacher User의 annual authority와 manager role 변경
 
@@ -303,11 +289,11 @@ Rollover는 global admin만 수행한다. 명시적 confirmation, 적절한 aggr
 
 Rollover는 다음을 자동 수행하지 않는다.
 
-- 학생 진급이나 enrollment 복사
+- 학생 진급이나 Student 복사
 - 이전 SchoolYear teacher User의 다음 SchoolYear 자동 복제·자동 승계
 - classroom 복사
 - 담임 재배정
-- Student identity 복제
+- 이전 학년도 Student 연결
 
 필요한 다음 학년도 구성은 planning 단계에서 명시적으로 준비한다. 다음 SchoolYear의 teacher User도 이 단계에서 별도로 생성한다. Classroom이나 담임이 없는 planning year도 준비 중에는 허용한다. active 전환 전 최소 readiness validation은 active School, destination planning year의 유효성 및 source active year 일치를 포함하며, 모든 반·담임·학생이 채워졌음을 강제하지 않는다.
 
@@ -318,14 +304,14 @@ Rollover는 다음을 자동 수행하지 않는다.
 권한은 `role × School scope × SchoolYear status`로 판단한다. Role만으로 다른 School이나 다른 상태의 mutation 권한을 얻을 수 없다.
 
 - global admin은 모든 School의 SchoolYear를 관리하고 archived 자료를 열람한다. SchoolYear 최종 rollover, manager 지정·교체·해제와 cross-school/system recovery는 global admin만 수행한다.
-- current active-year manager는 자기 School 전체의 Classroom, teacher User, StudentEnrollment와 운영 현황을 조회하고 각 기능 spec이 허용한 mutation을 수행한다. 담임 assignment 관리와 학교 전체 집계·통계·보고서도 이 school-wide scope에 포함된다.
-- current active-year manager는 자기 School의 planning SchoolYear를 생성·준비할 수 있다. Teacher User와 임시 비밀번호 준비, bulk bootstrap, Classroom 및 grade/class_label 구성, 담임과 StudentEnrollment 편성을 포함할 수 있지만 planning teacher/student runtime operation과 rollover는 수행할 수 없다.
+- current active-year manager는 자기 School 전체의 Classroom, teacher User, Student와 운영 현황을 조회하고 각 기능 spec이 허용한 mutation을 수행한다. 담임 assignment 관리와 학교 전체 집계·통계·보고서도 이 school-wide scope에 포함된다.
+- current active-year manager는 자기 School의 planning SchoolYear를 생성·준비할 수 있다. Teacher User와 임시 비밀번호 준비, Classroom 구성, 담임과 Student 명단 준비를 포함할 수 있지만 planning teacher/student runtime operation과 rollover는 수행할 수 없다.
 - current active-year manager는 자기 School의 archived SchoolYears를 school-wide read-only로 조회할 수 있다. 이는 과거 role이 아니라 현재 학교 운영 책임에서 나오는 authority이며 다른 School에는 적용되지 않는다.
 - archived manager User는 명시적인 year login context에서 당시 자기 School 전체를 read-only로 열람한다. Archived ordinary teacher User는 당시 실제 담당했던 Classroom 범위만 read-only로 열람한다.
 - 같은 사람이 2025 manager, 2026 ordinary teacher인 경우 각 annual account는 독립된 scope를 가진다. 2026 account의 현재 role로 2025 account의 historical authority를 덮어쓰지 않는다.
 - archived account는 teacher·student·classroom·담임·manager 등 school-operation data를 변경할 수 없다.
-- archived 자료의 화면 조회, 필터·검색, 집계·통계·보고서와 source data를 변경하지 않는 export는 read operation이다. Starter는 학급·teacher·student·enrollment 현황 같은 공통 지표만 정의하며 서비스별 metric은 downstream domain이 추가한다.
-- 학생 login은 active School, active SchoolYear, active Classroom, active StudentEnrollment를 모두 요구한다.
+- archived 자료의 화면 조회, 필터·검색, 집계·통계·보고서와 source data를 변경하지 않는 export는 read operation이다. Starter는 학급·teacher·student 현황 같은 공통 지표만 정의하며 서비스별 metric은 downstream domain이 추가한다.
+- 학생 login은 active School, active SchoolYear, active Classroom, active Student를 모두 요구한다.
 - planning/archived year에서는 학생 token/PIN login을 허용하지 않는다. Teacher archived login과 혼동하지 않는다.
 - 기존 PIN throttling, classroom token과 student session TTL 경계를 유지한다.
 - manager에게 `/admin/*`를 개방하지 않으며 URL과 parameter 조작으로 school/year scope를 넓힐 수 없다.
@@ -351,10 +337,10 @@ Rollover는 다음을 자동 수행하지 않는다.
 - 같은 SchoolYear의 `grade + normalized class_label`은 유일하다.
 - current HomeroomAssignment는 Classroom당 최대 하나, teacher User당 최대 하나다.
 - HomeroomAssignment의 teacher User와 Classroom은 같은 SchoolYear다.
-- Student는 같은 SchoolYear에 active StudentEnrollment를 최대 하나 가진다.
-- 같은 Classroom의 active enrollment끼리 student_number가 중복될 수 없다.
+- Student는 정확히 하나의 Classroom에 속한다.
+- 같은 Classroom의 active Student끼리 student_number가 중복될 수 없다.
 - archived SchoolYear 하위 운영 data는 mutation할 수 없다.
-- 학생 정상 login은 School, SchoolYear, Classroom과 enrollment가 모두 active여야 한다.
+- 학생 정상 login은 School, SchoolYear, Classroom과 Student가 모두 active여야 한다.
 - planning teacher User는 정상 runtime login에 사용할 수 없다.
 - archived teacher User의 school-operation 권한은 당시 role/scope 안의 read-only로 제한한다.
 - current active-year manager는 자기 School의 archived SchoolYears를 school-wide read-only로 열람할 수 있다.
@@ -375,7 +361,7 @@ Rollover는 다음을 자동 수행하지 않는다.
 
 - migration과 backfill 구현
 - Student 분리와 인증 구현
-- SchoolYear, HomeroomAssignment, StudentEnrollment model 구현
+- SchoolYear, HomeroomAssignment와 Student model 구현
 - route, controller, view와 bulk UI 구현
 - 자동 진급, 자동 복사와 다음 학년 계산
 - 학기 모델
@@ -397,13 +383,12 @@ Migration ordering, 정확한 column 이름, authentication controller와 route,
 3. Phase 3 — `login_id`, temporary-password login, 강제 변경, 재발급과 rate limiting
 4. Phase 4 — Classroom의 `school_year_id`, `class_label`과 연도별 uniqueness
 5. Phase 5 — HomeroomAssignment history 도입과 `Classroom.teacher_id` 이전
-6. Phase 6 — Student/User identity 분리와 별도 Student authentication
-7. Phase 7 — StudentEnrollment 도입과 student ClassroomMembership 이전
-8. Phase 8 — planning-year teacher/classroom bulk bootstrap
-9. Phase 9 — manager의 school-wide authorization
-10. Phase 10 — global-admin rollover와 archived read-only enforcement
-11. Phase 11 — archived account login, historical reporting과 context UI
-12. Phase 12 — legacy SchoolMembership과 teacher ClassroomMembership residue 제거
-13. Phase 13 — authorization/security와 fresh-DB audit
+6. Phase 6 — Student 도입, student ClassroomMembership 이전과 별도 Student authentication
+7. Phase 7 — planning-year teacher/classroom bulk bootstrap
+8. Phase 8 — manager의 school-wide authorization
+9. Phase 9 — global-admin rollover와 archived read-only enforcement
+10. Phase 10 — archived account login, historical reporting과 context UI
+11. Phase 11 — legacy residue 제거
+12. Phase 12 — authorization/security와 fresh-DB audit
 
-SchoolYear foundation을 먼저 두어 이후 annual teacher User, Classroom과 enrollment가 최종 FK를 한 번만 도입하게 한다. Teacher User schema와 scoped authentication을 Classroom/Homeroom 이전보다 먼저 확정해 credential과 authorization FK를 다시 옮기지 않는다. Temporary-password flow를 bulk bootstrap보다 먼저 구현해 생성된 User가 즉시 안전한 lifecycle을 따르게 한다. Classroom을 SchoolYear에 귀속한 뒤 HomeroomAssignment와 StudentEnrollment를 연결하며, rollover는 모든 하위 read-only 경계가 준비된 마지막 단계에서 활성화한다.
+SchoolYear foundation을 먼저 두어 이후 annual teacher User와 Classroom이 최종 FK를 한 번만 도입하게 한다. Teacher User schema와 scoped authentication을 Classroom/Homeroom 이전보다 먼저 확정해 credential과 authorization FK를 다시 옮기지 않는다. Classroom을 SchoolYear에 귀속한 뒤 HomeroomAssignment와 Student를 연결하며, rollover는 모든 하위 read-only 경계가 준비된 마지막 단계에서 활성화한다.
