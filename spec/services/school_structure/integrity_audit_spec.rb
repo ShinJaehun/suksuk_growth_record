@@ -85,18 +85,17 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     )
   end
 
-  it 'finds student classroom memberships whose user is not a student' do
+  it 'allows suppressing samples without changing the total issue count' do
+    school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
-                     annual_school: create(:school))
-    membership = build(:classroom_membership, user: teacher, role: 'student')
-    membership.save!(validate: false)
+                     annual_school: school, annual_grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 5)
+    assign_without_validation(classroom, teacher)
 
-    result = described_class.call
+    result = described_class.call(sample_limit: 0)
 
-    expect(result.count_for(:role_mismatch)).to eq(1)
-    expect(result.samples_for(:role_mismatch)).to include(
-      include('classroom_membership_id' => membership.id, 'user_id' => teacher.id)
-    )
+    expect(result.count_for(:teacher_classroom_grade_mismatch)).to eq(1)
+    expect(result.samples_for(:teacher_classroom_grade_mismatch)).to be_empty
   end
 
   it 'finds an inactive teacher assignment' do
@@ -117,8 +116,8 @@ RSpec.describe SchoolStructure::IntegrityAudit do
 
   it 'finds an assignment whose user is not a teacher' do
     classroom = create(:classroom)
-    student = create(:user, :student)
-    assign_without_validation(classroom, student)
+    admin = create(:user, :admin)
+    assign_without_validation(classroom, admin)
 
     result = described_class.call
 

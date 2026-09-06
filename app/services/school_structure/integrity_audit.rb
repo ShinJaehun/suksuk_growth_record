@@ -4,7 +4,6 @@ module SchoolStructure
     MAX_SAMPLE_LIMIT = 1_000
 
     ISSUE_LABELS = {
-      role_mismatch: 'role mismatch',
       teacher_without_school: 'teacher without school',
       teacher_classroom_school_mismatch: 'teacher/classroom school mismatch',
       teacher_classroom_grade_mismatch: 'teacher/classroom grade mismatch',
@@ -46,7 +45,6 @@ module SchoolStructure
     def call
       Result.new(
         issues: {
-          role_mismatch: issue(role_mismatch_scope),
           teacher_without_school: issue(
             teacher_without_school_scope,
             sample_scope: classroom_assignment_sample_scope(teacher_without_school_scope)
@@ -83,22 +81,6 @@ module SchoolStructure
 
     attr_reader :sample_limit
 
-    def classroom_membership_scope
-      ClassroomMembership
-        .joins(:user, :classroom)
-    end
-
-    def classroom_sample_scope(scope)
-      scope.select(
-        'classroom_memberships.id AS classroom_membership_id',
-        'classroom_memberships.user_id AS user_id',
-        'classroom_memberships.classroom_id AS classroom_id',
-        'classrooms.school_year_id AS classroom_school_year_id',
-        'classroom_memberships.role AS role',
-        'classroom_memberships.student_number AS student_number'
-      )
-    end
-
     def classroom_assignment_sample_scope(scope)
       scope.select(
         'homeroom_assignments.id AS homeroom_assignment_id',
@@ -109,11 +91,6 @@ module SchoolStructure
         'users.grade AS teacher_grade',
         'classrooms.grade AS classroom_grade'
       )
-    end
-
-    def role_mismatch_scope
-      classroom_membership_scope.where(classroom_memberships: { role: 'student' })
-                                .where.not(users: { role: 'student' })
     end
 
     def assignment_identity_sample_scope(scope)
@@ -161,7 +138,7 @@ module SchoolStructure
                         .where(teacher_id: HomeroomAssignment.current.group(:teacher_id).having('COUNT(*) > 1').select(:teacher_id))
     end
 
-    def issue(scope, sample_scope: classroom_sample_scope(scope))
+    def issue(scope, sample_scope:)
       Issue.new(
         count: scope.except(:select, :order).count,
         samples: sample_attributes(sample_scope)
