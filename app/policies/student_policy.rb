@@ -10,6 +10,12 @@ class StudentPolicy < ApplicationPolicy
     user.is_a?(Student) && user == record && eligible_student?(record)
   end
 
+  def manage?
+    return true if admin? && operational_classroom?(record.classroom)
+
+    teacher? && teacher_of_classroom?
+  end
+
   private
 
   def teacher_of_classroom?

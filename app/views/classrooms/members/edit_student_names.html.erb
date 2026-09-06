@@ -1,6 +1,6 @@
 <%= turbo_frame_tag :modal do %>
-  <% boy_avatar_keys = User.avatar_keys_for("boy") %>
-  <% girl_avatar_keys = User.avatar_keys_for("girl") %>
+  <% boy_avatar_keys = Student.avatar_keys_for("boy") %>
+  <% girl_avatar_keys = Student.avatar_keys_for("girl") %>
   <% boy_avatar_urls = boy_avatar_keys.map { |key| asset_path("avatars/#{key}.png") } %>
   <% girl_avatar_urls = girl_avatar_keys.map { |key| asset_path("avatars/#{key}.png") } %>
 
@@ -48,12 +48,12 @@
         </div>
 
         <div class="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
-          <% @student_name_memberships.each_with_index do |membership, position| %>
+          <% @roster_students.each_with_index do |student, position| %>
             <%= render "classrooms/members/student_roster_edit_row",
-                  membership: membership,
+                  student: student,
                   position: position,
-                  submitted_attrs: (@submitted_student_roster || {})[membership.id.to_s],
-                  row_errors: (@student_roster_errors_by_membership_id || {})[membership.id.to_s] %>
+                  submitted_attrs: (@submitted_student_roster || {})[student.id.to_s],
+                  row_errors: (@student_roster_errors_by_student_id || {})[student.id.to_s] %>
           <% end %>
         </div>
 

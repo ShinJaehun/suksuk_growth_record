@@ -3,28 +3,23 @@ require 'rails_helper'
 RSpec.describe Classrooms::ShowContext do
   let(:classroom) { create(:classroom) }
 
-  it 'returns active students in roster order' do
-    second = create(:user, :student, name: '둘째')
-    first = create(:user, :student, name: '첫째')
-    inactive = create(:user, :student)
-    second_membership = create(:classroom_membership, classroom: classroom, user: second, student_number: 2)
-    first_membership = create(:classroom_membership, classroom: classroom, user: first, student_number: 1)
-    create(:classroom_membership, classroom: classroom, user: inactive, status: 'inactive')
+  it 'returns active Students in roster order' do
+    second = create(:student, classroom: classroom, name: '둘째', student_number: 2)
+    first = create(:student, classroom: classroom, name: '첫째', student_number: 1)
+    create(:student, classroom: classroom, active: false, student_number: 3)
 
     context = described_class.new(classroom: classroom)
 
-    expect(context.student_memberships.to_a).to eq([first_membership, second_membership])
+    expect(context.students.to_a).to eq([first, second])
   end
 
-  it 'preloads avatar attachments for active students' do
-    student = create(:user, :student, avatar_key: 'boy01')
-    membership = create(:classroom_membership, classroom: classroom, user: student)
+  it 'returns direct Student rows with preset avatar data' do
+    student = create(:student, classroom: classroom, avatar_key: 'boy01')
 
-    loaded_membership = described_class.new(classroom: classroom).student_memberships.load.first
+    loaded_student = described_class.new(classroom: classroom).students.load.first
 
-    expect(loaded_membership.id).to eq(membership.id)
-    expect(loaded_membership.association(:user)).to be_loaded
-    expect(loaded_membership.user.association(:avatar_attachment)).to be_loaded
+    expect(loaded_student).to eq(student)
+    expect(loaded_student.avatar_key).to eq('boy01')
   end
 
   it 'returns the assigned teacher' do

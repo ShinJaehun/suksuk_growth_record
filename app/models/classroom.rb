@@ -7,7 +7,9 @@ class Classroom < ApplicationRecord
   has_one :current_homeroom_assignment, -> { current }, class_name: "HomeroomAssignment"
   has_one :teacher, through: :current_homeroom_assignment
 
-  # Student memberships protect a classroom from deletion.
+  has_many :students, dependent: :restrict_with_error
+
+  # Legacy student memberships remain until the cleanup migration.
   has_many :classroom_memberships, dependent: :destroy
   has_many :users, through: :classroom_memberships
   before_destroy :prevent_destroy_with_students, prepend: true
@@ -22,12 +24,8 @@ class Classroom < ApplicationRecord
     !active?
   end
 
-  def students
-    users.merge(ClassroomMembership.where(role: 'student', status: 'active'))
-  end
-
-  def active_student_memberships_count
-    classroom_memberships.student.active.count
+  def active_students_count
+    students.active.count
   end
 
   validates :class_label, presence: true, length: { maximum: 50 }
@@ -62,7 +60,7 @@ class Classroom < ApplicationRecord
   end
 
   def prevent_destroy_with_students
-    return unless classroom_memberships.student.exists?
+    return unless students.exists? || classroom_memberships.student.exists?
 
     errors.add(:base, :students_present)
     throw :abort

@@ -1,24 +1,30 @@
 module NavigationHelper
   def primary_navigation_items(context)
+    if context[:student]
+      return [
+        navigation_item('navigation.my_page', student_profile_path)
+      ]
+    end
+
     user = context[:user]
     return [] unless user
 
     if user.admin?
       [
-        navigation_item("navigation.school_management", schools_path),
-        navigation_item("navigation.classrooms", classrooms_path),
-        (navigation_item("navigation.teacher_management", teachers_path) if can_manage_teachers?)
+        navigation_item('navigation.school_management', schools_path),
+        navigation_item('navigation.classrooms', classrooms_path),
+        (navigation_item('navigation.teacher_management', teachers_path) if can_manage_teachers?)
       ].compact
     elsif context[:manager]
       [
-        navigation_item("navigation.school_operations", school_path(context[:manager].annual_school)),
-        navigation_item("navigation.classrooms", classrooms_path),
-        navigation_item("navigation.teacher_management", teachers_path)
+        navigation_item('navigation.school_operations', school_path(context[:manager].annual_school)),
+        navigation_item('navigation.classrooms', classrooms_path),
+        navigation_item('navigation.teacher_management', teachers_path)
       ]
     elsif user.teacher?
       []
     elsif user.student?
-      [navigation_item("navigation.my_page", user_path(user))]
+      [navigation_item('navigation.my_page', user_path(user))]
     else
       []
     end
@@ -29,7 +35,11 @@ module NavigationHelper
 
     classrooms = context.fetch(:classrooms, [])
     {
-      mode: classrooms.none? ? :index : (classrooms.one? ? :single : :multiple),
+      mode: if classrooms.none?
+              :index
+            else
+              (classrooms.one? ? :single : :multiple)
+            end,
       classrooms: classrooms
     }
   end
@@ -39,14 +49,26 @@ module NavigationHelper
   end
 
   def navigation_account(context)
+    if (student = context[:student])
+      return {
+        actor: student,
+        student: true,
+        display_name: student.name,
+        edit_path: nil,
+        sign_out_label: t('navigation.account.finish'),
+        sign_out_path: destroy_student_session_path
+      }
+    end
+
     user = context[:user]
     return unless user
 
     {
-      user: user,
+      actor: user,
+      student: false,
       display_name: user.name.presence || user.email,
       edit_path: (edit_user_registration_path unless user.student?),
-      sign_out_label: t(user.student? ? "navigation.account.finish" : "navigation.account.sign_out"),
+      sign_out_label: t(user.student? ? 'navigation.account.finish' : 'navigation.account.sign_out'),
       sign_out_path: user.student? ? destroy_student_session_path : destroy_user_session_path
     }
   end

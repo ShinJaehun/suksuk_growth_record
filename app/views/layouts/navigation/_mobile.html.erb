@@ -1,32 +1,32 @@
 <div class="flex items-center gap-3">
   <% if account %>
-    <% user = account[:user] %>
+    <% actor = account[:actor] %>
 
-    <% if user.student? %>
+    <% if account[:student] %>
       <div class="hidden md:flex items-center gap-2">
-        <%= user_avatar_image(
-              user,
+        <%= student_avatar_image(
+              actor,
               size: 128,
               class: "h-10 w-10 rounded-xl object-cover border border-slate-200 bg-slate-100",
               alt: t("navigation.avatar_alt", name: account[:display_name])
             ) %>
         <div class="flex flex-col items-end text-xs text-gray-600 leading-tight">
           <span><%= account[:display_name] %></span>
-          <span class="text-[10px] text-gray-400"><%= user.role %></span>
+          <span class="text-[10px] text-gray-400">student</span>
         </div>
       </div>
     <% else %>
       <%= link_to account[:edit_path],
             class: "hidden md:flex items-center gap-2 rounded-xl hover:bg-slate-50" do %>
         <%= user_avatar_image(
-              user,
+              actor,
               size: 128,
               class: "h-10 w-10 rounded-xl object-cover border border-slate-200 bg-slate-100",
               alt: t("navigation.avatar_alt", name: account[:display_name])
             ) %>
         <div class="flex flex-col items-end text-xs text-gray-600 leading-tight">
           <span><%= account[:display_name] %></span>
-          <span class="text-[10px] text-gray-400"><%= user.role %></span>
+          <span class="text-[10px] text-gray-400"><%= actor.role %></span>
         </div>
       <% end %>
     <% end %>
@@ -39,15 +39,26 @@
     <details class="md:hidden relative" data-navigation-region="mobile">
       <summary class="list-none flex items-center gap-2 cursor-pointer select-none">
         <div class="hidden min-[380px]:flex items-center gap-2">
-          <%= user_avatar_image(
-                user,
-                size: 128,
-                class: "h-8 w-8 rounded-xl object-cover border border-slate-200 bg-slate-100",
-                alt: t("navigation.avatar_alt", name: account[:display_name])
-              ) %>
+          <% if account[:student] %>
+            <%= student_avatar_image(
+                  actor,
+                  size: 128,
+                  class: "h-8 w-8 rounded-xl object-cover border border-slate-200 bg-slate-100",
+                  alt: t("navigation.avatar_alt", name: account[:display_name])
+                ) %>
+          <% else %>
+            <%= user_avatar_image(
+                  actor,
+                  size: 128,
+                  class: "h-8 w-8 rounded-xl object-cover border border-slate-200 bg-slate-100",
+                  alt: t("navigation.avatar_alt", name: account[:display_name])
+                ) %>
+          <% end %>
           <div class="flex flex-col items-end text-xs text-gray-600 leading-tight">
             <span><%= account[:display_name] %></span>
-            <span class="text-[10px] text-gray-400"><%= user.role %></span>
+            <span class="text-[10px] text-gray-400">
+              <%= account[:student] ? "student" : actor.role %>
+            </span>
           </div>
         </div>
         <div class="w-6 h-6 flex flex-col justify-between">

@@ -28,6 +28,29 @@ RSpec.describe "Student self service", type: :request do
     expect(response.body).not_to include(other_student.name)
   end
 
+  it "shows self-service PIN fields without teacher management fields" do
+    sign_in_student
+
+    get edit_student_pin_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include('name="student[student_pin]"')
+    expect(response.body).to include('name="student[student_pin_confirmation]"')
+    expect(response.body).not_to include('name="student[name]"')
+    expect(response.body).not_to include('name="student[avatar_key]"')
+    expect(response.body).not_to include('name="student[student_number]"')
+  end
+
+  it "shows an unassigned student number without an editable number field" do
+    student.update!(student_number: nil)
+    sign_in_student
+
+    get student_profile_path
+
+    expect(response.body).to include("미지정")
+    expect(response.body).not_to include('name="student[student_number]"')
+  end
+
   it "updates the current Student PIN" do
     sign_in_student
 
@@ -38,6 +61,25 @@ RSpec.describe "Student self service", type: :request do
     expect(response).to redirect_to(student_profile_path)
     expect(student.reload.authenticate_student_pin("4321")).to be_truthy
     expect(student.authenticate_student_pin("1234")).to be_falsey
+  end
+
+  it "ignores teacher-managed fields submitted to the self-service PIN endpoint" do
+    original_attributes = student.attributes.slice("name", "student_number", "avatar_key", "active")
+    sign_in_student
+
+    patch student_pin_path, params: {
+      student: {
+        student_pin: "4321",
+        student_pin_confirmation: "4321",
+        name: "변조 이름",
+        student_number: 99,
+        avatar_key: "girl01",
+        active: false
+      }
+    }
+
+    expect(student.reload.attributes.slice("name", "student_number", "avatar_key", "active")).to eq(original_attributes)
+    expect(student.authenticate_student_pin("4321")).to be_truthy
   end
 
   it "rejects blank, invalid, and mismatched PIN values" do

@@ -17,18 +17,23 @@ class Classrooms::IndexContext
   end
 
   def student_counts
-    @student_counts ||= ClassroomMembership
-                        .where(classroom_id: classroom_ids, role: 'student', status: 'active')
+    @student_counts ||= Student.active
+                        .where(classroom_id: classroom_ids)
                         .group(:classroom_id)
                         .count
   end
 
   def student_previews
-    @student_previews ||= classroom_membership_previews(
-      role: 'student',
-      status: 'active',
-      limit_per_classroom: 5
-    )
+    return @student_previews if defined?(@student_previews)
+    return @student_previews = {} if classroom_ids.empty?
+
+    ranked_ids = Student.from(
+      Student.active.where(classroom_id: classroom_ids).select(
+        "students.id, students.classroom_id, " \
+        "ROW_NUMBER() OVER (PARTITION BY students.classroom_id ORDER BY students.created_at ASC, students.id ASC) AS preview_position"
+      ), :students
+    ).where("preview_position <= 5").pluck(:id)
+    @student_previews = Student.where(id: ranked_ids).order(:classroom_id, :created_at, :id).group_by(&:classroom_id)
   end
 
   private
@@ -37,32 +42,4 @@ class Classrooms::IndexContext
     @classroom_ids ||= classrooms.map(&:id)
   end
 
-  def classroom_membership_previews(role:, limit_per_classroom:, user_role: nil, status: nil)
-    return {} if classroom_ids.empty?
-
-    membership_scope = ClassroomMembership.where(classroom_id: classroom_ids, role: role)
-    membership_scope = membership_scope.where(status: status) if status
-    membership_scope = membership_scope.joins(:user).where(users: { role: user_role }) if user_role
-    membership_scope = membership_scope.where(users: { active: true }) if user_role == 'teacher'
-
-    ranked_membership_ids = ClassroomMembership
-                            .from(
-                              membership_scope
-                                .select(
-                                  'classroom_memberships.id, classroom_memberships.classroom_id, ' \
-                                  'ROW_NUMBER() OVER (PARTITION BY classroom_memberships.classroom_id ' \
-                                  'ORDER BY classroom_memberships.created_at ASC, classroom_memberships.id ASC) AS preview_position'
-                                ),
-                              :classroom_memberships
-                            )
-                            .where('preview_position <= ?', limit_per_classroom)
-                            .pluck(:id)
-
-    ClassroomMembership
-      .where(id: ranked_membership_ids)
-      .includes(user: { avatar_attachment: :blob })
-      .order(:classroom_id, :created_at, :id)
-      .group_by(&:classroom_id)
-      .transform_values { |memberships| memberships.map(&:user) }
-  end
 end

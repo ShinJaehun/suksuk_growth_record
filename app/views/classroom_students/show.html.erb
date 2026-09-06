@@ -1,8 +1,8 @@
 <section class="mx-auto w-full max-w-6xl pt-4 space-y-6">
   <%= render "classroom_students/student_profile_card",
         classroom: @classroom,
-        user: @user,
+        student: @student,
         can_manage_student: @can_manage_student,
-        can_manage_own_student_pin: @can_manage_own_student_pin,
-        student_active: @student_active_in_classroom %>
+        can_manage_own_student_pin: false,
+        student_active: @student.active? %>
 </section>

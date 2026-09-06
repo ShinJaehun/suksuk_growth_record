@@ -21,14 +21,25 @@ RSpec.describe 'Navigation', type: :request do
 
   it 'shows student navigation without teacher account or management links' do
     classroom = create(:classroom)
-    student = create(:user, :student)
-    create(:classroom_membership, classroom: classroom, user: student, role: :student)
-    sign_in student
+    student = create(
+      :student,
+      classroom: classroom,
+      student_pin: '1234'
+    )
 
-    get classroom_student_path(classroom, student)
+    post public_student_login_path(
+      student_login_token: classroom.student_login_token
+    ), params: {
+      student_id: student.id,
+      student_pin: '1234'
+    }
+
+    expect(response).to redirect_to(student_profile_path)
+
+    get student_profile_path
 
     expect(navbar_links).to include(
-      user_path(student),
+      student_profile_path,
       destroy_student_session_path
     )
     expect(navbar.text).to include(I18n.t('navigation.my_page'))
@@ -59,5 +70,4 @@ RSpec.describe 'Navigation', type: :request do
 
     expect(navbar_links).to include(classroom_path(classroom))
   end
-
 end

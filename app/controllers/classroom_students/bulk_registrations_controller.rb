@@ -95,31 +95,24 @@ class ClassroomStudents::BulkRegistrationsController < ApplicationController
   end
 
   def bulk_remaining_capacity
-    [Classroom::MAX_ACTIVE_STUDENTS - @classroom.active_student_memberships_count, 0].max
+    [Classroom::MAX_ACTIVE_STUDENTS - @classroom.active_students_count, 0].max
   end
 
   def load_members_student_management!
-    base_scope = @classroom.classroom_memberships.student
-    status_counts = base_scope.group(:status).count
+    base_scope = @classroom.students
+    status_counts = base_scope.group(:active).count
     @member_status = "active"
     @student_member_counts = {
-      "active" => status_counts.fetch("active", 0),
-      "inactive" => status_counts.fetch("inactive", 0)
+      "active" => status_counts.fetch(true, 0),
+      "inactive" => status_counts.fetch(false, 0)
     }
     @student_member_counts["all"] = @student_member_counts.values.sum
 
-    @student_memberships = base_scope
-      .where(status: @member_status)
-      .in_roster_order
-      .preload(:user)
+    @students = base_scope.active.in_roster_order
   end
 
   def load_classroom_student_grid!
-    @student_memberships = @classroom.classroom_memberships
-      .student
-      .active
-      .in_roster_order
-      .preload(:user)
+    @students = @classroom.students.active.in_roster_order
   end
 
   def render_bulk_setup(error_message: nil, status: :ok)

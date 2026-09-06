@@ -8,17 +8,17 @@
 
 - student는 일반 teacher/admin 로그인 화면을 사용하지 않는다.
 - 교실별 token URL에서 학생을 선택하고 PIN으로 로그인한다.
-- 로그인 시 active student `ClassroomMembership`, classroom과 PIN을 서버에서 확인한다.
-- 성공 시 기존 session을 reset하고 해당 student로 로그인한다.
+- 로그인 시 active Student, 해당 Classroom과 PIN을 서버에서 확인한다.
+- 성공 시 기존 session을 reset하고 `student_id`, classroom context와 last-seen 기반의 별도 Student session을 설정한다.
 - student session은 짧은 TTL과 마지막 활동 시각으로 관리한다.
 - token 재발급 후 기존 URL과 QR은 사용할 수 없다.
 
 ## 권한
 
-- student는 자기 정보와 active membership classroom만 조회한다.
+- student는 자기 정보와 자신이 직접 속한 active Classroom만 조회한다.
 - 다른 학생, 다른 classroom과 관리 endpoint에 접근할 수 없다.
 - URL이나 parameter 조작으로 classroom 또는 user scope를 넓힐 수 없다.
-- inactive student membership은 로그인과 현재 교실 운영 대상에서 제외한다.
+- inactive Student는 로그인과 현재 교실 운영 대상에서 제외한다.
 - policy, scope와 controller validation이 최종 권한 경계다.
 
 ## 학생 페이지
@@ -38,14 +38,14 @@
 ## Teacher/Admin 학생 관리
 
 - 담당 teacher와 admin은 허용 classroom 안에서 학생 명부, profile과 PIN을 관리한다.
-- student membership의 active/inactive lifecycle과 과거 소속 보존 정책을 따른다.
-- 다른 classroom membership id를 제출해도 변경하지 않는다.
+- Student.active lifecycle과 row/기록 보존 정책을 따른다.
+- 다른 classroom Student id를 제출해도 변경하지 않는다.
 - bulk edit은 한 행 실패 시 전체 rollback하고 정원과 출석번호 invariant를 저장 직전에 다시 확인한다.
 
 ## Acceptance criteria
 
-1. active membership student는 유효 token과 PIN으로 로그인할 수 있다.
-2. inactive membership, 잘못된 PIN 또는 만료 token은 로그인할 수 없다.
+1. active Student는 자기 Classroom의 유효 token과 PIN으로 로그인할 수 있다.
+2. inactive Student, 잘못된 PIN 또는 만료 token은 로그인할 수 없다.
 3. 로그인 성공 시 이전 session이 재사용되지 않는다.
 4. student는 자기 정보와 현재 classroom만 볼 수 있다.
 5. 다른 student/classroom URL 조작은 권한 범위를 넓히지 않는다.
@@ -56,6 +56,6 @@
 ## Non-goals
 
 - 제거된 service-specific domain
-- student 별도 인증 모델
+- Student용 Devise 모델 또는 범용 인증 프레임워크 추가
 - 학생의 학교 전역 membership
 - 학생 domain 전면 재설계

@@ -42,15 +42,10 @@
 
   <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <%= turbo_frame_tag "students_list_#{@classroom.id}" do %>
-      <% if @student_memberships.any? %>
+      <% if @students.any? %>
         <div id="students_grid_<%= @classroom.id %>" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <% @student_memberships.each do |student_membership| %>
-            <%= render partial: "users/user",
-                  locals: {
-                    user: student_membership.user,
-                    student_membership: student_membership,
-                    classroom: @classroom
-                  } %>
+          <% @students.each do |student| %>
+            <%= render "classroom_students/student_card", student: student, classroom: @classroom %>
           <% end %>
         </div>
       <% else %>

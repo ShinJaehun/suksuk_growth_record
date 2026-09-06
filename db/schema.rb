@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -116,12 +116,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_001000) do
     t.string "avatar_key"
     t.bigint "classroom_id", null: false
     t.datetime "created_at", null: false
+    t.string "gender"
     t.string "name", null: false
     t.integer "student_number"
     t.string "student_pin_digest"
     t.datetime "updated_at", null: false
     t.index ["classroom_id", "student_number"], name: "index_students_on_active_classroom_number", unique: true, where: "(active AND (student_number IS NOT NULL))"
     t.index ["classroom_id"], name: "index_students_on_classroom_id"
+    t.check_constraint "gender IS NULL OR (gender::text = ANY (ARRAY['boy'::character varying, 'girl'::character varying]::text[]))", name: "chk_students_gender"
     t.check_constraint "student_number IS NULL OR student_number > 0", name: "chk_students_student_number_positive"
   end
 

@@ -536,85 +536,27 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response).to have_http_status(:unprocessable_content)
   end
 
-  it 'renders the managed student PIN field as an empty password input with the default PIN status' do
+  it 'renders the Student management PIN field without exposing its digest' do
     sign_in teacher
 
-    get edit_classroom_student_path(classroom, legacy_student)
+    get edit_classroom_student_path(classroom, student)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('type="password"')
-    expect(response.body).to include('name="user[student_pin]"')
-    expect(response.body).to include('현재 PIN:')
-    expect(response.body).to include('기본 PIN(1234)으로 설정됨')
+    expect(response.body).to include('name="student[student_pin]"')
     expect(response.body).to include('새 PIN을 입력하면 변경됩니다. 비워두면 기존 PIN을 유지합니다.')
-    expect(response.body).not_to include(legacy_student.student_pin_digest)
+    expect(response.body).not_to include(student.student_pin_digest)
   end
 
-  it 'shows the custom PIN status after the managed PIN changes from 1234' do
-    legacy_student.update!(student_pin: '4321')
+  it 'uses a teacher-managed Student PIN for the actual Student login' do
     sign_in teacher
 
-    get edit_classroom_student_path(classroom, legacy_student)
+    patch classroom_student_path(classroom, student), params: { student: { student_pin: '4321' } }
+    sign_out teacher
 
-    expect(response).to have_http_status(:ok)
-    expect(response.body).to include('현재 PIN:')
-    expect(response.body).to include('설정됨')
-    expect(response.body).not_to include('기본 PIN(1234)으로 설정됨')
-  end
-
-  it 'shows the unset PIN status for a student without a PIN' do
-    legacy_student.update_column(:student_pin_digest, nil)
-    sign_in teacher
-
-    get edit_classroom_student_path(classroom, legacy_student)
-
-    expect(response).to have_http_status(:ok)
-    expect(response.body).to include('현재 PIN:')
-    expect(response.body).to include('미설정')
-  end
-
-  it 'keeps the legacy teacher PIN update behavior during the transition' do
-    sign_in teacher
-
-    patch classroom_student_path(classroom, legacy_student), params: {
-      user: {
-        name: legacy_student.name,
-        student_pin: '4321'
-      }
-    }
-
-    expect(response).to redirect_to(edit_classroom_student_path(classroom, legacy_student))
-    expect(User.find(legacy_student.id).authenticate_student_pin('4321')).to be_truthy
-  end
-
-  it 'keeps the existing student PIN when the managed PIN field is blank' do
-    original_digest = legacy_student.student_pin_digest
-    sign_in teacher
-
-    patch classroom_student_path(classroom, legacy_student), params: {
-      user: {
-        name: '새 이름',
-        student_pin: ''
-      }
-    }
-
-    expect(response).to redirect_to(edit_classroom_student_path(classroom, legacy_student))
-    expect(legacy_student.reload.student_pin_digest).to eq(original_digest)
-    expect(legacy_student.authenticate_student_pin('1234')).to be_truthy
-  end
-
-  it 'rejects an invalid managed student PIN format' do
-    original_digest = legacy_student.student_pin_digest
-    sign_in teacher
-
-    patch classroom_student_path(classroom, legacy_student), params: {
-      user: {
-        name: legacy_student.name,
-        student_pin: '12ab'
-      }
-    }
-
+    post_student_pin(pin: '1234')
     expect(response).to have_http_status(:unprocessable_content)
-    expect(legacy_student.reload.student_pin_digest).to eq(original_digest)
+    post_student_pin(pin: '4321')
+    expect(response).to redirect_to(student_profile_path)
   end
 end

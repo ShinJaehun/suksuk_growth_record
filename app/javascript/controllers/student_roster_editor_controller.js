@@ -22,10 +22,7 @@ export default class extends Controller {
     const avatarKey = row.querySelector("[data-student-roster-editor-target='avatarKey']")
     const preview = row.querySelector("[data-student-roster-editor-target='avatarPreview']")
     if (!avatarKey || !preview) return
-    if (
-      gender === row.dataset.originalGender &&
-      avatarKey.value === row.dataset.originalAvatarKey
-    ) return
+    if (gender === row.dataset.originalGender && avatarKey.value === row.dataset.originalAvatarKey) return
 
     let poolIndex = keys.indexOf(avatarKey.value)
     if (poolIndex < 0) {
@@ -33,10 +30,7 @@ export default class extends Controller {
       avatarKey.value = keys[poolIndex]
     }
 
-    if (row.dataset.uploadedAvatar !== "true") {
-      preview.src = urls[poolIndex]
-      preview.alt = this.avatarAltValue
-      preview.classList.remove("hidden")
-    }
+    preview.src = urls[poolIndex]
+    preview.alt = this.avatarAltValue
   }
 }

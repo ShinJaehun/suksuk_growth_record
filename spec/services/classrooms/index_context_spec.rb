@@ -44,39 +44,29 @@ RSpec.describe Classrooms::IndexContext do
     expect(loaded_teacher.avatar_attachment.association(:blob)).to be_loaded
   end
 
-  it 'counts active student memberships and returns at most five student previews with avatars loaded' do
+  it 'counts active Students and returns at most five direct Student previews' do
     classroom = create(:classroom, annual_school: school)
     students = 6.times.map do |index|
-      create(:user, :student, name: "학생 #{index + 1}")
+      create(
+        :student,
+        classroom: classroom,
+        name: "학생 #{index + 1}",
+        avatar_key: index.zero? ? 'boy01' : nil,
+        created_at: (index + 1).minutes.ago
+      )
     end
-    students.first.avatar.attach(
-      io: StringIO.new('avatar'),
-      filename: 'avatar.png',
-      content_type: 'image/png'
-    )
-    students.each do |student|
-      create(:classroom_membership, classroom: classroom, user: student, role: 'student', status: 'active')
-    end
-    inactive_student = create(:user, :student)
-    create(
-      :classroom_membership,
-      classroom: classroom,
-      user: inactive_student,
-      role: 'student',
-      status: 'inactive'
-    )
-    outside_classroom = create(:classroom)
-    outside_student = create(:user, :student)
-    create(:classroom_membership, classroom: outside_classroom, user: outside_student, role: 'student')
+    inactive_student = create(:student, classroom: classroom, active: false)
+    outside_student = create(:student)
 
     context = described_class.new(classrooms_scope: Classroom.where(id: classroom.id))
     previews = context.student_previews.fetch(classroom.id)
 
+    expected_previews = students.sort_by { |student| [student.created_at, student.id] }.first(5)
+
     expect(context.student_counts).to eq(classroom.id => 6)
-    expect(previews).to eq(students.first(5))
+    expect(previews).to eq(expected_previews)
     expect(previews).not_to include(inactive_student, outside_student)
-    expect(previews.first.association(:avatar_attachment)).to be_loaded
-    expect(previews.first.avatar_attachment.association(:blob)).to be_loaded
+    expect(students.first.avatar_key).to eq('boy01')
   end
 
   it 'returns empty collections for an empty scope' do

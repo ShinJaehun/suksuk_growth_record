@@ -5,7 +5,7 @@ class ApplicationController < ActionController::Base
   include Pagy::Method
 
   helper_method :navigation_context, :current_student, :student_signed_in?
-  
+
   before_action :configure_permitted_parameters, if: :devise_controller?
   before_action :expire_ineligible_teacher_session
   before_action :require_teacher_password_change
@@ -20,10 +20,10 @@ class ApplicationController < ActionController::Base
   rescue_from Pundit::NotAuthorizedError do
     respond_to do |format|
       format.html do
-        redirect_to(root_path, alert: t("errors.not_authorized"))
+        redirect_to(root_path, alert: t('errors.not_authorized'))
       end
       format.json do
-        render json: { ok: false, error: "not_authorized" }, status: :forbidden
+        render json: { ok: false, error: 'not_authorized' }, status: :forbidden
       end
       format.any do
         head :forbidden
@@ -69,17 +69,23 @@ class ApplicationController < ActionController::Base
 
   def configure_permitted_parameters
     devise_parameter_sanitizer.permit(:sign_up, keys: [:name])
-    devise_parameter_sanitizer.permit(:account_update, keys: [:name, :gender, :avatar_key])
+    devise_parameter_sanitizer.permit(:account_update, keys: %i[name gender avatar_key])
   end
-
 
   private
 
   def navigation_context
-    return {} unless request.format.html? && current_user
+    return {} unless request.format.html?
     return @navigation_context if defined?(@navigation_context)
 
-    @navigation_context = { user: current_user }
+    if current_user
+      @navigation_context = { user: current_user }
+    elsif current_student
+      return @navigation_context = { student: current_student }
+    else
+      return @navigation_context = {}
+    end
+
     return @navigation_context unless current_user.active_teacher?
 
     school = current_user.annual_school
@@ -98,7 +104,7 @@ class ApplicationController < ActionController::Base
 
     classroom = current_user.assigned_classroom
     @teacher_nav_classrooms = if classroom&.active? &&
-      classroom.school_year.active? && classroom.school_year.school.active?
+                                 classroom.school_year.active? && classroom.school_year.school.active?
                                 [classroom]
                               else
                                 []
@@ -110,7 +116,7 @@ class ApplicationController < ActionController::Base
     return if current_user.active? && current_user.school_year&.active? && current_user.school_year.school.active?
 
     school = current_user.school_year&.school
-    message_key = current_user.inactive? ? "devise.failure.inactive" : "users.sessions.teacher_ineligible"
+    message_key = current_user.inactive? ? 'devise.failure.inactive' : 'users.sessions.teacher_ineligible'
     sign_out(:user)
     redirect_to school ? school_teacher_login_path(school) : new_user_session_path, alert: t(message_key)
   end
@@ -129,7 +135,7 @@ class ApplicationController < ActionController::Base
     unless current_student
       clear_student_session
       return redirect_to student_session_timeout_redirect_path(classroom_id),
-        alert: "사용 시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요."
+                         alert: '사용 시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.'
     end
 
     now = Time.current.to_i
@@ -144,7 +150,7 @@ class ApplicationController < ActionController::Base
       classroom_id = session[:student_login_classroom_id]
       clear_student_session
       redirect_to student_session_timeout_redirect_path(classroom_id),
-        alert: "사용 시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요."
+                  alert: '사용 시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.'
     else
       session[:student_last_seen_at] = now
     end
@@ -156,6 +162,7 @@ class ApplicationController < ActionController::Base
 
   def student_session_timeout_redirect_path(classroom_id)
     return new_student_session_path if classroom_id.blank?
+
     classroom = Classroom.find_by(id: classroom_id)
     return new_student_session_path unless classroom
 
@@ -186,11 +193,11 @@ class ApplicationController < ActionController::Base
 
   # index가 아닌 액션에서는 authorize 검증, Devise 컨트롤러는 제외
   def skip_pundit_verify_authorized?
-    devise_controller? || action_name == "index"
+    devise_controller? || action_name == 'index'
   end
 
   # index 액션에서만 policy_scope 검증, Devise 컨트롤러는 제외
   def pundit_verify_policy_scoped?
-    !devise_controller? && action_name == "index"
+    !devise_controller? && action_name == 'index'
   end
 end

@@ -21,10 +21,23 @@ RSpec.describe 'Classroom members', type: :request do
                                 })
   end
 
+  def managed_student(classroom: nil, status: 'active', student_number: nil, **attributes)
+    classroom ||= self.classroom
+    attributes[:gender] = 'boy' unless attributes.key?(:gender)
+    attributes[:avatar_key] = 'boy01' unless attributes.key?(:avatar_key)
+
+    create(
+      :student,
+      classroom:,
+      active: status == 'active',
+      student_number:,
+      **attributes
+    )
+  end
+
   it 'shows member management sections to a classroom teacher' do
     assign_teacher(classroom, teacher)
-    student = create(:user, :student, name: '활성 학생', gender: 'boy', avatar_key: 'boy01')
-    create(:classroom_membership, classroom: classroom, user: student, role: 'student')
+    student = managed_student(name: '활성 학생', gender: 'boy', avatar_key: 'boy01')
     sign_in teacher
 
     get classroom_members_path(classroom)
@@ -94,16 +107,15 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'shows active students by default with matching row actions' do
-    active_student = create(:user, :student, name: '김활동')
-    inactive_student = create(:user, :student, name: '박휴식')
-    active_membership = create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
-    create(:classroom_membership, classroom: classroom, user: inactive_student, role: 'student', status: 'inactive')
+    active_student = managed_student(name: '김활동')
+    inactive_student = managed_student(name: '박휴식', status: 'inactive')
+    active_membership = active_student
     sign_in admin
 
     get classroom_members_path(classroom)
 
     document = Nokogiri::HTML(response.body)
-    active_row = document.at_css("#member_row_classroom_membership_#{active_membership.id}")
+    active_row = document.at_css("#member_row_student_#{active_membership.id}")
     student_management = document.at_css('#student-management')
 
     expect(response).to have_http_status(:ok)
@@ -126,24 +138,23 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'filters inactive and all students with matching row actions' do
-    active_student = create(:user, :student, name: '김활동')
-    inactive_student = create(:user, :student, name: '박휴식')
-    active_membership = create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
-    inactive_membership = create(:classroom_membership, classroom: classroom, user: inactive_student, role: 'student',
-                                                        status: 'inactive')
+    active_student = managed_student(name: '김활동')
+    inactive_student = managed_student(name: '박휴식', status: 'inactive')
+    active_membership = active_student
+    inactive_membership = inactive_student
     sign_in admin
 
     get classroom_members_path(classroom, status: 'inactive')
 
     inactive_document = Nokogiri::HTML(response.body)
-    inactive_row = inactive_document.at_css("#member_row_classroom_membership_#{inactive_membership.id}")
+    inactive_row = inactive_document.at_css("#member_row_student_#{inactive_membership.id}")
 
     expect(response).to have_http_status(:ok)
     expect(inactive_document.at_css(%(a[aria-current="page"])).text).to include('비활성')
     expect(response.body).not_to include(active_student.name)
     expect(inactive_row.text).to include(inactive_student.name, '비활성')
     expect(inactive_row.text).not_to include(inactive_membership.id.to_s)
-    expect(response.body).not_to include("member_row_classroom_membership_#{active_membership.id}")
+    expect(response.body).not_to include("member_row_student_#{active_membership.id}")
     expect(response.body).to include(edit_classroom_student_path(classroom, inactive_student))
     expect(response.body).to include(reactivate_classroom_student_path(classroom, inactive_student))
     expect(response.body).not_to include(deactivate_classroom_student_path(classroom, inactive_student))
@@ -154,8 +165,8 @@ RSpec.describe 'Classroom members', type: :request do
 
     expect(all_document.at_css(%(a[aria-current="page"])).text).to include('전체')
     expect(response.body).to include(active_student.name, inactive_student.name)
-    expect(all_document.at_css("#member_row_classroom_membership_#{active_membership.id}").text).not_to include(active_membership.id.to_s)
-    expect(all_document.at_css("#member_row_classroom_membership_#{inactive_membership.id}").text).not_to include(inactive_membership.id.to_s)
+    expect(all_document.at_css("#member_row_student_#{active_membership.id}").text).not_to include(active_membership.id.to_s)
+    expect(all_document.at_css("#member_row_student_#{inactive_membership.id}").text).not_to include(inactive_membership.id.to_s)
 
     get classroom_members_path(classroom, status: 'unknown')
 
@@ -168,38 +179,22 @@ RSpec.describe 'Classroom members', type: :request do
 
   it 'orders active, inactive, and all filters by roster number within status groups' do
     active_students = [
-      create(:user, :student, name: '활성 5'),
-      create(:user, :student, name: '활성 번호 없음 B'),
-      create(:user, :student, name: '활성 1'),
-      create(:user, :student, name: '활성 2'),
-      create(:user, :student, name: '활성 번호 없음 A')
+      managed_student(name: '활성 5', student_number: 5),
+      managed_student(name: '활성 번호 없음 B'),
+      managed_student(name: '활성 1', student_number: 1),
+      managed_student(name: '활성 2', student_number: 2),
+      managed_student(name: '활성 번호 없음 A')
     ]
-    [5, nil, 1, 2, nil].each_with_index do |number, index|
-      create(:classroom_membership,
-             classroom: classroom,
-             user: active_students[index],
-             role: 'student',
-             status: 'active',
-             student_number: number)
-    end
     inactive_students = [
-      create(:user, :student, name: '비활성 5 B'),
-      create(:user, :student, name: '비활성 1'),
-      create(:user, :student, name: '비활성 5 A'),
-      create(:user, :student, name: '비활성 번호 없음')
+      managed_student(name: '비활성 5 B', status: 'inactive', student_number: 5),
+      managed_student(name: '비활성 1', status: 'inactive', student_number: 1),
+      managed_student(name: '비활성 5 A', status: 'inactive', student_number: 5),
+      managed_student(name: '비활성 번호 없음', status: 'inactive')
     ]
-    [5, 1, 5, nil].each_with_index do |number, index|
-      create(:classroom_membership,
-             classroom: classroom,
-             user: inactive_students[index],
-             role: 'student',
-             status: 'inactive',
-             student_number: number)
-    end
     sign_in admin
 
     get classroom_members_path(classroom, status: 'active')
-    active_rows = Nokogiri::HTML(response.body).css('[data-student-membership-row]')
+    active_rows = Nokogiri::HTML(response.body).css('[data-student-row]')
     expect(active_rows.map { |row| row['data-student-id'].to_i }).to eq(
       [active_students[2], active_students[3], active_students[0], active_students[4], active_students[1]].map(&:id)
     )
@@ -208,7 +203,7 @@ RSpec.describe 'Classroom members', type: :request do
     )
 
     get classroom_members_path(classroom, status: 'inactive')
-    inactive_rows = Nokogiri::HTML(response.body).css('[data-student-membership-row]')
+    inactive_rows = Nokogiri::HTML(response.body).css('[data-student-row]')
     expect(inactive_rows.map { |row| row['data-student-id'].to_i }).to eq(
       [inactive_students[1], inactive_students[2], inactive_students[0], inactive_students[3]].map(&:id)
     )
@@ -217,7 +212,7 @@ RSpec.describe 'Classroom members', type: :request do
     )
 
     get classroom_members_path(classroom, status: 'all')
-    all_rows = Nokogiri::HTML(response.body).css('[data-student-membership-row]')
+    all_rows = Nokogiri::HTML(response.body).css('[data-student-row]')
     expect(all_rows.map { |row| row['data-student-id'].to_i }).to eq(
       [
         active_students[2], active_students[3], active_students[0], active_students[4], active_students[1],
@@ -294,22 +289,20 @@ RSpec.describe 'Classroom members', type: :request do
     expect(response.body).to include(student.name)
   end
 
-  it 'renders the filtered student roster edit modal with membership-scoped fields' do
+  it 'renders the filtered student roster edit modal with Student-scoped fields' do
     assign_teacher(classroom, teacher)
-    active_student = create(:user, :student, name: '활성 이름')
-    inactive_student = create(:user, :student, name: '비활성 이름')
-    active_membership = create(:classroom_membership, classroom: classroom, user: active_student, role: 'student',
-                                                      student_number: 7)
-    inactive_membership = create(:classroom_membership, classroom: classroom, user: inactive_student, role: 'student',
-                                                        status: 'inactive', student_number: nil)
+    active_student = managed_student(name: '활성 이름', student_number: 7)
+    inactive_student = managed_student(name: '비활성 이름', status: 'inactive')
+    active_membership = active_student
+    inactive_membership = inactive_student
     sign_in teacher
 
     get classroom_edit_member_student_names_path(classroom, status: 'inactive'), headers: { 'Turbo-Frame' => 'modal' }
 
     document = Nokogiri::HTML(response.body)
     form = document.at_css('form#student_names_form')
-    active_row = document.at_css("#name_row_classroom_membership_#{active_membership.id}")
-    inactive_row = document.at_css("#name_row_classroom_membership_#{inactive_membership.id}")
+    active_row = document.at_css("#name_row_student_#{active_membership.id}")
+    inactive_row = document.at_css("#name_row_student_#{inactive_membership.id}")
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('학생 명단 일괄 편집')
@@ -329,16 +322,10 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'orders roster edit rows by filter status and roster order' do
-    active_two = create(:classroom_membership, classroom: classroom, user: create(:user, :student, name: '활성 2'),
-                                               role: 'student', status: 'active', student_number: 2)
-    active_one = create(:classroom_membership, classroom: classroom, user: create(:user, :student, name: '활성 1'),
-                                               role: 'student', status: 'active', student_number: 1)
-    inactive_one = create(:classroom_membership, classroom: classroom,
-                                                 user: create(:user, :student, name: '비활성 1'),
-                                                 role: 'student', status: 'inactive', student_number: 1)
-    inactive_nil = create(:classroom_membership, classroom: classroom,
-                                                 user: create(:user, :student, name: '비활성 미지정'),
-                                                 role: 'student', status: 'inactive', student_number: nil)
+    active_two = managed_student(name: '활성 2', student_number: 2)
+    active_one = managed_student(name: '활성 1', student_number: 1)
+    inactive_one = managed_student(name: '비활성 1', status: 'inactive', student_number: 1)
+    inactive_nil = managed_student(name: '비활성 미지정', status: 'inactive')
     sign_in admin
 
     get classroom_edit_member_student_names_path(classroom, status: 'all')
@@ -346,17 +333,14 @@ RSpec.describe 'Classroom members', type: :request do
     rows = Nokogiri::HTML(response.body).css('[data-student-roster-editor-target="row"]')
     expect(rows.map { |row| row['id'] }).to eq(
       [active_one, active_two, inactive_one, inactive_nil].map do |membership|
-        "name_row_classroom_membership_#{membership.id}"
+        "name_row_student_#{membership.id}"
       end
     )
   end
 
-  it 'uses the current classroom membership number in the roster editor' do
-    student = create(:user, :student)
-    current_membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                                       status: 'active', student_number: 7)
-    create(:classroom_membership, classroom: create(:classroom), user: student, role: 'student',
-                                  status: 'inactive', student_number: 12)
+  it 'uses the Student number in the roster editor' do
+    student = managed_student(student_number: 7)
+    current_membership = student
     sign_in admin
 
     get classroom_edit_member_student_names_path(classroom, status: 'active')
@@ -365,16 +349,14 @@ RSpec.describe 'Classroom members', type: :request do
       %(input[name="students[#{current_membership.id}][student_number]"])
     )
     expect(input['value']).to eq('7')
-    expect(response.body).not_to include('value="12"')
   end
 
   it 'keeps the selected filter after saving names from the modal' do
     assign_teacher(classroom, teacher)
-    active_student = create(:user, :student, name: '활성 저장 전')
-    inactive_student = create(:user, :student, name: '비활성 저장 전')
-    active_membership = create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
-    inactive_membership = create(:classroom_membership, classroom: classroom, user: inactive_student, role: 'student',
-                                                        status: 'inactive')
+    active_student = managed_student(name: '활성 저장 전')
+    inactive_student = managed_student(name: '비활성 저장 전', status: 'inactive')
+    active_membership = active_student
+    inactive_membership = inactive_student
     sign_in teacher
 
     get classroom_members_path(classroom, status: 'inactive')
@@ -394,7 +376,7 @@ RSpec.describe 'Classroom members', type: :request do
 
     inactive_result = Nokogiri::HTML.fragment(response.body)
     inactive_row = inactive_result.at_css(
-      "#member_row_classroom_membership_#{inactive_membership.id}"
+      "#member_row_student_#{inactive_membership.id}"
     )
 
     expect(response.media_type).to eq('text/vnd.turbo-stream.html')
@@ -402,7 +384,7 @@ RSpec.describe 'Classroom members', type: :request do
     expect(inactive_result.at_css(%(a[aria-current="page"])).text).to include('비활성')
 
     expect(inactive_row.text).to include('비활성 저장 후')
-    expect(inactive_result.at_css("#member_row_classroom_membership_#{active_membership.id}")).to be_nil
+    expect(inactive_result.at_css("#member_row_student_#{active_membership.id}")).to be_nil
     expect(active_student.reload.name).to eq('활성 저장 전')
 
     get classroom_members_path(classroom, status: 'all')
@@ -423,10 +405,10 @@ RSpec.describe 'Classroom members', type: :request do
 
     all_result = Nokogiri::HTML.fragment(response.body)
     active_row = all_result.at_css(
-      "#member_row_classroom_membership_#{active_membership.id}"
+      "#member_row_student_#{active_membership.id}"
     )
     inactive_row = all_result.at_css(
-      "#member_row_classroom_membership_#{inactive_membership.id}"
+      "#member_row_student_#{inactive_membership.id}"
     )
 
     expect(all_result.at_css(%(a[aria-current="page"])).text).to include('전체')
@@ -437,12 +419,10 @@ RSpec.describe 'Classroom members', type: :request do
   describe 'PATCH /classrooms/:classroom_id/members/students/name' do
     it 'updates student numbers, names, genders, and avatar keys together' do
       assign_teacher(classroom, teacher)
-      first = create(:user, :student, name: '첫 학생', gender: 'boy', avatar_key: 'boy01')
-      second = create(:user, :student, name: '둘 학생', gender: 'girl', avatar_key: 'girl01')
-      first_membership = create(:classroom_membership, classroom: classroom, user: first, role: 'student',
-                                                       student_number: 1)
-      second_membership = create(:classroom_membership, classroom: classroom, user: second, role: 'student',
-                                                        student_number: 2)
+      first = managed_student(name: '첫 학생', gender: 'boy', avatar_key: 'boy01', student_number: 1)
+      second = managed_student(name: '둘 학생', gender: 'girl', avatar_key: 'girl01', student_number: 2)
+      first_membership = first
+      second_membership = second
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom, status: 'active'), params: {
@@ -460,20 +440,21 @@ RSpec.describe 'Classroom members', type: :request do
       expect(response).to redirect_to(classroom_members_path(classroom, status: 'active'))
       expect(first_membership.reload.student_number).to eq(3)
       expect(second_membership.reload.student_number).to eq(4)
-      expect(first.reload.attributes.values_at('name', 'gender', 'avatar_key', 'role')).to eq(
-        ['첫 수정', 'girl', 'girl02', 'student']
+      expect(first.reload.attributes.values_at('name', 'gender', 'avatar_key')).to eq(
+        ['첫 수정', 'girl', 'girl02']
       )
       expect(second.reload.attributes.values_at('name', 'gender', 'avatar_key')).to eq(
         ['둘 수정', 'boy', 'boy02']
       )
       expect(first_membership).to be_active
+      expect(first.authenticate_student_pin('1234')).to be_truthy
+      expect(first.authenticate_student_pin('9999')).to be_falsey
     end
 
     it 'preserves a legacy mismatched avatar during an unrelated roster update' do
-      student = create(:user, :student, name: '기존 이름', gender: 'boy', avatar_key: 'boy01')
+      student = managed_student(name: '기존 이름', gender: 'boy', avatar_key: 'boy01', student_number: 7)
       student.update_column(:avatar_key, 'girl01')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                                 student_number: 7)
+      membership = student
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -492,9 +473,8 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects a manipulated mismatched avatar when gender is unchanged' do
-      student = create(:user, :student, name: '기존 이름', gender: 'boy', avatar_key: 'boy01')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                                 student_number: 7)
+      student = managed_student(name: '기존 이름', gender: 'boy', avatar_key: 'boy01', student_number: 7)
+      membership = student
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -514,10 +494,9 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'keeps a legacy avatar that becomes valid for the changed gender' do
-      student = create(:user, :student, gender: 'boy', avatar_key: 'boy01')
+      student = managed_student(gender: 'boy', avatar_key: 'boy01', student_number: 7)
       student.update_column(:avatar_key, 'girl01')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                                 student_number: 7)
+      membership = student
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -533,12 +512,10 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'swaps two active student numbers without violating the unique index' do
-      first = create(:user, :student, name: '1번')
-      second = create(:user, :student, name: '2번')
-      first_membership = create(:classroom_membership, classroom: classroom, user: first, role: 'student',
-                                                       student_number: 1)
-      second_membership = create(:classroom_membership, classroom: classroom, user: second, role: 'student',
-                                                        student_number: 2)
+      first = managed_student(name: '1번', student_number: 1)
+      second = managed_student(name: '2번', student_number: 2)
+      first_membership = first
+      second_membership = second
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -555,17 +532,15 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'supports a three-student number cycle' do
       memberships = [1, 2, 3].map do |number|
-        student = create(:user, :student, name: "#{number}번")
-        create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                      student_number: number)
+        managed_student(name: "#{number}번", student_number: number)
       end
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
         students: {
-          memberships[0].id => { student_number: '2', name: memberships[0].user.name },
-          memberships[1].id => { student_number: '3', name: memberships[1].user.name },
-          memberships[2].id => { student_number: '1', name: memberships[2].user.name }
+          memberships[0].id => { student_number: '2', name: memberships[0].name },
+          memberships[1].id => { student_number: '3', name: memberships[1].name },
+          memberships[2].id => { student_number: '1', name: memberships[2].name }
         }
       }
 
@@ -573,12 +548,10 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'allows clearing a number and editing a legacy student without assigning gender' do
-      numbered = create(:user, :student, name: '번호 학생', gender: 'boy', avatar_key: 'boy01')
-      legacy = create(:user, :student, name: '레거시 학생', gender: nil, avatar_key: nil)
-      numbered_membership = create(:classroom_membership, classroom: classroom, user: numbered, role: 'student',
-                                                          student_number: 7)
-      legacy_membership = create(:classroom_membership, classroom: classroom, user: legacy, role: 'student',
-                                                        student_number: nil)
+      numbered = managed_student(name: '번호 학생', gender: 'boy', avatar_key: 'boy01', student_number: 7)
+      legacy = managed_student(name: '레거시 학생', gender: nil, avatar_key: nil)
+      numbered_membership = numbered
+      legacy_membership = legacy
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -595,12 +568,10 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects invalid raw student numbers and preserves input while rolling back other rows' do
-      first = create(:user, :student, name: '원래 첫째')
-      second = create(:user, :student, name: '원래 둘째')
-      first_membership = create(:classroom_membership, classroom: classroom, user: first, role: 'student',
-                                                       student_number: 1)
-      second_membership = create(:classroom_membership, classroom: classroom, user: second, role: 'student',
-                                                        student_number: 2)
+      first = managed_student(name: '원래 첫째', student_number: 1)
+      second = managed_student(name: '원래 둘째', student_number: 2)
+      first_membership = first
+      second_membership = second
       sign_in admin
 
       %w[0 -1 1.5 abc].each do |invalid_number|
@@ -622,11 +593,10 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects duplicate final active numbers for submitted and unsubmitted students' do
-      students = 3.times.map { |index| create(:user, :student, name: "학생 #{index}") }
-      memberships = students.each_with_index.map do |student, index|
-        create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                      student_number: index + 1)
+      students = 3.times.map do |index|
+        managed_student(name: "학생 #{index}", student_number: index + 1)
       end
+      memberships = students
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -650,19 +620,15 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'allows inactive students to share numbers with active and inactive students' do
-      active = create(:user, :student)
-      active_membership = create(:classroom_membership, classroom: classroom, user: active, role: 'student',
-                                                        status: 'active', student_number: 7)
-      inactive_students = 2.times.map { create(:user, :student) }
-      inactive_memberships = inactive_students.map do |student|
-        create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                      status: 'inactive', student_number: 8)
-      end
+      active = managed_student(student_number: 7)
+      active_membership = active
+      inactive_students = 2.times.map { managed_student(status: 'inactive', student_number: 8) }
+      inactive_memberships = inactive_students
       sign_in admin
 
       patch classroom_member_student_names_path(classroom, status: 'inactive'), params: {
         students: inactive_memberships.each_with_object({}) do |membership, rows|
-          rows[membership.id] = { student_number: '7', name: membership.user.name }
+          rows[membership.id] = { student_number: '7', name: membership.name }
         end
       }
 
@@ -671,13 +637,11 @@ RSpec.describe 'Classroom members', type: :request do
       expect(active_membership.reload.student_number).to eq(7)
     end
 
-    it 'rolls back every field when a user row is invalid' do
-      first = create(:user, :student, name: '첫 원본', gender: 'boy', avatar_key: 'boy01')
-      second = create(:user, :student, name: '둘 원본', gender: 'girl', avatar_key: 'girl01')
-      first_membership = create(:classroom_membership, classroom: classroom, user: first, role: 'student',
-                                                       student_number: 1)
-      second_membership = create(:classroom_membership, classroom: classroom, user: second, role: 'student',
-                                                        student_number: 2)
+    it 'rolls back every field when a Student row is invalid' do
+      first = managed_student(name: '첫 원본', gender: 'boy', avatar_key: 'boy01', student_number: 1)
+      second = managed_student(name: '둘 원본', gender: 'girl', avatar_key: 'girl01', student_number: 2)
+      first_membership = first
+      second_membership = second
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -701,9 +665,8 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects an invalid submitted gender' do
-      student = create(:user, :student, gender: 'boy', avatar_key: 'boy01')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                                 student_number: 1)
+      student = managed_student(gender: 'boy', avatar_key: 'boy01', student_number: 1)
+      membership = student
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -719,21 +682,20 @@ RSpec.describe 'Classroom members', type: :request do
       expect(student.reload.gender).to eq('boy')
     end
 
-    it 'rolls back temporary number clears when a later user save raises' do
-      students = 2.times.map { |index| create(:user, :student, name: "원본 #{index}") }
-      memberships = students.each_with_index.map do |student, index|
-        create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                      student_number: index + 1)
+    it 'rolls back temporary number clears when a later Student save raises' do
+      students = 2.times.map do |index|
+        managed_student(name: "원본 #{index}", student_number: index + 1)
       end
+      memberships = students
       calls = 0
-      allow_any_instance_of(User).to receive(:save!).and_wrap_original do |method, *args|
+      allow_any_instance_of(Student).to receive(:save!).and_wrap_original do |method|
         calls += 1
         if calls == 2
-          method.receiver.errors.add(:base, 'user failed')
+          method.receiver.errors.add(:base, 'student failed')
           raise ActiveRecord::RecordInvalid.new(method.receiver)
         end
 
-        method.call(*args)
+        method.call
       end
       sign_in admin
 
@@ -750,12 +712,11 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'handles a database number race without leaving temporary nil values' do
-      students = 2.times.map { |index| create(:user, :student, name: "학생 #{index}") }
-      memberships = students.each_with_index.map do |student, index|
-        create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                      student_number: index + 1)
+      students = 2.times.map do |index|
+        managed_student(name: "학생 #{index}", student_number: index + 1)
       end
-      allow_any_instance_of(ClassroomMembership).to receive(:save!)
+      memberships = students
+      allow_any_instance_of(Student).to receive(:save!)
         .and_raise(ActiveRecord::RecordNotUnique)
       sign_in admin
 
@@ -773,8 +734,8 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'lets a classroom teacher update active student names' do
       assign_teacher(classroom, teacher)
-      student = create(:user, :student, name: '이전 이름')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
+      student = managed_student(name: '이전 이름')
+      membership = student
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -790,9 +751,8 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'lets a classroom teacher update inactive student names' do
       assign_teacher(classroom, teacher)
-      student = create(:user, :student, name: '쉬는 학생')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student',
-                                                 status: 'inactive')
+      student = managed_student(name: '쉬는 학생', status: 'inactive')
+      membership = student
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom, status: 'inactive'), params: {
@@ -808,8 +768,8 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'lets an admin update student names' do
-      student = create(:user, :student, name: '관리 전')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
+      student = managed_student(name: '관리 전')
+      membership = student
       sign_in admin
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -909,10 +869,10 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'rolls back all changes and shows row errors when any name is invalid' do
       assign_teacher(classroom, teacher)
-      valid_student = create(:user, :student, name: '유효 학생')
-      invalid_student = create(:user, :student, name: '무효 학생')
-      valid_membership = create(:classroom_membership, classroom: classroom, user: valid_student, role: 'student')
-      invalid_membership = create(:classroom_membership, classroom: classroom, user: invalid_student, role: 'student')
+      valid_student = managed_student(name: '유효 학생')
+      invalid_student = managed_student(name: '무효 학생')
+      valid_membership = valid_student
+      invalid_membership = invalid_student
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom, status: 'active'), params: {
@@ -961,12 +921,9 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'lets a classroom teacher reset active student PINs without changing inactive students' do
       assign_teacher(classroom, teacher)
-      active_student = create(:user, :student, student_pin: '1234')
-      second_active_student = create(:user, :student, student_pin: '2345')
-      inactive_student = create(:user, :student, student_pin: '3456')
-      create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
-      create(:classroom_membership, classroom: classroom, user: second_active_student, role: 'student')
-      create(:classroom_membership, classroom: classroom, user: inactive_student, role: 'student', status: 'inactive')
+      active_student = managed_student(student_pin: '1234')
+      second_active_student = managed_student(student_pin: '2345')
+      inactive_student = managed_student(student_pin: '3456', status: 'inactive')
       sign_in teacher
 
       patch classroom_member_student_pin_path(classroom),
@@ -985,8 +942,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'lets an admin reset active student PINs' do
-      active_student = create(:user, :student, student_pin: '1234')
-      create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
+      active_student = managed_student(student_pin: '1234')
       sign_in admin
 
       patch classroom_member_student_pin_path(classroom), params: { student_pin: '6789' }

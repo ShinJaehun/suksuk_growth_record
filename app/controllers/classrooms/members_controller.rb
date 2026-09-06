@@ -12,7 +12,7 @@ class Classrooms::MembersController < ApplicationController
   def edit_student_names
     authorize @classroom, :manage_members?
     @member_status = member_status_filter
-    load_student_name_memberships
+    load_students_for_roster
 
     render :edit_student_names, layout: false
   end
@@ -21,17 +21,17 @@ class Classrooms::MembersController < ApplicationController
     authorize @classroom, :manage_members?
 
     @member_status = member_status_filter
-    load_student_name_memberships
+    load_students_for_roster
     result = ClassroomStudents::RosterUpdate.call(
       classroom: @classroom,
-      memberships: @student_name_memberships,
+      students: @roster_students,
       rows: params.fetch(:students, {})
     )
 
     unless result.success?
-      @student_name_memberships = result.memberships
+      @roster_students = result.students
       @submitted_student_roster = result.rows
-      @student_roster_errors_by_membership_id = result.row_errors
+      @student_roster_errors_by_student_id = result.row_errors
       return render_student_roster_errors(result.error_key)
     end
 
@@ -63,24 +63,24 @@ class Classrooms::MembersController < ApplicationController
     @student_pin_error = student_pin_error_message(@student_pin)
     return render_student_pin_error if @student_pin_error.present?
 
-    memberships = active_student_memberships.to_a
-    if memberships.empty?
+    students = @classroom.students.active.order(:created_at, :id).to_a
+    if students.empty?
       @student_pin_error = t("students.members.pin_reset.no_active_students")
       return render_student_pin_error
     end
 
     ApplicationRecord.transaction do
-      memberships.each { |membership| membership.user.update!(student_pin: @student_pin) }
+      students.each { |student| student.update!(student_pin: @student_pin) }
     end
 
     respond_to do |format|
       format.html do
         redirect_to classroom_members_path(@classroom),
-          notice: t("students.members.pin_reset.success", count: memberships.size),
+          notice: t("students.members.pin_reset.success", count: students.size),
           status: :see_other
       end
       format.turbo_stream do
-        flash.now[:notice] = t("students.members.pin_reset.success", count: memberships.size)
+        flash.now[:notice] = t("students.members.pin_reset.success", count: students.size)
         render :update_student_pin, layout: false
       end
     end
@@ -98,60 +98,40 @@ class Classrooms::MembersController < ApplicationController
     @classroom = Classroom.find(params[:classroom_id])
   end
 
-  def load_student_memberships
+  def load_students
     @member_status = member_status_filter
-    base_scope = @classroom.classroom_memberships.student
-    status_counts = base_scope.group(:status).count
+    base_scope = @classroom.students
+    status_counts = base_scope.group(:active).count
     @student_member_counts = {
-      "active" => status_counts.fetch("active", 0),
-      "inactive" => status_counts.fetch("inactive", 0)
+      "active" => status_counts.fetch(true, 0),
+      "inactive" => status_counts.fetch(false, 0)
     }
     @student_member_counts["all"] = @student_member_counts.values.sum
 
-    @student_memberships =
+    @students =
       if @member_status == "all"
-        base_scope
-          .order(Arel.sql("CASE classroom_memberships.status WHEN 'active' THEN 0 ELSE 1 END"))
-          .in_roster_order
-          .preload(:user)
+        base_scope.order(active: :desc).in_roster_order
       else
-        base_scope
-          .where(status: @member_status)
-          .in_roster_order
-          .preload(:user)
+        base_scope.where(active: @member_status == "active").in_roster_order
       end
   end
 
   def load_members_page!
-    load_student_memberships
+    load_students
   end
 
   def member_status_filter
     params[:status].to_s.presence_in(MEMBER_STATUS_FILTERS) || "active"
   end
 
-  def active_student_memberships
-    @classroom.classroom_memberships
-      .student
-      .active
-      .includes(:user)
-      .order(:created_at, :id)
-  end
-
-  def load_student_name_memberships
+  def load_students_for_roster
     @member_status ||= member_status_filter
-    base_scope = @classroom.classroom_memberships.student
-    @student_name_memberships =
+    base_scope = @classroom.students
+    @roster_students =
       if @member_status == "all"
-        base_scope
-          .order(Arel.sql("CASE classroom_memberships.status WHEN 'active' THEN 0 ELSE 1 END"))
-          .in_roster_order
-          .preload(user: { avatar_attachment: :blob })
+        base_scope.order(active: :desc).in_roster_order
       else
-        base_scope
-          .where(status: @member_status)
-          .in_roster_order
-          .preload(user: { avatar_attachment: :blob })
+        base_scope.where(active: @member_status == "active").in_roster_order
       end
   end
 

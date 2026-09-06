@@ -43,13 +43,31 @@ RSpec.describe Student, type: :model do
     end
   end
 
+  describe "gender" do
+    it "accepts boy, girl, and nil for legacy compatibility" do
+      expect(build(:student, gender: "boy")).to be_valid
+      expect(build(:student, gender: "girl")).to be_valid
+      expect(build(:student, gender: nil)).to be_valid
+    end
+
+    it "rejects unknown gender values" do
+      expect(build(:student, gender: "other")).not_to be_valid
+    end
+
+    it "returns the avatar pool for each student gender" do
+      expect(described_class.avatar_keys_for("boy")).to eq(described_class::BOY_AVATAR_KEYS)
+      expect(described_class.avatar_keys_for("girl")).to eq(described_class::GIRL_AVATAR_KEYS)
+      expect(described_class.avatar_keys_for(nil)).to eq([])
+    end
+  end
+
   describe "PIN and avatar" do
     it "accepts only four-digit PIN input when provided" do
       expect(build(:student, student_pin: "1234")).to be_valid
       expect(build(:student, student_pin: "123")).not_to be_valid
     end
 
-    it "accepts any existing student preset without a gender" do
+    it "accepts existing student preset keys" do
       expect(build(:student, avatar_key: "boy01")).to be_valid
       expect(build(:student, avatar_key: "girl01")).to be_valid
       expect(build(:student, avatar_key: "teacherM01")).not_to be_valid

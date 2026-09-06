@@ -1,4 +1,17 @@
 ko:
+  activerecord:
+    attributes:
+      student:
+        student_number: "출석번호"
+    errors:
+      models:
+        student:
+          attributes:
+            student_number:
+              not_a_number: "출석번호는 1 이상의 정수여야 합니다."
+              not_an_integer: "출석번호는 1 이상의 정수여야 합니다."
+              greater_than_or_equal_to: "출석번호는 1 이상의 정수여야 합니다."
+              taken: "%{value}번 출석번호는 이미 사용 중입니다."
   students:
     roster:
       student_number_value: "%{number}번"
@@ -8,6 +21,8 @@ ko:
       student_number_hint: "학급에서 사용하는 번호를 입력하세요."
     edit:
       title: "학생 정보 관리"
+      success: "학생 정보를 수정했습니다."
+      pin_blank_hint: "새 PIN을 입력하면 변경됩니다. 비워두면 기존 PIN을 유지합니다."
       back_to_student: "학생 정보로 돌아가기"
       back_to_members: "구성원 관리로 돌아가기"
       self_pin:
@@ -46,6 +61,7 @@ ko:
       failure_fallback: "학생 정보를 확인해 주세요."
       errors:
         invalid_pin: "PIN은 4자리 숫자여야 합니다."
+        gender_required: "성별을 선택해 주세요."
         invalid_avatar: "성별에 맞는 아바타를 선택해 주세요."
         student_number_required: "출석번호를 입력해 주세요."
         student_number_invalid: "출석번호는 1 이상의 정수여야 합니다."
@@ -140,5 +156,5 @@ ko:
       confirm: "이 학생을 운영 대상에서 제외할까요? 과거 기록은 보존됩니다."
     reactivate:
       success: "학생을 복구했습니다."
-      active_membership_conflict: "이 학생은 다른 학급에서 활동 중이어서 복구할 수 없습니다."
+      active_membership_conflict: "같은 출석번호를 사용하는 활성 학생이 있어 복구할 수 없습니다."
       too_many: "한 교실에는 최대 %{count}명까지 등록할 수 있습니다."

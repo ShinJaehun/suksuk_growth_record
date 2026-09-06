@@ -9,7 +9,7 @@ School
 └── SchoolYear
     └── Classroom
         ├── HomeroomAssignment (current and history)
-        ├── student ClassroomMembership
+        ├── Student
         └── 운영 기록
 ```
 
@@ -35,13 +35,13 @@ Teacher 0..1 ─ 0..1 Classroom
 - 교사와 교실이 모두 active다.
 - 한 교사는 최대 한 교실, 한 교실은 최대 한 교사와 연결된다.
 
-정상 teacher는 SchoolYear에 속하며 SchoolYear가 없는 teacher는 교실 담당자로 배정할 수 없다. `ClassroomMembership`은 학생의 교실 소속에 사용한다.
+정상 teacher는 SchoolYear에 속하며 SchoolYear가 없는 teacher는 교실 담당자로 배정할 수 없다. 학생은 `Student.classroom_id`로 교실에 직접 속한다.
 
-teacher assignment는 `ended_on IS NULL`인 HomeroomAssignment, `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 관계를 보장한다. `ClassroomMembership`은 student membership에만 사용한다.
+teacher assignment는 `ended_on IS NULL`인 HomeroomAssignment와 current row partial unique index로 1:1 관계를 보장한다.
 
 ## 학생의 학교
 
-학생의 학교는 active student `ClassroomMembership`이 연결하는 `classroom.school_year.school`을 통해 결정한다.
+학생의 학교는 `student.classroom.school_year.school`을 통해 결정한다.
 
 ## 학교 비활성화
 

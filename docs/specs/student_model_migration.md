@@ -4,9 +4,9 @@
 
 학생을 staff 인증용 `User`와 분리하고 특정 학년도의 특정 Classroom에만 속하는 최소 `Student` 모델로 이전한다. 이 starter는 장기 학적·개인 identity 시스템이 아니라 학년도별 학급 활동과 보고서를 보존하는 캐주얼한 학급 서비스를 목표로 한다.
 
-## 현재 runtime과 목표
+## Legacy source와 목표
 
-현재 학생은 `User(role: student)`와 student `ClassroomMembership`의 조합이다. 이름, PIN digest, gender와 avatar 정보는 User에 있고 Classroom, 출석번호와 active/inactive 상태는 ClassroomMembership에 있다. 학생 PIN 인증도 현재는 Devise User session을 사용한다.
+migration 이전 legacy 학생은 `User(role: student)`와 student `ClassroomMembership`의 조합이었다. 이름, PIN digest, gender와 avatar 정보는 User에 있고 Classroom, 출석번호와 active/inactive 상태는 ClassroomMembership에 있다. 학생 PIN 인증도 현재는 Devise User session을 사용한다.
 
 최종 구조는 다음과 같다.
 
@@ -22,7 +22,7 @@ School
         └── Student
 ```
 
-`Student`는 `belongs_to :classroom`이며 `classroom_id`, `name`, `student_number`, `active`, `student_pin_digest`와 optional `avatar_key`를 가진다. School과 SchoolYear는 Classroom을 통해 결정한다. `gender`, ActiveStorage avatar attachment와 `StudentEnrollment`는 두지 않는다.
+`Student`는 `belongs_to :classroom`이며 `classroom_id`, `name`, nullable `student_number`, `active`, `student_pin_digest`, `gender`와 optional `avatar_key`를 가진다. School과 SchoolYear는 Classroom을 통해 결정한다. ActiveStorage avatar attachment와 `StudentEnrollment`는 두지 않는다.
 
 ## Identity와 lifecycle
 
@@ -36,7 +36,7 @@ School
 
 ## 출석번호와 roster
 
-- `student_number`는 1 이상의 정수이며 Student가 직접 소유한다.
+- `student_number`는 nullable이며 값이 있으면 1 이상의 정수이고 Student가 직접 소유한다.
 - 같은 Classroom의 active Student끼리 번호가 유일해야 하며 DB partial unique index를 최종 방어선으로 둔다.
 - inactive Student끼리와 active/inactive 사이에는 같은 번호를 허용한다.
 - 기존 번호순 roster, 번호 교환·순환, transaction과 active 최대 30명 계약을 유지한다.
@@ -65,7 +65,7 @@ Student는 Devise User가 아니며 Devise로 인증하지 않는다. 현재 URL
 기존 student ClassroomMembership마다 Student 하나를 생성한다.
 
 - `classroom_id`, `student_number`, active/inactive는 membership에서 복사한다.
-- `name`, PIN digest와 유효한 `avatar_key`는 student User에서 복사한다. legacy `gender`는 복사하지 않는다.
+- `name`, PIN digest, `gender`와 유효한 `avatar_key`는 student User에서 복사한다.
 - 한 student User가 여러 membership을 가지면 membership마다 독립 Student를 만든다. 새 row 사이에 legacy identity 연결을 남기지 않는다.
 
 Migration은 객관적 preflight를 먼저 수행하고 불일치를 추측하여 보정하지 않는다. 최소한 다음을 fail-fast 확인한다.
@@ -73,7 +73,7 @@ Migration은 객관적 preflight를 먼저 수행하고 불일치를 추측하�
 - membership의 User와 Classroom 존재
 - membership role과 User role이 모두 student
 - 필수 이름과 유효한 PIN digest 존재
-- student_number가 신규 필수/범위 규칙을 만족
+- student_number가 null이거나 1 이상의 정수인지 확인
 - active 번호 중복과 active Student 30명 제한 위반 없음
 - legacy student User에 ActiveStorage custom avatar attachment가 없음
 - 현재 starter 밖의 서비스가 student User를 참조한다면 integration 시 Student 참조로 전환할 수 있음
@@ -82,10 +82,10 @@ Student runtime 전환과 검증 뒤 User의 student role, student용 ClassroomM
 
 ## Avatar와 개인정보
 
-- Student는 gender를 저장하지 않는다.
+- Student는 `gender`를 저장하며 신규 등록에서는 `boy` 또는 `girl`을 요구한다. legacy nil은 migration/호환 경로에서만 허용할 수 있다.
 - optional `avatar_key`는 preset 학생 avatar를 표시하기 위한 cosmetic 정보이며 identity가 아니다.
-- 기존 `boyXX`/`girlXX` key와 asset은 사용할 수 있지만 Student는 이를 성별로 해석하지 않는다.
-- 신규 Student는 전체 허용 student preset pool에서 avatar를 선택할 수 있다.
+- `boyXX` key는 boy pool, `girlXX` key는 girl pool에 속한다.
+- 신규 Student와 명시적 avatar 변경은 Student.gender에 맞는 preset pool만 허용한다. legacy gender/avatar 불일치는 관계없는 수정에서 강제로 정리하지 않는다.
 - Student에는 ActiveStorage custom avatar upload 기능을 두지 않는다.
 - legacy student User에 custom avatar attachment가 있으면 migration preflight가 fail-fast한다. 조용히 삭제하거나 무시하지 않고 실제 데이터의 별도 정리·보존 결정 후 migration한다.
 - 이름 외 생년월일, 주소, 연락처, 보호자·학적 식별자 등 profile 개인정보를 추가하지 않는다.
@@ -101,7 +101,7 @@ Student runtime 전환과 검증 뒤 User의 student role, student용 ClassroomM
 
 1. Student는 정확히 하나의 Classroom에 직접 속한다.
 2. Student와 staff User 인증 경계가 분리되고 Student는 Devise를 사용하지 않는다.
-3. 이름, 번호, active 상태와 PIN digest의 source는 Student 하나다.
+3. 이름, 번호, active 상태, PIN digest, gender와 avatar_key의 source는 Student 하나다.
 4. active 번호는 Classroom 안에서 유일하고 inactive 번호 중복은 허용한다.
 5. 기존 roster ordering, 번호 교환·순환과 active 최대 30명 계약을 유지한다.
 6. inactive Student와 활동 기록을 보존하고 로그인·mutation을 막는다.
@@ -110,7 +110,7 @@ Student runtime 전환과 검증 뒤 User의 student role, student용 ClassroomM
 9. legacy membership 하나를 독립 Student 하나로 fail-fast 이전한다.
 10. 전환 뒤 student User와 ClassroomMembership을 runtime authority로 사용하지 않는다.
 11. 학년도 간 동일 학생 identity나 StudentEnrollment를 만들지 않는다.
-12. gender는 이전하지 않고 유효한 preset avatar_key만 이전하며 custom avatar attachment가 있으면 fail-fast한다.
+12. legacy gender와 유효한 preset avatar_key를 이전하고 gender/avatar 운영 규칙을 유지하며 custom avatar attachment가 있으면 fail-fast한다.
 
 ## Non-goals
 

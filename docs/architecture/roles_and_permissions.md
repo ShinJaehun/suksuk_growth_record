@@ -41,7 +41,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 
 ### Student
 
-- active student `ClassroomMembership`으로 연결된 자기 classroom과 자기 정보에만 접근한다.
+- active `Student`가 직접 속한 자기 classroom과 자기 정보에만 접근한다.
 - 교실 구조, 다른 사용자 정보와 운영 관리 기능을 변경할 수 없다.
 - PIN/token 로그인과 짧은 student session 정책을 따른다.
 
@@ -52,7 +52,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 | 리소스/액션 | global admin | manager | 일반 teacher | student |
 |---|---|---|---|---|
 | `/teachers` | 모든 학교 | 자기 학교 | 불가 | 불가 |
-| `/classrooms` 목록·상세 | 모든 학교 | 자기 학교 | 담당 active classroom | 자기 active membership classroom |
+| `/classrooms` 목록·상세 | 모든 학교 | 자기 학교 | 담당 active classroom | 자기 active Student classroom |
 | classroom 생성·구조 수정 | 가능 | 자기 학교 | 불가 | 불가 |
 | teacher profile 관리 | 가능 | 자기 학교 허용 범위 | 불가 | 불가 |
 | teacher lifecycle | member·manager | 자기 학교 member만 | 불가 | 불가 |
@@ -70,20 +70,20 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 - 신규 assignment 시 teacher와 classroom은 같은 school과 grade야 하며 둘 다 active여야 한다.
 - teacher와 classroom은 각각 다른 현재 assignment가 없어야 한다.
 - teacher 비활성화 시 현재 assignment를 해제하고 재활성화 때 자동 복원하지 않는다.
-- classroom 비활성화 시 assignment와 student membership을 보존하고 운영만 잠그며, 재활성화하면 보존된 관계를 다시 사용한다.
+- classroom 비활성화 시 assignment와 Student row를 보존하고 운영만 잠근다.
 - classroom grade 변경으로 담당 teacher와 불일치가 생기면 저장을 거부한다.
 
-담당 변경은 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 한 transaction에서 처리한다. 관계를 해제해도 학생 membership이나 과거 서비스 기록을 삭제하지 않는다.
+담당 변경은 기존 current HomeroomAssignment 종료와 새 assignment 생성을 한 transaction에서 처리한다. 관계를 해제해도 Student나 과거 서비스 기록을 삭제하지 않는다.
 
 Teacher의 학교 소속과 권한은 annual User에만 저장하며 별도 membership fallback을 두지 않는다.
 
-## Student membership 경계
+## Student 경계
 
-- student는 active classroom membership을 최대 하나만 가진다.
-- inactive student membership은 과거 소속 기록으로 보존한다.
-- 학생 조회·변경은 URL classroom, student membership과 actor의 classroom 권한을 함께 확인한다.
-- 다른 classroom이나 허용 scope 밖 membership id를 제출해도 변경하지 않는다.
-- student hard delete보다 membership lifecycle을 우선한다.
+- Student는 정확히 하나의 Classroom에 직접 속한다.
+- inactive Student는 row와 과거 기록을 보존한다.
+- 학생 조회·변경은 URL classroom, `Student.classroom_id`와 actor의 classroom 권한을 함께 확인한다.
+- 다른 classroom이나 허용 scope 밖 Student id를 제출해도 변경하지 않는다.
+- student hard delete보다 `Student.active` lifecycle을 우선한다.
 
 ## 현재 assignment 구조
 

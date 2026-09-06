@@ -133,14 +133,14 @@ RSpec.describe Classroom, type: :model do
     expect(build(:classroom, school_year: other_year, grade: 4, class_label: "1")).to be_valid
   end
 
-  it "returns only active student memberships from students" do
+  it "returns the classroom's direct Student records" do
     classroom = create(:classroom)
-    active_student = create(:user, :student)
-    inactive_student = create(:user, :student)
-    create(:classroom_membership, classroom: classroom, user: active_student, role: "student")
-    create(:classroom_membership, classroom: classroom, user: inactive_student, role: "student", status: "inactive")
+    active_student = create(:student, classroom: classroom, active: true)
+    inactive_student = create(:student, classroom: classroom, active: false)
+    outside_student = create(:student)
 
-    expect(classroom.students).to contain_exactly(active_student)
+    expect(classroom.students).to contain_exactly(active_student, inactive_student)
+    expect(classroom.students).not_to include(outside_student)
   end
 
   describe "hard delete safety" do

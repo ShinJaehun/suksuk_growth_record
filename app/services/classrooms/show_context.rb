@@ -3,12 +3,8 @@ class Classrooms::ShowContext
     @classroom = classroom
   end
 
-  def student_memberships
-    @student_memberships ||= @classroom.classroom_memberships
-                                       .student
-                                       .active
-                                       .in_roster_order
-                                       .preload(user: { avatar_attachment: :blob })
+  def students
+    @students ||= @classroom.students.active.in_roster_order
   end
 
   def homeroom_teacher

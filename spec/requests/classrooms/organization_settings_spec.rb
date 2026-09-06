@@ -159,12 +159,10 @@ RSpec.describe 'Classroom organization settings', type: :request do
     other_teacher = create(:user, :teacher, :active_annual_teacher,
                            annual_school: other_school,
                            name: '나래 선생님')
-    student = create(:user, :student, name: '새싹 학생')
-    other_student = create(:user, :student, name: '나래 학생')
+    student = create(:student, classroom: classroom, name: '새싹 학생')
+    other_student = create(:student, classroom: other_classroom, name: '나래 학생')
     assign_teacher(classroom, teacher)
     assign_teacher(other_classroom, other_teacher)
-    create(:classroom_membership, classroom: classroom, user: student, role: :student)
-    create(:classroom_membership, classroom: other_classroom, user: other_student, role: :student)
     sign_in admin
 
     get classrooms_path, params: { school_id: school.id }
@@ -233,11 +231,9 @@ RSpec.describe 'Classroom organization settings', type: :request do
 
   it 'counts and previews only active students on the classrooms index' do
     classroom = create(:classroom, annual_school: school, class_label: '활성 기준 학급')
-    active_student = create(:user, :student, name: '활성 미리보기 학생', gender: 'boy', avatar_key: 'boy01')
-    inactive_student = create(:user, :student, name: '비활성 제외 학생', gender: 'girl', avatar_key: 'girl01')
+    active_student = create(:student, classroom: classroom, name: '활성 미리보기 학생', avatar_key: 'boy01')
+    inactive_student = create(:student, classroom: classroom, name: '비활성 제외 학생', avatar_key: 'girl01', active: false)
     assign_teacher(classroom, teacher)
-    create(:classroom_membership, classroom: classroom, user: active_student, role: :student, status: :active)
-    create(:classroom_membership, classroom: classroom, user: inactive_student, role: :student, status: :inactive)
     sign_in admin
 
     get classrooms_path

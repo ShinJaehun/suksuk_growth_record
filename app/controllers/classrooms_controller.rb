@@ -61,7 +61,7 @@ class ClassroomsController < ApplicationController
     @can_manage_classroom = policy(@classroom).update?
     @can_manage_classroom_members = policy(@classroom).manage_members?
     context = Classrooms::ShowContext.new(classroom: @classroom)
-    @student_memberships = context.student_memberships
+    @students = context.students
     @homeroom_teacher = context.homeroom_teacher
   end
 

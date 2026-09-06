@@ -58,15 +58,15 @@ manager의 canonical source는 active annual teacher의 `User.school_role == "ma
 
 teacher의 담당 classroom을 바꾸면 기존 assignment 종료와 새 assignment 생성을 한 transaction에서 처리한다. 같은 SchoolYear 안에서 grade를 변경한 뒤 유효한 classroom을 선택하지 않으면 미배정으로 저장한다. persisted annual teacher의 `school_year_id`는 일반 teacher-management operation에서 변경하지 않으며 cross-School transfer는 별도 annual account workflow가 필요하다. classroom의 `school_year_id`도 생성 후 변경할 수 없다.
 
-현재 teacher assignment는 current HomeroomAssignment를 canonical source로 사용하며 teacher와 classroom 양쪽 모두 최대 하나의 상대만 가진다. `ClassroomMembership`은 student membership에 사용한다.
+현재 teacher assignment는 current HomeroomAssignment를 canonical source로 사용하며 teacher와 classroom 양쪽 모두 최대 하나의 상대만 가진다. 학생 소속과 lifecycle은 Classroom 직속 `Student`가 담당한다.
 
 ---
 
 ## 5. Lifecycle 경계
 
 - teacher 비활성화는 현재 classroom assignment를 해제하며 재활성화 시 자동 복원하지 않는다.
-- classroom 비활성화는 teacher assignment와 student membership을 보존한 채 운영을 잠근다.
-- student의 현재 운영 상태는 `ClassroomMembership.status`로 관리한다.
+- classroom 비활성화는 teacher assignment와 Student row를 보존한 채 운영을 잠근다.
+- student의 현재 운영 상태는 `Student.active`로 관리한다.
 
 ---
 

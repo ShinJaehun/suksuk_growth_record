@@ -4,7 +4,7 @@
 
 학교 공통 starter에서 teacher와 classroom의 운영 lifecycle, 역할별 접근·관리 권한, 일반 운영 영역과 향후 global admin bulk management 영역의 경계를 정의한다. teacher와 classroom의 단일 담당 관계를 명확히 하고 활성 상태를 일상적인 운영 lifecycle로 사용한다.
 
-이 문서는 현재 runtime의 annual teacher User, `HomeroomAssignment`, student `ClassroomMembership`과 School-scoped `login_id` 인증을 기준으로 한다. 아직 구현되지 않은 StudentEnrollment target은 [`school_year_architecture.md`](school_year_architecture.md)를 따른다.
+이 문서의 teacher/School/Classroom 정책은 현재 runtime을 설명한다. 문서 안의 student `ClassroomMembership` 설명은 Student cutover 이전 baseline이며, 현재 학생 runtime authority는 Classroom 직속 `Student`다. 학생 관련 현재 정책은 [`student_model_migration.md`](student_model_migration.md), [`student_membership_lifecycle.md`](student_membership_lifecycle.md), [`student_roster.md`](student_roster.md)가 우선한다.
 
 ## 용어와 현재 구조
 
