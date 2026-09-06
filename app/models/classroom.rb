@@ -3,12 +3,15 @@ class Classroom < ApplicationRecord
   has_secure_token :student_login_token
 
   belongs_to :school_year
-  belongs_to :teacher, class_name: 'User', optional: true, inverse_of: :assigned_classroom
+  has_many :homeroom_assignments, dependent: :restrict_with_error
+  has_one :current_homeroom_assignment, -> { current }, class_name: "HomeroomAssignment"
+  has_one :teacher, through: :current_homeroom_assignment
 
   # Student memberships protect a classroom from deletion.
   has_many :classroom_memberships, dependent: :destroy
   has_many :users, through: :classroom_memberships
   before_destroy :prevent_destroy_with_students, prepend: true
+  before_destroy :prevent_destroy_with_homeroom_history, prepend: true
 
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
@@ -36,9 +39,7 @@ class Classroom < ApplicationRecord
     less_than_or_equal_to: 6
   }
   validate :school_year_must_not_change, on: :update
-  validates :teacher_id, uniqueness: true, allow_nil: true
-  validate :teacher_assignment_must_be_valid
-  validate :teacher_assignment_must_not_replace_existing_teacher
+  validate :grade_must_match_current_teacher, on: :update
 
   private
 
@@ -54,6 +55,12 @@ class Classroom < ApplicationRecord
     errors.add(:school_year, :immutable)
   end
 
+  def grade_must_match_current_teacher
+    return unless will_save_change_to_grade? && teacher && teacher.grade != grade
+
+    errors.add(:teacher, :grade_mismatch)
+  end
+
   def prevent_destroy_with_students
     return unless classroom_memberships.student.exists?
 
@@ -61,29 +68,11 @@ class Classroom < ApplicationRecord
     throw :abort
   end
 
-  def teacher_assignment_must_be_valid
-    return unless teacher
+  def prevent_destroy_with_homeroom_history
+    return unless homeroom_assignments.exists?
 
-    errors.add(:teacher, :invalid) unless teacher.teacher?
-    errors.add(:teacher, :inactive) unless teacher.active?
-    errors.add(:teacher, :inactive_classroom) if !active? && will_save_change_to_teacher_id?
-
-    errors.add(:teacher, :school_year_required) unless teacher.school_year
-    return unless teacher.school_year
-
-    errors.add(:teacher, :inactive_school_year) unless school_year&.active? && teacher.school_year.active?
-    errors.add(:teacher, :inactive_school) unless school_year&.school&.active?
-    errors.add(:teacher, :school_mismatch) unless teacher.school_year_id == school_year_id
-    errors.add(:teacher, :grade_required) if teacher.grade.nil?
-    errors.add(:teacher, :grade_mismatch) unless teacher.grade == grade
+    errors.add(:base, :homeroom_history_present)
+    throw :abort
   end
 
-  def teacher_assignment_must_not_replace_existing_teacher
-    return unless will_save_change_to_teacher_id?
-    return if teacher_id_in_database.blank?
-    return if teacher_id.blank?
-    return if teacher_id == teacher_id_in_database
-
-    errors.add(:teacher, :already_assigned)
-  end
 end

@@ -21,7 +21,7 @@ module TeacherAssignmentHelpers
     attributes[:login_id] = FactoryBot.generate(:annual_teacher_login_id) if teacher.login_id.blank?
     attributes[:school_role] = "member" if teacher.school_role.blank?
     teacher.update!(attributes)
-    classroom.update!(teacher: teacher)
+    HomeroomAssignment.create!(classroom: classroom, teacher: teacher, started_on: Date.current)
   end
 end
 

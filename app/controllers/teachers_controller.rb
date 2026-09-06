@@ -124,8 +124,11 @@ class TeachersController < ApplicationController
     return Classroom.none unless school && selected_membership_grade
 
     classrooms = school.school_years.active.first&.classrooms&.active || Classroom.none
+    occupied_classroom_ids = HomeroomAssignment.current
+      .where.not(teacher_id: @teacher&.id)
+      .select(:classroom_id)
     classrooms.where(grade: selected_membership_grade)
-              .where(teacher_id: [nil, @teacher&.id].uniq)
+              .where.not(id: occupied_classroom_ids)
               .order(:class_label, :id)
               .load
   end
@@ -212,7 +215,7 @@ class TeachersController < ApplicationController
                   school.school_years.active.first&.classrooms&.find_by(id: raw_id, grade: membership_grade)
                 end
     classroom = nil if classroom&.inactive? && classroom != @teacher.assigned_classroom
-    if classroom.nil? || (classroom.teacher_id.present? && classroom.teacher_id != @teacher.id)
+    if classroom.nil? || (classroom.teacher && classroom.teacher != @teacher)
       @assignment_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.classroom_not_found'))
     end

@@ -4,7 +4,7 @@
 
 현재 starter에 실제로 존재하는 공통 학교·교실·사용자 구조를 기록한다. 추출 과정에서 제거된 service-specific 도메인은 현재 시스템으로 설명하지 않는다.
 
-이 문서는 현재 runtime을 설명한다. annual teacher User와 SchoolYear는 현재 구현이며, 아직 도입하지 않은 HomeroomAssignment와 StudentEnrollment target은 [`school_year_architecture.md`](../specs/school_year_architecture.md)와 구분한다.
+이 문서는 현재 runtime을 설명한다. annual teacher User, SchoolYear와 HomeroomAssignment는 현재 구현이며, 아직 도입하지 않은 StudentEnrollment target은 [`school_year_architecture.md`](../specs/school_year_architecture.md)와 구분한다.
 
 ## 핵심 역할
 
@@ -49,9 +49,9 @@
 현재 구조는 다음과 같다.
 
 ```text
-Classroom.teacher_id nullable
-foreign key: users
-unique index: teacher_id where teacher_id is not null
+HomeroomAssignment(classroom_id, teacher_id, started_on, ended_on)
+current: ended_on IS NULL
+partial unique: current classroom_id / current teacher_id
 
 Teacher 0..1 ↔ 0..1 Classroom
 ```
@@ -61,8 +61,8 @@ Teacher 0..1 ↔ 0..1 Classroom
 - 신규 assignment 시 teacher와 classroom은 같은 SchoolYear와 grade를 가지며 teacher, classroom, SchoolYear, School이 active여야 한다.
 - 신규 teacher `ClassroomMembership`은 만들지 않는다.
 - `ClassroomMembership`은 학생 classroom 소속에 사용한다.
-- teacher 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
-- classroom 비활성화 시 현재 `teacher_id`와 student membership을 보존한 채 운영을 잠그며, 재활성화하면 보존된 관계를 다시 사용한다.
+- teacher 비활성화 시 current assignment를 종료하고 재활성화 때 자동 복원하지 않는다.
+- classroom 비활성화 시 current assignment와 student membership을 보존한 채 운영을 잠그며, 재활성화하면 보존된 관계를 다시 사용한다.
 - classroom grade 변경이 `User.grade`와 충돌하면 먼저 assignment를 해제해야 한다.
 
 ## Teacher 운영 영역

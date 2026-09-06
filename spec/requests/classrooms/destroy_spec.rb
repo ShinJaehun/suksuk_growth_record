@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe 'Classroom deletion', type: :request do
   let(:school) { create(:school) }
 
-  it 'lets an admin delete an unused classroom while preserving the teacher user' do
+  it 'rejects deleting a classroom with homeroom history' do
     admin = create(:user, :admin)
     teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     classroom = create(:classroom, annual_school: school)
@@ -12,12 +12,13 @@ RSpec.describe 'Classroom deletion', type: :request do
 
     expect do
       delete classroom_path(classroom)
-    end.to change(Classroom, :count).by(-1)
+    end.not_to change(Classroom, :count)
 
-    expect(response).to redirect_to(classrooms_path)
+    expect(response).to redirect_to(edit_classroom_path(classroom))
     expect(response).to have_http_status(:see_other)
     expect(User.exists?(teacher.id)).to eq(true)
-    expect(flash[:notice]).to eq(I18n.t('classrooms.destroy.success'))
+    expect(classroom.reload.teacher).to eq(teacher)
+    expect(flash[:alert]).to be_present
   end
 
   it 'rejects direct deletion by an assigned teacher' do

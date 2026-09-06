@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_07_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_08_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -67,13 +67,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_001000) do
     t.integer "grade", null: false
     t.bigint "school_year_id", null: false
     t.string "student_login_token", null: false
-    t.bigint "teacher_id"
     t.datetime "updated_at", null: false
     t.index ["school_year_id", "grade", "class_label"], name: "index_classrooms_on_school_year_grade_class_label", unique: true
     t.index ["school_year_id"], name: "index_classrooms_on_school_year_id"
     t.index ["student_login_token"], name: "index_classrooms_on_student_login_token", unique: true
-    t.index ["teacher_id"], name: "index_classrooms_on_teacher_id", unique: true, where: "(teacher_id IS NOT NULL)"
     t.check_constraint "class_label::text <> ''::text AND length(class_label::text) <= 50 AND class_label::text = btrim(class_label::text) AND \"right\"(class_label::text, 1) <> '반'::text", name: "chk_classrooms_class_label_canonical"
+  end
+
+  create_table "homeroom_assignments", force: :cascade do |t|
+    t.bigint "classroom_id", null: false
+    t.datetime "created_at", null: false
+    t.date "ended_on"
+    t.date "started_on", null: false
+    t.bigint "teacher_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["classroom_id"], name: "index_current_homeroom_assignment_per_classroom", unique: true, where: "(ended_on IS NULL)"
+    t.index ["classroom_id"], name: "index_homeroom_assignments_on_classroom_id"
+    t.index ["teacher_id"], name: "index_current_homeroom_assignment_per_teacher", unique: true, where: "(ended_on IS NULL)"
+    t.index ["teacher_id"], name: "index_homeroom_assignments_on_teacher_id"
+    t.check_constraint "ended_on IS NULL OR ended_on >= started_on", name: "chk_homeroom_assignment_date_order"
   end
 
   create_table "school_years", force: :cascade do |t|
@@ -146,7 +158,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_001000) do
   add_foreign_key "classroom_memberships", "classrooms", on_delete: :cascade
   add_foreign_key "classroom_memberships", "users", on_delete: :cascade
   add_foreign_key "classrooms", "school_years"
-  add_foreign_key "classrooms", "users", column: "teacher_id"
+  add_foreign_key "homeroom_assignments", "classrooms"
+  add_foreign_key "homeroom_assignments", "users", column: "teacher_id"
   add_foreign_key "school_years", "schools"
   add_foreign_key "teacher_credential_events", "users", column: "actor_user_id"
   add_foreign_key "teacher_credential_events", "users", column: "teacher_user_id"

@@ -77,11 +77,26 @@ RSpec.describe Teachers::SaveWithAssignment do
 
     expect(save(teacher: teacher, school: school, grade: 5, classroom: first)).to be_success
     expect(first.reload.teacher).to eq(teacher)
+    first_assignment = first.current_homeroom_assignment
     expect(save(teacher: teacher, school: school, grade: 5, classroom: second)).to be_success
     expect(first.reload.teacher).to be_nil
+    expect(first_assignment.reload.ended_on).to eq(Date.current)
     expect(second.reload.teacher).to eq(teacher)
+    second_assignment = second.current_homeroom_assignment
     expect(save(teacher: teacher, school: school, grade: 5)).to be_success
     expect(second.reload.teacher).to be_nil
+    expect(second_assignment.reload.ended_on).to eq(Date.current)
+    expect(teacher.homeroom_assignments.count).to eq(2)
+  end
+
+  it "is idempotent when the selected classroom is unchanged" do
+    school = create(:school)
+    teacher = annual_teacher(school: school, grade: 5)
+    classroom = create(:classroom, annual_school: school, grade: 5, teacher: teacher)
+
+    expect do
+      expect(save(teacher: teacher, school: school, grade: 5, classroom: classroom)).to be_success
+    end.not_to change(HomeroomAssignment, :count)
   end
 
   it "rejects mismatched, inactive, occupied, and nonexistent classrooms" do

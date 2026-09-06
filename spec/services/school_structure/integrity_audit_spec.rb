@@ -2,7 +2,12 @@ require 'rails_helper'
 
 RSpec.describe SchoolStructure::IntegrityAudit do
   def assign_without_validation(classroom, teacher)
-    classroom.update_columns(teacher_id: teacher.id)
+    assignment = HomeroomAssignment.new(
+      classroom: classroom,
+      teacher: teacher,
+      started_on: Date.current
+    )
+    assignment.save!(validate: false)
   end
 
   it 'is clean for a valid teacher assignment' do
@@ -69,8 +74,8 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school, annual_grade: 4)
     classroom = create(:classroom, annual_school: school, grade: 4)
-    teacher.update_columns(active: false)
     assign_without_validation(classroom, teacher)
+    teacher.update_columns(active: false)
 
     result = described_class.call
 
@@ -78,6 +83,16 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     expect(result.samples_for(:inactive_teacher_assignment)).to include(
       include('classroom_id' => classroom.id, 'user_id' => teacher.id)
     )
+  end
+
+  it 'finds an assignment whose user is not a teacher' do
+    classroom = create(:classroom)
+    student = create(:user, :student)
+    assign_without_validation(classroom, student)
+
+    result = described_class.call
+
+    expect(result.count_for(:invalid_homeroom_assignment_teacher_role)).to eq(1)
   end
 
   it 'limits samples without changing the total issue count' do

@@ -2,6 +2,7 @@ FactoryBot.define do
   factory :classroom do
     transient do
       annual_school { nil }
+      teacher { nil }
     end
 
     school_year do
@@ -11,5 +12,11 @@ FactoryBot.define do
     end
     sequence(:class_label) { |n| n.to_s }
     grade { 4 }
+
+    after(:create) do |classroom, evaluator|
+      if evaluator.teacher
+        create(:homeroom_assignment, classroom: classroom, teacher: evaluator.teacher)
+      end
+    end
   end
 end

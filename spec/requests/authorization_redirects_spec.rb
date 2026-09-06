@@ -12,7 +12,7 @@ RSpec.describe "Authorization redirects", type: :request do
     get classroom_path(classroom)
     expect(response).to have_http_status(:ok)
 
-    classroom.update!(teacher: nil)
+    classroom.current_homeroom_assignment.update!(ended_on: Date.current)
     get classroom_path(classroom), headers: { "HTTP_REFERER" => classroom_url(classroom) }
 
     expect(response).to redirect_to(root_path)

@@ -144,15 +144,17 @@ RSpec.describe Classroom, type: :model do
   end
 
   describe "hard delete safety" do
-    it "allows deletion when a teacher is assigned and there are no students" do
+    it "rejects deletion when homeroom assignment history exists" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
       classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
-      expect(classroom.destroy).to be_truthy
-      expect(Classroom.exists?(classroom.id)).to eq(false)
+      assignment = classroom.current_homeroom_assignment
+
+      expect(classroom.destroy).to eq(false)
+      expect(Classroom.exists?(classroom.id)).to eq(true)
       expect(User.exists?(teacher.id)).to eq(true)
-      expect(ClassroomMembership.where(classroom_id: classroom.id)).to be_empty
+      expect(HomeroomAssignment.exists?(assignment.id)).to eq(true)
     end
 
     it "rejects deletion when an active student membership exists" do
@@ -178,62 +180,6 @@ RSpec.describe Classroom, type: :model do
 
 
   describe "teacher assignment" do
-    it "allows one active teacher from the same school year and grade" do
-      school = create(:school)
-      teacher = annual_teacher(school: school, grade: 4)
-      classroom = build(:classroom, annual_school: school, grade: 4, teacher: teacher)
-
-      expect(classroom).to be_valid
-    end
-
-    it "rejects a teacher from another school year in the same school" do
-      school = create(:school)
-      classroom_year = create(:school_year, :active, school: school, year: 2026)
-      teacher_year = create(:school_year, :planning, school: school, year: 2027)
-      teacher = create(:user, :teacher, school_year: teacher_year,
-        login_id: "next-year-teacher", school_role: "member", grade: 4)
-
-      expect(build(:classroom, school_year: classroom_year, grade: 4, teacher: teacher)).not_to be_valid
-    end
-
-    it "rejects planning and archived annual teachers without replacing the assignment" do
-      school = create(:school)
-      current_teacher = annual_teacher(school: school, grade: 4)
-      assigned_classroom = create(:classroom, annual_school: school, grade: 4, teacher: current_teacher)
-
-      %i[planning archived].each_with_index do |status, offset|
-        school_year = create(:school_year, status, school: school, year: 2027 + offset)
-        candidate = create(:user, :teacher, school_year: school_year,
-          login_id: "#{status}-teacher", school_role: "member", grade: 4)
-        classroom = build(:classroom, annual_school: school, grade: 4, teacher: candidate)
-
-        expect(classroom).not_to be_valid
-        expect(assigned_classroom.reload.teacher).to eq(current_teacher)
-      end
-    end
-
-    it "rejects assigning one teacher to two classrooms" do
-      school = create(:school)
-      teacher = annual_teacher(school: school, grade: 4)
-      create(:classroom, annual_school: school, grade: 4, teacher: teacher)
-
-      duplicate = build(:classroom, annual_school: school, grade: 4, teacher: teacher)
-      expect(duplicate).not_to be_valid
-    end
-
-    it "rejects school, grade, lifecycle, and role mismatches" do
-      school = create(:school)
-      teacher = annual_teacher(school: school, grade: 4)
-      invalid = [
-        build(:classroom, annual_school: create(:school), grade: 4, teacher: teacher),
-        build(:classroom, annual_school: school, grade: 5, teacher: teacher),
-        build(:classroom, annual_school: school, grade: 4, active: false, teacher: teacher),
-        build(:classroom, teacher: create(:user, :student))
-      ]
-
-      expect(invalid).to all(be_invalid)
-    end
-
     it "preserves its teacher through deactivation and reactivation" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
@@ -247,19 +193,6 @@ RSpec.describe Classroom, type: :model do
       expect(classroom.reload.teacher).to eq(teacher)
     end
 
-    it "rejects assigning or replacing a teacher while inactive" do
-      school = create(:school)
-      first_teacher = annual_teacher(school: school, grade: 4)
-      second_teacher = annual_teacher(school: school, grade: 4)
-      unassigned = create(:classroom, annual_school: school, grade: 4, active: false)
-      assigned = create(:classroom, annual_school: school, grade: 4, teacher: first_teacher)
-      assigned.update!(active: false)
-
-      expect(unassigned.update(teacher: second_teacher)).to eq(false)
-      expect(assigned.update(teacher: second_teacher)).to eq(false)
-      expect(assigned.reload.teacher).to eq(first_teacher)
-    end
-
     it "releases an inactive classroom assignment when its teacher is deactivated" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
@@ -267,6 +200,11 @@ RSpec.describe Classroom, type: :model do
       classroom.update!(active: false)
 
       teacher.update!(active: false)
+
+      expect(classroom.reload.teacher).to be_nil
+      expect(classroom.homeroom_assignments.last.ended_on).to eq(Date.current)
+
+      teacher.update!(active: true)
 
       expect(classroom.reload.teacher).to be_nil
     end

@@ -8,7 +8,7 @@
 School
 └── SchoolYear
     └── Classroom
-        ├── teacher_id (optional, unique when present)
+        ├── HomeroomAssignment (current and history)
         ├── student ClassroomMembership
         └── 운영 기록
 ```
@@ -27,7 +27,7 @@ SchoolYear 1 ─ N Teacher
 Teacher 0..1 ─ 0..1 Classroom
 ```
 
-현재 담당 교사는 nullable `Classroom.teacher_id`로 표현하며 다음을 모두 만족해야 한다.
+현재 담당 교사는 `ended_on IS NULL`인 HomeroomAssignment로 표현하며 다음을 모두 만족해야 한다.
 
 - 연결된 `User.role`이 `teacher`다.
 - 교사와 Classroom의 `school_year_id`가 같다.
@@ -37,7 +37,7 @@ Teacher 0..1 ─ 0..1 Classroom
 
 정상 teacher는 SchoolYear에 속하며 SchoolYear가 없는 teacher는 교실 담당자로 배정할 수 없다. `ClassroomMembership`은 학생의 교실 소속에 사용한다.
 
-teacher assignment는 nullable `Classroom.teacher_id`, `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 관계를 보장한다. `ClassroomMembership`은 student membership에만 사용한다.
+teacher assignment는 `ended_on IS NULL`인 HomeroomAssignment, `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 관계를 보장한다. `ClassroomMembership`은 student membership에만 사용한다.
 
 ## 학생의 학교
 

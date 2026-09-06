@@ -15,6 +15,6 @@ class ClassroomStudentPolicy < ApplicationPolicy
   
   def teacher_of?(classroom)
     return false unless teacher?
-    classroom.teacher_id == user.id
+    classroom.teacher == user
   end
 end

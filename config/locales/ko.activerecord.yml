@@ -17,6 +17,7 @@ ko:
               immutable: "생성된 교실의 소속 학교는 변경할 수 없습니다."
             base:
               students_present: "학생이 있는 교실은 삭제할 수 없습니다."
+              homeroom_history_present: "담임 이력이 있는 교실은 삭제할 수 없습니다."
             teacher:
               invalid: "선생님 계정만 담당자로 지정할 수 있습니다."
               inactive: "비활성 선생님은 담당자로 지정할 수 없습니다."

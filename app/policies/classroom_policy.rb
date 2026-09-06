@@ -12,7 +12,8 @@ class ClassroomPolicy < ApplicationPolicy
 
       # Teachers can see only their classrooms
       if user&.active_teacher?
-        return active_scope.where(teacher_id: user.id, active: true)
+        return active_scope.joins(:current_homeroom_assignment)
+          .where(homeroom_assignments: { teacher_id: user.id }, active: true)
       end
 
       # Students can see only their classrooms
@@ -115,7 +116,7 @@ class ClassroomPolicy < ApplicationPolicy
   def teacher_of?(classroom)
     return false unless user&.active_teacher?
 
-    classroom.teacher_id == user.id
+    classroom.teacher == user
   end
 
   def member_of?(classroom)

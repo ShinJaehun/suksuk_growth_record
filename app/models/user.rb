@@ -6,24 +6,24 @@ class User < ApplicationRecord
   has_secure_password :student_pin, validations: false
 
   GENDERS = %w[boy girl male female].freeze
-  BOY_AVATAR_KEYS = (1..23).map { |number| format("boy%02d", number) }.freeze
-  GIRL_AVATAR_KEYS = (1..17).map { |number| format("girl%02d", number) }.freeze
-  TEACHER_MALE_AVATAR_KEYS = (1..8).map { |number| format("teacherM%02d", number) }.freeze
-  TEACHER_FEMALE_AVATAR_KEYS = (1..6).map { |number| format("teacherF%02d", number) }.freeze
+  BOY_AVATAR_KEYS = (1..23).map { |number| format('boy%02d', number) }.freeze
+  GIRL_AVATAR_KEYS = (1..17).map { |number| format('girl%02d', number) }.freeze
+  TEACHER_MALE_AVATAR_KEYS = (1..8).map { |number| format('teacherM%02d', number) }.freeze
+  TEACHER_FEMALE_AVATAR_KEYS = (1..6).map { |number| format('teacherF%02d', number) }.freeze
   ADMIN_AVATAR_KEYS = %w[admin].freeze
   STUDENT_AVATAR_KEYS = (BOY_AVATAR_KEYS + GIRL_AVATAR_KEYS).freeze
   TEACHER_AVATAR_KEYS = (TEACHER_MALE_AVATAR_KEYS + TEACHER_FEMALE_AVATAR_KEYS).freeze
   AVATAR_KEYS_BY_ROLE = {
-    "student" => STUDENT_AVATAR_KEYS,
-    "teacher" => TEACHER_AVATAR_KEYS,
-    "admin" => (ADMIN_AVATAR_KEYS + TEACHER_AVATAR_KEYS).freeze
+    'student' => STUDENT_AVATAR_KEYS,
+    'teacher' => TEACHER_AVATAR_KEYS,
+    'admin' => (ADMIN_AVATAR_KEYS + TEACHER_AVATAR_KEYS).freeze
   }.freeze
   AVATAR_KEYS_BY_GENDER = {
-    "boy" => BOY_AVATAR_KEYS,
-    "girl" => GIRL_AVATAR_KEYS,
-    "male" => TEACHER_MALE_AVATAR_KEYS,
-    "female" => TEACHER_FEMALE_AVATAR_KEYS,
-    "admin" => ADMIN_AVATAR_KEYS
+    'boy' => BOY_AVATAR_KEYS,
+    'girl' => GIRL_AVATAR_KEYS,
+    'male' => TEACHER_MALE_AVATAR_KEYS,
+    'female' => TEACHER_FEMALE_AVATAR_KEYS,
+    'admin' => ADMIN_AVATAR_KEYS
   }.freeze
   AVATAR_KEYS = AVATAR_KEYS_BY_GENDER.values.flatten.freeze
 
@@ -31,17 +31,17 @@ class User < ApplicationRecord
   validates :gender, inclusion: { in: GENDERS }, allow_nil: true
   validates :avatar_key, inclusion: { in: AVATAR_KEYS }, allow_nil: true, if: :will_save_change_to_avatar_key?
   validate :avatar_key_allowed_for_role, if: :will_save_change_to_avatar_key?
-  validates :student_pin, format: { with: /\A\d{4}\z/, message: "must be 4 digits" }, allow_blank: true
+  validates :student_pin, format: { with: /\A\d{4}\z/, message: 'must be 4 digits' }, allow_blank: true
   validates :school_year, :login_id, :school_role, presence: true, if: :teacher?
   validates :school_role, inclusion: { in: %w[member manager] }, if: :teacher?
   validates :grade,
-    numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 6 },
-    allow_nil: true,
-    if: :teacher?
+            numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 6 },
+            allow_nil: true,
+            if: :teacher?
   validates :school_year, :login_id, :school_role, :grade, absence: true, unless: :teacher?
   validate :annual_school_year_immutable, on: :update, if: :teacher?
 
-  enum :role, { student: "student", teacher: "teacher", admin: "admin" }
+  enum :role, { student: 'student', teacher: 'teacher', admin: 'admin' }
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
   has_one_attached :avatar
@@ -54,20 +54,24 @@ class User < ApplicationRecord
   has_many :classroom_memberships, dependent: :destroy
   has_many :classrooms, through: :classroom_memberships
   belongs_to :school_year, optional: true
-  has_one :assigned_classroom,
-    class_name: "Classroom",
-    foreign_key: :teacher_id,
-    inverse_of: :teacher,
-    dependent: :nullify
+  has_many :homeroom_assignments,
+           foreign_key: :teacher_id,
+           inverse_of: :teacher,
+           dependent: :restrict_with_error
+  has_one :current_homeroom_assignment,
+          -> { current },
+          class_name: 'HomeroomAssignment',
+          foreign_key: :teacher_id
+  has_one :assigned_classroom, through: :current_homeroom_assignment, source: :classroom
   has_many :issued_teacher_credential_events,
-    class_name: "TeacherCredentialEvent",
-    foreign_key: :actor_user_id,
-    inverse_of: :actor_user,
-    dependent: :restrict_with_error
+           class_name: 'TeacherCredentialEvent',
+           foreign_key: :actor_user_id,
+           inverse_of: :actor_user,
+           dependent: :restrict_with_error
   has_many :teacher_credential_events,
-    foreign_key: :teacher_user_id,
-    inverse_of: :teacher_user,
-    dependent: :restrict_with_error
+           foreign_key: :teacher_user_id,
+           inverse_of: :teacher_user,
+           dependent: :restrict_with_error
 
   def self.avatar_keys_for(gender)
     AVATAR_KEYS_BY_GENDER.fetch(gender.to_s, [])
@@ -99,11 +103,11 @@ class User < ApplicationRecord
   end
 
   def school_manager?
-    teacher? && school_role == "manager"
+    teacher? && school_role == 'manager'
   end
 
   def school_member?
-    teacher? && school_role == "member"
+    teacher? && school_role == 'member'
   end
 
   def active_for_authentication?
@@ -115,7 +119,7 @@ class User < ApplicationRecord
   end
 
   def default_student_pin?
-    student_pin_configured? && authenticate_student_pin("1234")
+    student_pin_configured? && authenticate_student_pin('1234')
   end
 
   def email_required?
@@ -145,7 +149,7 @@ class User < ApplicationRecord
 
   def clear_student_devise_credentials
     self.email = nil
-    self.encrypted_password = ""
+    self.encrypted_password = ''
     self.reset_password_token = nil
     self.reset_password_sent_at = nil
   end
@@ -155,7 +159,11 @@ class User < ApplicationRecord
   end
 
   def release_assigned_classroom
-    assigned_classroom&.update!(teacher: nil)
+    assignment = current_homeroom_assignment
+    return unless assignment
+    return if assignment.classroom.school_year.archived?
+
+    assignment.update!(ended_on: Date.current)
   end
 
   def avatar_key_allowed_for_role
@@ -163,5 +171,4 @@ class User < ApplicationRecord
 
     errors.add(:avatar_key, :inclusion)
   end
-
 end

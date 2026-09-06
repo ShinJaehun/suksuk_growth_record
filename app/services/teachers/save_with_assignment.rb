@@ -31,7 +31,8 @@ module Teachers
     def call
       User.transaction do
         teacher.lock! if teacher.persisted?
-        @current_classroom = teacher.assigned_classroom
+        @current_assignment = teacher.current_homeroom_assignment
+        @current_classroom = current_assignment&.classroom
         validate_annual_school_immutability
         raise ActiveRecord::Rollback if teacher.errors.any?
 
@@ -42,10 +43,18 @@ module Teachers
         raise ActiveRecord::Rollback if teacher.errors.any?
 
         [current_classroom, classroom].compact.uniq.sort_by(&:id).each(&:lock!)
+        validate_current_target_after_lock
+        raise ActiveRecord::Rollback if teacher.errors.any?
 
         persist_teacher!
-        current_classroom.update!(teacher: nil) if current_classroom && current_classroom != classroom
-        classroom.update!(teacher: teacher) if classroom && classroom.teacher_id != teacher.id
+        current_assignment.update!(ended_on: Date.current) if current_assignment && current_classroom != classroom
+        if classroom && current_classroom != classroom
+          HomeroomAssignment.create!(
+            classroom: classroom,
+            teacher: teacher,
+            started_on: Date.current
+          )
+        end
       end
 
       result
@@ -58,7 +67,7 @@ module Teachers
     private
 
     attr_reader :teacher, :attributes, :school, :raw_classroom_id, :membership_grade, :classroom, :grade,
-                :current_classroom, :actor, :temporary_password
+                :current_assignment, :current_classroom, :actor, :temporary_password
 
     def normalize_inputs
       normalize_login_id
@@ -89,7 +98,8 @@ module Teachers
       add_error(:classroom_grade_mismatch) unless grade && classroom.grade == grade
       add_error(:inactive_teacher) unless teacher.active?
       add_error(:inactive_classroom) unless classroom.active? || classroom == current_classroom
-      add_error(:classroom_already_assigned) if classroom.teacher_id.present? && classroom.teacher_id != teacher.id
+      assigned_teacher = classroom.teacher
+      add_error(:classroom_already_assigned) if assigned_teacher && assigned_teacher != teacher
     end
 
     def validate_annual_school_immutability
@@ -128,6 +138,15 @@ module Teachers
 
     def invalid_classroom_id?
       raw_classroom_id.present? && classroom.nil?
+    end
+
+    def validate_current_target_after_lock
+      return unless classroom
+
+      target_assignment = HomeroomAssignment.current.find_by(classroom_id: classroom.id)
+      return if target_assignment.nil? || target_assignment.teacher_id == teacher.id
+
+      add_error(:classroom_already_assigned)
     end
 
     def persist_teacher!

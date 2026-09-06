@@ -4,7 +4,7 @@
 
 학교 공통 starter에서 teacher와 classroom의 운영 lifecycle, 역할별 접근·관리 권한, 일반 운영 영역과 향후 global admin bulk management 영역의 경계를 정의한다. teacher와 classroom의 단일 담당 관계를 명확히 하고 활성 상태를 일상적인 운영 lifecycle로 사용한다.
 
-이 문서는 현재 runtime의 annual teacher User, `Classroom.teacher_id`, student `ClassroomMembership`과 School-scoped `login_id` 인증을 기준으로 한다. 아직 구현되지 않은 HomeroomAssignment와 StudentEnrollment target은 [`school_year_architecture.md`](school_year_architecture.md)를 따른다.
+이 문서는 현재 runtime의 annual teacher User, `HomeroomAssignment`, student `ClassroomMembership`과 School-scoped `login_id` 인증을 기준으로 한다. 아직 구현되지 않은 StudentEnrollment target은 [`school_year_architecture.md`](school_year_architecture.md)를 따른다.
 
 ## 용어와 현재 구조
 
@@ -12,7 +12,7 @@
 - 학교 대표 선생님은 해당 학교의 active SchoolYear에 속하고 `User.role == "teacher"`, `User.school_role == "manager"`인 사용자다.
 - 일반 선생님은 `User.role == "teacher"`이고 `User.school_role == "member"`인 사용자다.
 - teacher의 학교는 `User.school_year.school`이다.
-- teacher와 classroom의 현재 담당 관계는 nullable `Classroom.teacher_id`로 표현한다.
+- teacher와 classroom의 현재 담당 관계는 current `HomeroomAssignment`로 표현한다.
 - `Classroom`은 `SchoolYear`에 속하고 학교는 `classroom.school_year.school`로 결정하며 기존 학년 정책은 [Classroom Grade Foundation](classroom_grade_foundation.md)을 따른다.
 
 ## 운영 영역 구조
@@ -93,10 +93,10 @@ manager lifecycle은 manager 수나 다른 active manager 존재 여부와 관�
 
 - teacher는 담당 classroom이 없거나 정확히 하나다.
 - classroom은 담당 teacher가 없거나 정확히 한 명이다.
-- 현재 담당 관계의 canonical source of truth는 nullable `Classroom.teacher_id`다.
+- 현재 담당 관계의 canonical source of truth는 current `HomeroomAssignment`다.
 - `Classroom`은 teacher `User`를 optional association으로 참조하고 teacher는 최대 하나의 classroom을 가진다. 정확한 Rails association 이름은 구현 시 기존 `User` naming에 맞춘다.
-- DB의 nullable `teacher_id` foreign key와 null이 아닌 값에 대한 unique index로 한 teacher가 여러 classroom을 동시에 담당하지 못하게 한다.
-- `Classroom.teacher_id` 자체가 단일 값이므로 한 classroom에 여러 teacher를 배정하지 않는다.
+- HomeroomAssignment의 Classroom/User foreign key와 current row partial unique index로 한 teacher가 여러 classroom을 동시에 담당하지 못하게 한다.
+- current HomeroomAssignment partial uniqueness이므로 한 classroom에 여러 teacher를 배정하지 않는다.
 - 신규 teacher `ClassroomMembership`은 생성하지 않는다. `ClassroomMembership`은 학생의 classroom 소속과 그에 필요한 기존 책임만 유지한다.
 
 ### 기존 teacher assignment 이전
@@ -166,7 +166,7 @@ active:boolean, default: true, null: false
 
 - 삭제하지 않고 기존 student membership과 학생·서비스 기록을 보존한다.
 - 신규 student와 teacher를 배정할 수 없다.
-- 비활성화는 교실 전체 운영을 잠그며 현재 `teacher_id`, student membership과 `student_number`를 그대로 보존한다.
+- 비활성화는 교실 전체 운영을 잠그며 current HomeroomAssignment, student membership과 `student_number`를 그대로 보존한다.
 - 학생 관리 등 일반 운영 mutation을 허용하지 않는다.
 - student token/PIN 로그인을 허용하지 않으며 기존 학생 session도 다음 request에서 종료한다.
 - 일반 선생님의 목록, 자동 진입과 정상 운영 대상에서 제외한다.
@@ -174,7 +174,7 @@ active:boolean, default: true, null: false
 
 inactive School에 대한 기존 lifecycle과 접근 차단이 상위 경계다. classroom의 active 상태가 inactive School의 운영을 다시 허용하거나 기존 School policy를 우회하지 않는다.
 
-classroom을 재활성화하면 보존된 `teacher_id`와 student membership을 별도 복원 작업 없이 다시 사용한다. 기존 teacher가 그 시점에도 active이고 school·grade 불변식을 만족해야 한다. classroom이 inactive인 동안 teacher 자체가 비활성화되면 Teacher lifecycle 정책에 따라 `teacher_id`를 해제하며, 이 경우 classroom을 재활성화해도 teacher를 자동 복원하지 않는다.
+classroom을 재활성화하면 보존된 current HomeroomAssignment와 student membership을 별도 복원 작업 없이 다시 사용한다. 기존 teacher가 그 시점에도 active이고 school·grade 불변식을 만족해야 한다. classroom이 inactive인 동안 teacher 자체가 비활성화되면 Teacher lifecycle 정책에 따라 `teacher_id`를 해제하며, 이 경우 classroom을 재활성화해도 teacher를 자동 복원하지 않는다.
 
 inactive classroom에 보존된 teacher assignment는 classroom을 재활성화하기 전까지 해당 teacher의 grade 변경, classroom 이동과 assignment 해제를 허용하지 않는다. 이름·이메일·성별·avatar 등 일반 profile 변경은 허용하며, teacher 자체의 lifecycle 변경은 별도 정책을 따른다.
 
@@ -193,7 +193,7 @@ teacher를 classroom에 배정할 때 다음을 모두 만족해야 한다.
 
 global admin도 이 불변식을 우회할 수 없다. 다른 school, 다른 grade, inactive teacher, inactive classroom 또는 이미 배정된 teacher/classroom ID를 직접 제출해도 거부한다.
 
-teacher의 담당 classroom을 바꾸면 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 하나의 transaction에서 처리한다. 미배정으로 변경하면 기존 `teacher_id`만 해제한다. 이 변경은 현재 운영 관계만 갱신하며 과거 서비스 기록이나 작성자 정보를 삭제하지 않는다.
+teacher의 담당 classroom을 바꾸면 기존 assignment 종료와 새 assignment 생성을 하나의 transaction에서 처리한다. 미배정으로 변경하면 기존 `teacher_id`만 해제한다. 이 변경은 현재 운영 관계만 갱신하며 과거 서비스 기록이나 작성자 정보를 삭제하지 않는다.
 
 teacher의 grade가 `nil`이면 classroom을 배정할 수 없다. 담당 classroom이 있는 teacher의 grade를 다른 값으로 변경할 때 기존 classroom을 유지할 수 없으며, 새 grade의 classroom을 선택하거나 미배정으로 저장해야 한다. grade 변경은 기존 classroom assignment를 자동으로 다른 classroom에 옮기지 않는다.
 
@@ -263,7 +263,7 @@ teacher의 grade와 담당 classroom grade는 연결 상태에서 항상 일치�
 
 global admin은 관리 가능한 teacher의 `User.grade`를 설정·수정할 수 있다. 학교 대표 선생님은 자기 school의 ordinary member teacher에 대해 설정·수정할 수 있고, 자신의 일반 profile·운영 정보는 기존 canonical 권한 범위 안에서 수정할 수 있다. ordinary teacher는 `/teachers`에서 학년을 관리할 수 없으며 다른 school의 teacher grade는 URL 또는 parameter 조작으로도 변경할 수 없다. 이 권한은 lifecycle이나 manager role 변경 권한을 확대하지 않는다.
 
-teacher 운영 목록에서 기본 학년 표시는 `User.grade`를 사용하고 값이 없으면 미배정 또는 기존 locale의 동일 의미를 표시한다. 학급은 `Classroom.teacher_id`로 연결된 단일 classroom을 표시하고 없으면 미배정으로 표시한다.
+teacher 운영 목록에서 기본 학년 표시는 `User.grade`를 사용하고 값이 없으면 미배정 또는 기존 locale의 동일 의미를 표시한다. 학급은 current HomeroomAssignment로 연결된 단일 classroom을 표시하고 없으면 미배정으로 표시한다.
 
 Teacher의 학교 소속과 권한은 annual User에만 저장하며 별도 membership fallback을 두지 않는다. 별도 Grade model이나 table은 만들지 않는다.
 
@@ -288,7 +288,7 @@ teacher의 기본 학년 filter는 `User.grade`를 사용한다.
 - `미배정`: `User.grade`가 `nil`인 teacher
 - `전체`: 현재 허용된 school scope의 모든 대상 teacher
 
-teacher 학년 filter는 `User.grade`만 기준으로 한다. 현재 담당 학급은 `Classroom.teacher_id`로 연결된 단일 classroom이며 학년 filter의 source가 아니다.
+teacher 학년 filter는 `User.grade`만 기준으로 한다. 현재 담당 학급은 current HomeroomAssignment로 연결된 단일 classroom이며 학년 filter의 source가 아니다.
 
 ### `/teachers/new`, `/teachers/:id/edit` classroom picker
 
@@ -333,8 +333,8 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 
 ## 현재 구현 상태
 
-- teacher assignment의 controller, service, policy, scope와 UI는 `Classroom.teacher_id`를 사용하며 신규 teacher `ClassroomMembership` 생성을 거부한다.
-- `Classroom.teacher_id`는 `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 cardinality를 방어한다.
+- teacher assignment의 controller, service, policy, scope와 UI는 current HomeroomAssignment를 사용하며 신규 teacher `ClassroomMembership` 생성을 거부한다.
+- HomeroomAssignment는 Classroom/User foreign key와 current row partial unique index로 1:1 cardinality를 방어한다.
 - teacher 비활성화는 현재 assignment를 해제하고, classroom 비활성화는 assignment를 보존한 채 운영만 잠근다.
 - classroom grade, teacher school·grade와 lifecycle validation이 assignment 불변식을 방어한다.
 - school당 manager 최대 한 명을 model validation과 DB partial unique index로 방어한다.
@@ -345,7 +345,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 
 #### A. Already consistent
 
-- `User.active`는 teacher의 Devise 로그인과 운영 권한을 차단하며, teacher deactivate callback은 현재 `Classroom.teacher_id`를 해제한다. School membership과 과거 기록은 유지되고 reactivate 시 assignment를 자동 복원하지 않는다.
+- `User.active`는 teacher의 Devise 로그인과 운영 권한을 차단하며, teacher deactivate callback은 current HomeroomAssignment를 종료한다. 과거 기록은 유지되고 reactivate 시 assignment를 자동 복원하지 않는다.
 - teacher assignment 저장은 inactive teacher를 신규 assignment 대상으로 거부한다.
 - student deactivate와 기존 destroy 호환 action은 membership row를 삭제하지 않고 `ClassroomMembership.status`만 inactive로 바꾼다. `classroom_id`와 `student_number`는 그대로 유지한다.
 - student reactivate는 같은 membership row를 active로 바꾸며 기존 classroom과 번호를 유지한다. 다른 active membership, inactive classroom과 active 학생 최대 30명 조건을 검사한다.
@@ -378,7 +378,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 7. `User.grade`는 `nil` 또는 정수 1부터 6만 허용하고 별도 Grade model을 만들지 않는다.
 8. teacher의 담당 classroom은 없거나 정확히 하나이고 classroom의 담당 teacher도 없거나 정확히 한 명이다.
 9. 한 teacher가 두 classroom을 동시에 담당하거나 한 classroom을 두 teacher가 동시에 담당할 수 없다.
-10. teacher assignment의 canonical source는 nullable `Classroom.teacher_id`이며 신규 teacher `ClassroomMembership`을 생성하지 않는다.
+10. teacher assignment의 canonical source는 current `HomeroomAssignment`이며 신규 teacher `ClassroomMembership`을 생성하지 않는다.
 11. teacher와 classroom을 연결하면 양쪽 SchoolYear와 grade가 각각 같아야 한다.
 12. inactive teacher나 inactive classroom은 신규 assignment 대상이 될 수 없다.
 13. 다른 teacher가 담당 중인 classroom을 직접 제출해도 배정할 수 없다.
@@ -390,7 +390,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 19. school이나 grade가 없거나 유효하지 않으면 classroom 후보를 조회·표시하지 않는다.
 20. teacher form에서 classroom을 선택하지 않고 school과 grade만 저장할 수 있으며 edit 재진입 시 persisted grade가 선택되어 있다.
 21. teacher grade 변경으로 현재 classroom과 grade 불일치가 생기면 그 관계를 유지할 수 없고 새 grade classroom 또는 미배정을 명시적으로 선택해야 한다.
-22. 담당 classroom 변경은 기존 `teacher_id` 해제와 새 `teacher_id` 설정을 하나의 transaction에서 처리한다.
+22. 담당 classroom 변경은 기존 assignment 종료와 새 assignment 생성을 하나의 transaction에서 처리한다.
 23. 담당 teacher가 있는 classroom의 grade를 불일치 상태로 변경할 수 없으며 기본 운영에서는 먼저 assignment를 해제한다.
 24. teacher를 deactivate하면 현재 classroom assignment를 해제하고 reactivation 시 자동 복원하지 않는다.
 25. classroom을 deactivate하면 현재 teacher assignment와 student membership을 보존한 채 운영을 잠그고, reactivation 시 별도 복원 없이 보존된 관계를 다시 사용한다.

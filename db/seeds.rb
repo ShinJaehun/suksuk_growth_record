@@ -232,8 +232,14 @@ empty_classroom.save!
 
 puts '== 교실 담당 교사 배정 =='
 
-classroom.update!(teacher: classroom_teacher)
-empty_classroom.update!(teacher: school_manager)
+HomeroomAssignment.find_or_create_by!(classroom: classroom, ended_on: nil) do |assignment|
+  assignment.teacher = classroom_teacher
+  assignment.started_on = Date.current
+end
+HomeroomAssignment.find_or_create_by!(classroom: empty_classroom, ended_on: nil) do |assignment|
+  assignment.teacher = school_manager
+  assignment.started_on = Date.current
+end
 
 puts '== 학생 25명 생성 =='
 
