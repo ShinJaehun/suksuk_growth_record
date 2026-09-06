@@ -4,7 +4,7 @@ RSpec.describe 'Home', type: :request do
   let(:admin) { create(:user, :admin) }
   let(:student) { create(:user, :student) }
   let(:classroom) { create(:classroom) }
-  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
 
   it 'redirects guests to the teacher and admin sign in page' do
     get root_path

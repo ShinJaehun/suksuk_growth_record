@@ -18,7 +18,7 @@
           </span>
         <% end %>
       </div>
-      <p class="mt-1 text-sm font-medium text-slate-500"><%= classroom.name %></p>
+      <p class="mt-1 text-sm font-medium text-slate-500"><%= classroom_display_name(classroom) %></p>
     </div>
 
     <% if can_manage_student %>

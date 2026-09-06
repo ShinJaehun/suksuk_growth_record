@@ -10,7 +10,6 @@ class School < ApplicationRecord
     orange
   ].freeze
 
-  has_many :classrooms, dependent: :restrict_with_error
   has_many :school_years, dependent: :restrict_with_error
 
   before_validation :assign_color_key, on: :create

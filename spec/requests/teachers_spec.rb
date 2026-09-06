@@ -35,8 +35,8 @@ RSpec.describe "Teacher operations", type: :request do
     own_teacher = annual_teacher(school: school, grade: 5)
     other_school = create(:school)
     other_teacher = annual_teacher(school: other_school)
-    own_classroom = create(:classroom, school: school, grade: 5)
-    other_classroom = create(:classroom, school: other_school, grade: 5)
+    own_classroom = create(:classroom, annual_school: school, grade: 5)
+    other_classroom = create(:classroom, annual_school: other_school, grade: 5)
     sign_in manager
 
     get teachers_path
@@ -48,12 +48,12 @@ RSpec.describe "Teacher operations", type: :request do
 
     get classroom_options_teachers_path,
       params: { school_id: other_school.id, membership_grade: 5 }
-    expect(response.body).to include(own_classroom.name)
-    expect(response.body).not_to include(other_classroom.name)
+    expect(response.body).to include(own_classroom.class_label)
+    expect(response.body).not_to include(other_classroom.class_label)
   end
 
   it "renders one grade select and one classroom select without plural assignment inputs" do
-    classroom = create(:classroom, school: school, grade: 5)
+    classroom = create(:classroom, annual_school: school, grade: 5)
     sign_in manager
 
     get new_teacher_path, params: { membership_grade: 5 }
@@ -62,23 +62,23 @@ RSpec.describe "Teacher operations", type: :request do
     expect(document.css('select[name="membership_grade"]').size).to eq(1)
     expect(document.css('select[name="classroom_id"]').size).to eq(1)
     expect(document.css('input[type="checkbox"]')).to be_empty
-    expect(response.body).to include(classroom.name)
+    expect(response.body).to include(classroom.class_label)
     expect(response.body).not_to include(I18n.t("admin.teachers.form.current_classrooms"))
   end
 
   it "does not query candidates until school and grade are selected" do
     admin = create(:user, :admin)
-    classroom = create(:classroom, school: school, grade: 5)
+    classroom = create(:classroom, annual_school: school, grade: 5)
     sign_in admin
 
     get new_teacher_path
-    expect(response.body).not_to include(classroom.name)
+    expect(response.body).not_to include(classroom.class_label)
 
     get new_teacher_path, params: { school_id: school.id }
-    expect(response.body).not_to include(classroom.name)
+    expect(response.body).not_to include(classroom.class_label)
 
     get new_teacher_path, params: { school_id: school.id, membership_grade: 5 }
-    expect(response.body).to include(classroom.name)
+    expect(response.body).to include(classroom.class_label)
   end
 
   it "creates a teacher with grade and no classroom" do
@@ -107,7 +107,7 @@ RSpec.describe "Teacher operations", type: :request do
   end
 
   it "assigns one matching classroom and restores it on edit" do
-    classroom = create(:classroom, school: school, grade: 5)
+    classroom = create(:classroom, annual_school: school, grade: 5)
     sign_in manager
     post teachers_path, params: {
       membership_grade: 5,
@@ -129,7 +129,7 @@ RSpec.describe "Teacher operations", type: :request do
 
   it "shows and preserves a locked inactive classroom assignment during profile updates" do
     teacher = annual_teacher(school: school, grade: 5)
-    classroom = create(:classroom, school: school, grade: 5, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 5, teacher: teacher)
     classroom.update!(active: false)
     sign_in manager
 
@@ -138,7 +138,7 @@ RSpec.describe "Teacher operations", type: :request do
     document = Nokogiri::HTML(response.body)
     expect(response.body).to include(
       I18n.t("admin.teachers.form.inactive_classroom_assignment_locked"),
-      classroom.name
+      classroom.class_label
     )
     expect(document.at_css('input[name="classroom_id"]')['value']).to eq(classroom.id.to_s)
     expect(document.css('select[name="membership_grade"], select[name="classroom_id"]')).to be_empty
@@ -159,8 +159,8 @@ RSpec.describe "Teacher operations", type: :request do
     teacher = annual_teacher(school: school, grade: 5)
     other_teacher = annual_teacher(school: school, grade: 5)
     invalid_classrooms = [
-      create(:classroom, school: school, grade: 6),
-      create(:classroom, school: school, grade: 5, teacher: other_teacher)
+      create(:classroom, annual_school: school, grade: 6),
+      create(:classroom, annual_school: school, grade: 5, teacher: other_teacher)
     ]
     sign_in manager
 
@@ -177,7 +177,7 @@ RSpec.describe "Teacher operations", type: :request do
 
   it "releases the classroom when a teacher is deactivated and does not restore it" do
     teacher = annual_teacher(school: school, grade: 5)
-    classroom = create(:classroom, school: school, grade: 5, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 5, teacher: teacher)
     sign_in manager
 
     patch deactivate_teacher_path(teacher)

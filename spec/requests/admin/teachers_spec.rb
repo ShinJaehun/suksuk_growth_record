@@ -11,7 +11,7 @@ RSpec.describe 'Admin teachers', type: :request do
   it 'shows the teacher management index to an admin' do
     school = create(:school, name: '새싹초등학교', color_key: 'orange')
     other_school = create(:school, name: '나래초등학교')
-    classroom = create(:classroom, school: school, grade: 4, name: '4학년 1반')
+    classroom = create(:classroom, annual_school: school, grade: 4, class_label: '1')
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_school_role: 'manager',
@@ -198,8 +198,8 @@ RSpec.describe 'Admin teachers', type: :request do
 
   it 'renders school and classroom assignment fields on the new teacher page' do
     school = create(:school)
-    classroom = create(:classroom, school: school, grade: 4, name: '1반')
-    named_with_grade = create(:classroom, school: school, grade: 6, name: '6학년 기러기반')
+    classroom = create(:classroom, annual_school: school, grade: 4, class_label: '1반')
+    named_with_grade = create(:classroom, annual_school: school, grade: 6, class_label: '기러기')
     sign_in admin
 
     get new_admin_teacher_path
@@ -468,7 +468,7 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).not_to include(school_teachers_path(manager_school))
 
     sign_in manager
-    assigned_classroom = create(:classroom, school: manager_school)
+    assigned_classroom = create(:classroom, annual_school: manager_school)
     assign_teacher(assigned_classroom, manager)
     get school_teachers_path(manager_school)
     document = Nokogiri::HTML(response.body)
@@ -494,8 +494,8 @@ RSpec.describe 'Admin teachers', type: :request do
   it 'shows school classroom assignment inputs without a school teacher management link' do
     school = create(:school)
     other_school = create(:school)
-    classroom = create(:classroom, school: school, grade: 4, name: '1반')
-    other_classroom = create(:classroom, school: other_school, grade: 6, name: '6학년 기러기반')
+    classroom = create(:classroom, annual_school: school, grade: 4, class_label: '1반')
+    other_classroom = create(:classroom, annual_school: other_school, grade: 6, class_label: '기러기')
     sign_in admin
 
     get edit_admin_teacher_path(teacher)
@@ -513,7 +513,7 @@ RSpec.describe 'Admin teachers', type: :request do
     school = create(:school)
     assigned_teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school, annual_grade: 4)
-    classroom = create(:classroom, school: school, grade: assigned_teacher.grade)
+    classroom = create(:classroom, annual_school: school, grade: assigned_teacher.grade)
     assign_teacher(classroom, assigned_teacher)
     sign_in admin
 
@@ -554,7 +554,7 @@ RSpec.describe 'Admin teachers', type: :request do
     assigned_teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: inactive_school,
       annual_grade: 4)
-    classroom = create(:classroom, school: inactive_school, grade: 4, teacher: assigned_teacher)
+    classroom = create(:classroom, annual_school: inactive_school, grade: 4, teacher: assigned_teacher)
     inactive_school.update!(active: false)
     sign_in admin
 

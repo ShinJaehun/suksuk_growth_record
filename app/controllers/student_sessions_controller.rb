@@ -53,7 +53,8 @@ class StudentSessionsController < ApplicationController
     @classroom =
       if params[:student_login_token].present?
         classroom = Classroom.find_by(student_login_token: params[:student_login_token])
-        return render_invalid_link unless classroom&.active? && classroom.school&.active?
+        return render_invalid_link unless classroom&.active? && classroom.school_year&.active? &&
+          classroom.school_year.school.active?
 
         classroom
       end

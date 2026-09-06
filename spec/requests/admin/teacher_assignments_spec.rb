@@ -12,7 +12,7 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
   end
 
   it 'creates a teacher with school, grade, and one classroom' do
-    classroom = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4)
     sign_in admin
 
     post admin_teachers_path, params: {
@@ -61,8 +61,8 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
       annual_school: school,
       annual_school_role: 'manager',
       annual_grade: 4)
-    first = create(:classroom, school: school, grade: 4, teacher: teacher)
-    second = create(:classroom, school: school, grade: 4)
+    first = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
+    second = create(:classroom, annual_school: school, grade: 4)
     sign_in admin
 
     patch admin_teacher_path(teacher), params: {
@@ -84,8 +84,8 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
       annual_school: school,
       annual_school_role: 'manager',
       annual_grade: 4)
-    old_classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
-    new_classroom = create(:classroom, school: other_school, grade: 5)
+    old_classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
+    new_classroom = create(:classroom, annual_school: other_school, grade: 5)
     sign_in admin
 
     patch admin_teacher_path(teacher), params: {
@@ -110,13 +110,13 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
     sign_in admin
 
     patch admin_teacher_path(teacher), params: {
       school_id: school.id,
       membership_grade: 4,
-      classroom_id: create(:classroom, school: other_school, grade: 4).id
+      classroom_id: create(:classroom, annual_school: other_school, grade: 4).id
     }
 
     expect(response).to have_http_status(:unprocessable_content)
@@ -128,7 +128,7 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
     sign_in admin
 
     patch admin_teacher_path(teacher), params: {

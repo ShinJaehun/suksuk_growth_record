@@ -19,7 +19,7 @@ RSpec.describe "Annual teacher authority" do
 
   it "grants own-school authority to an annual manager" do
     teacher = annual_teacher(school: school, school_role: "manager")
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
 
     expect(TeacherManagementPolicy.new(teacher, User).access?).to be(true)
     expect(SchoolPolicy.new(teacher, school).manage_teachers?).to be(true)

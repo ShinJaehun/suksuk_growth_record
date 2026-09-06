@@ -4,7 +4,7 @@ RSpec.describe 'Classroom students', type: :request do
   include ActionView::RecordIdentifier
 
   let(:classroom) { create(:classroom) }
-  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
   let(:turbo_headers) { { 'ACCEPT' => 'text/vnd.turbo-stream.html' } }
 
   before do
@@ -1092,7 +1092,7 @@ RSpec.describe 'Classroom students', type: :request do
 
   describe 'classroom-scoped student read boundaries' do
     let(:student) { create(:user, :student) }
-    let(:past_classroom) { create(:classroom, school: classroom.school, name: '과거 학급') }
+    let(:past_classroom) { create(:classroom, annual_school: classroom.school_year.school, class_label: '과거 학급') }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student', status: 'active')
@@ -1113,7 +1113,7 @@ RSpec.describe 'Classroom students', type: :request do
 
     it 'allows the past classroom teacher to view inactive student records' do
       past_teacher = create(:user, :teacher, :active_annual_teacher,
-        annual_school: past_classroom.school)
+        annual_school: past_classroom.school_year.school)
       assign_teacher(past_classroom, past_teacher)
       sign_out teacher
       sign_in past_teacher
@@ -1134,7 +1134,7 @@ RSpec.describe 'Classroom students', type: :request do
 
     it 'rejects an unassigned school manager' do
       manager = create(:user, :teacher, :active_annual_teacher,
-        annual_school: past_classroom.school,
+        annual_school: past_classroom.school_year.school,
         annual_school_role: "manager")
       sign_out teacher
       sign_in manager
@@ -1190,7 +1190,7 @@ RSpec.describe 'Classroom students', type: :request do
       get edit_classroom_student_path(classroom, student)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include('PIN 수정', student.name, classroom.school.name, classroom.name)
+      expect(response.body).to include('PIN 수정', student.name, classroom.school_year.school.name, classroom.class_label)
       expect(response.body).to include('name="user[student_pin]"')
       expect(response.body).to include('name="user[student_pin_confirmation]"')
       expect(response.body).not_to include('name="user[name]"')

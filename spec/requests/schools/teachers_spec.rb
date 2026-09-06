@@ -25,7 +25,7 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
   end
 
   it 'shows only teachers and their single classroom in the manager school' do
-    classroom = create(:classroom, school: school, grade: 4, teacher: member)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: member)
     outsider = create(:user, :teacher, :active_annual_teacher,
       annual_school: other_school, annual_grade: 4, name: '다른 학교 교사')
     sign_in manager
@@ -33,12 +33,12 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
     get school_teachers_path(school)
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include(member.name, classroom.name)
+    expect(response.body).to include(member.name, classroom.class_label)
     expect(response.body).not_to include(outsider.name)
   end
 
   it 'creates a teacher with grade and one classroom' do
-    classroom = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4)
     sign_in manager
 
     post school_teachers_path(school), params: {
@@ -76,8 +76,8 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
   end
 
   it 'moves and removes the single classroom assignment' do
-    first = create(:classroom, school: school, grade: 4, teacher: member)
-    second = create(:classroom, school: school, grade: 4)
+    first = create(:classroom, annual_school: school, grade: 4, teacher: member)
+    second = create(:classroom, annual_school: school, grade: 4)
     sign_in manager
 
     patch school_teacher_path(school, member), params: { membership_grade: 4, classroom_id: second.id }
@@ -96,7 +96,7 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
       post school_teachers_path(school), params: {
         user: teacher_params,
         membership_grade: 4,
-        classroom_id: create(:classroom, school: other_school, grade: 4).id
+        classroom_id: create(:classroom, annual_school: other_school, grade: 4).id
       }
     end.not_to change(User.teacher, :count)
 

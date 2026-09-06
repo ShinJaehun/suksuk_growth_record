@@ -97,8 +97,10 @@ class TeachersController < ApplicationController
                        else
                          manager_school
                        end
-    scope = teacher_management_scope.with_attached_avatar.includes(school_year: :school,
-                                                                   assigned_classroom: :school)
+    scope = teacher_management_scope.with_attached_avatar.includes(
+      school_year: :school,
+      assigned_classroom: { school_year: :school }
+    )
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
     if @selected_school
       scope = scope.joins(:school_year).where(school_years: { school_id: @selected_school.id })
@@ -121,11 +123,11 @@ class TeachersController < ApplicationController
   def classroom_candidates(school)
     return Classroom.none unless school && selected_membership_grade
 
-    school.classrooms.active
-          .where(grade: selected_membership_grade)
-          .where(teacher_id: [nil, @teacher&.id].uniq)
-          .order(:name, :id)
-          .load
+    classrooms = school.school_years.active.first&.classrooms&.active || Classroom.none
+    classrooms.where(grade: selected_membership_grade)
+              .where(teacher_id: [nil, @teacher&.id].uniq)
+              .order(:class_label, :id)
+              .load
   end
 
   def classroom_option_locals(school)
@@ -207,7 +209,7 @@ class TeachersController < ApplicationController
     return nil if raw_id.blank?
 
     classroom = if raw_id.match?(/\A[1-9]\d*\z/) && school && membership_grade
-                  school.classrooms.find_by(id: raw_id, grade: membership_grade)
+                  school.school_years.active.first&.classrooms&.find_by(id: raw_id, grade: membership_grade)
                 end
     classroom = nil if classroom&.inactive? && classroom != @teacher.assigned_classroom
     if classroom.nil? || (classroom.teacher_id.present? && classroom.teacher_id != @teacher.id)

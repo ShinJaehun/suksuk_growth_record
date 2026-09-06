@@ -5,7 +5,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   let(:classroom) { create(:classroom) }
   let(:student) { create(:user, :student, student_pin: '1234') }
-  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
+  let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
   let(:remote_ip) { '203.0.113.10' }
 
   before do
@@ -41,7 +41,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
   end
 
   it 'does not expose all classrooms and students on the global login page' do
-    other_classroom = create(:classroom, name: '다른 교실')
+    other_classroom = create(:classroom, class_label: '다른 교실')
     other_student = create(:user, :student, name: '다른 학생', student_pin: '5678')
     create(:classroom_membership, classroom: other_classroom, user: other_student, role: 'student')
 
@@ -49,9 +49,9 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('교실별 로그인 주소')
-    expect(response.body).not_to include(classroom.name)
+    expect(response.body).not_to include(classroom.class_label)
     expect(response.body).not_to include(student.name)
-    expect(response.body).not_to include(other_classroom.name)
+    expect(response.body).not_to include(other_classroom.class_label)
     expect(response.body).not_to include(other_student.name)
   end
 
@@ -92,6 +92,17 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(student.name)
     expect(response.body).not_to include(inactive_student.name)
+  end
+
+  it 'rejects planning and archived classroom login pages' do
+    %w[planning archived].each do |status|
+      classroom.school_year.update!(status: status)
+
+      get public_student_login_path(student_login_token: classroom.student_login_token)
+
+      expect(response).to have_http_status(:not_found)
+      expect(response.body).not_to include(student.name)
+    end
   end
 
   it 'shows only students from the token classroom login page' do
@@ -454,7 +465,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
   it 'does not affect school-scoped teacher login' do
     5.times { post_student_pin(pin: '0000') }
 
-    post school_teacher_login_path(classroom.school), params: {
+    post school_teacher_login_path(classroom.school_year.school), params: {
       teacher: {
         login_id: teacher.login_id,
         password: 'password123'

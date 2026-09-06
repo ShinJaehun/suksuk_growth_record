@@ -1,24 +1,23 @@
 class ClassroomPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
-      return scope.all if user&.admin?
+      active_scope = scope.joins(school_year: :school)
+        .merge(SchoolYear.active)
+        .merge(School.active)
+      return active_scope if user&.admin?
 
       if user&.active_teacher? && user.school_manager?
-        return scope.joins(:school).merge(School.active)
-          .where(school_id: user.annual_school&.id)
+        return active_scope.where(school_year_id: user.school_year_id)
       end
 
       # Teachers can see only their classrooms
       if user&.active_teacher?
-        return scope.joins(:school)
-                    .merge(School.active)
-                    .where(teacher_id: user.id, active: true)
+        return active_scope.where(teacher_id: user.id, active: true)
       end
 
       # Students can see only their classrooms
       if user&.student?
-        return scope.joins(:school, :classroom_memberships)
-                    .merge(School.active)
+        return active_scope.joins(:classroom_memberships)
                     .where(classroom_memberships: { user_id: user.id, role: 'student', status: 'active' })
                     .distinct
       end
@@ -93,7 +92,8 @@ class ClassroomPolicy < ApplicationPolicy
     # The shared new-classroom form checks structure permission before an admin selects a school.
     return true if admin? && record.respond_to?(:new_record?) && record.new_record?
 
-    record.respond_to?(:school) && record.school&.active?
+    record.respond_to?(:school_year) && record.school_year&.active? &&
+      record.school_year.school.active?
   end
 
   def active_classroom?
@@ -109,7 +109,7 @@ class ClassroomPolicy < ApplicationPolicy
   end
 
   def school_manager_of?(classroom)
-    school_manager? && classroom.school_id == user.annual_school&.id
+    school_manager? && classroom.school_year_id == user.school_year_id
   end
 
   def teacher_of?(classroom)

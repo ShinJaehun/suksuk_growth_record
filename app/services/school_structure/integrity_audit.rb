@@ -78,7 +78,7 @@ module SchoolStructure
         'classroom_memberships.id AS classroom_membership_id',
         'classroom_memberships.user_id AS user_id',
         'classroom_memberships.classroom_id AS classroom_id',
-        'classrooms.school_id AS classroom_school_id',
+        'classrooms.school_year_id AS classroom_school_year_id',
         'classroom_memberships.role AS role',
         'classroom_memberships.student_number AS student_number'
       )
@@ -88,8 +88,8 @@ module SchoolStructure
       scope.select(
         'classrooms.id AS classroom_id',
         'classrooms.teacher_id AS user_id',
-        'classrooms.school_id AS classroom_school_id',
-        'school_years.school_id AS teacher_school_id',
+        'classrooms.school_year_id AS classroom_school_year_id',
+        'users.school_year_id AS teacher_school_year_id',
         'users.grade AS teacher_grade',
         'classrooms.grade AS classroom_grade'
       )
@@ -110,9 +110,9 @@ module SchoolStructure
 
     def teacher_school_mismatch_scope
       Classroom
-        .joins(teacher: :school_year)
+        .joins(:teacher)
         .where.not(teacher_id: nil)
-        .where('school_years.school_id <> classrooms.school_id')
+        .where('users.school_year_id <> classrooms.school_year_id')
     end
 
     def teacher_grade_mismatch_scope
@@ -122,7 +122,7 @@ module SchoolStructure
     end
 
     def inactive_teacher_assignment_scope
-      Classroom.joins(teacher: { school_year: :school })
+      Classroom.joins(:teacher, school_year: :school)
         .where('users.active = FALSE OR school_years.status <> ? OR schools.active = FALSE', 'active')
     end
 

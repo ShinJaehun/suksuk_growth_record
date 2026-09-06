@@ -13,39 +13,37 @@
         </div>
 
         <div class="space-y-2 sm:max-w-3xl">
-          <% name_has_errors = classroom.errors[:name].any? %>
-          <%= f.label :name, t("classrooms.form.name_label"), class: "block text-sm font-semibold text-slate-800" %>
-          <%= f.text_field :name,
-                placeholder: t("classrooms.form.name_placeholder"),
-                class: "block w-full rounded-xl border px-4 py-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 #{name_has_errors ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-300 focus:border-sky-500 focus:ring-sky-100"}" %>
-          <% if name_has_errors %>
-            <p class="text-sm text-rose-600"><%= classroom.errors.full_messages_for(:name).to_sentence %></p>
+          <% class_label_has_errors = classroom.errors[:class_label].any? %>
+          <%= f.label :class_label, t("classrooms.form.class_label_label"), class: "block text-sm font-semibold text-slate-800" %>
+          <%= f.text_field :class_label,
+                placeholder: t("classrooms.form.class_label_placeholder"),
+                class: "block w-full rounded-xl border px-4 py-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 #{class_label_has_errors ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-300 focus:border-sky-500 focus:ring-sky-100"}" %>
+          <% if class_label_has_errors %>
+            <p class="text-sm text-rose-600"><%= classroom.errors.full_messages_for(:class_label).to_sentence %></p>
           <% else %>
-            <p class="text-sm text-slate-500"><%= t("classrooms.form.name_hint") %></p>
+            <p class="text-sm text-slate-500"><%= t("classrooms.form.class_label_hint") %></p>
           <% end %>
         </div>
 
         <div class="mt-5 grid gap-4 sm:max-w-3xl sm:grid-cols-2">
           <% if current_user.admin? && classroom.new_record? %>
             <div class="space-y-2">
-              <% school_has_errors = classroom.errors[:school].any? || classroom.errors[:school_id].any? %>
-              <%= f.label :school_id, t("classrooms.form.school_label"), class: "block text-sm font-semibold text-slate-800" %>
-              <%= f.collection_select :school_id,
-                    @school_options,
-                    :id,
-                    :name,
-                    { include_blank: t("classrooms.form.school_prompt") },
+              <% school_has_errors = classroom.errors[:school_year].any? %>
+              <%= label_tag "classroom_school_id", t("classrooms.form.school_label"), class: "block text-sm font-semibold text-slate-800" %>
+              <%= select_tag "classroom[school_id]",
+                    options_from_collection_for_select(@school_options, :id, :name, @selected_classroom_school&.id),
+                    include_blank: t("classrooms.form.school_prompt"),
                     class: "block w-full rounded-xl border px-4 py-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 #{school_has_errors ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-300 focus:border-sky-500 focus:ring-sky-100"}" %>
               <% if school_has_errors %>
-                <p class="text-sm text-rose-600"><%= (classroom.errors.full_messages_for(:school) + classroom.errors.full_messages_for(:school_id)).uniq.to_sentence %></p>
+                <p class="text-sm text-rose-600"><%= classroom.errors.full_messages_for(:school_year).to_sentence %></p>
               <% end %>
             </div>
           <% elsif classroom.persisted? || current_user.school_manager? %>
             <div class="space-y-2">
               <span class="block text-sm font-semibold text-slate-800"><%= t("classrooms.form.school_label") %></span>
-              <p class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"><%= classroom.school.name %></p>
-              <% if classroom.errors[:school].any? %>
-                <p class="text-sm text-rose-600"><%= classroom.errors.full_messages_for(:school).to_sentence %></p>
+              <p class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"><%= classroom.school_year.school.name %></p>
+              <% if classroom.errors[:school_year].any? %>
+                <p class="text-sm text-rose-600"><%= classroom.errors.full_messages_for(:school_year).to_sentence %></p>
               <% end %>
             </div>
           <% end %>

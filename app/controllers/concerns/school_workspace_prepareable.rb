@@ -8,7 +8,7 @@ module SchoolWorkspacePrepareable
   end
 
   def prepare_school_overview
-    @classroom_count = @school.classrooms.count
+    @classroom_count = active_school_year&.classrooms&.count.to_i
     @teacher_count = active_school_teachers.active.count
     @managers = active_school_teachers.active.where(school_role: "manager").order(:id)
   end
@@ -19,7 +19,10 @@ module SchoolWorkspacePrepareable
   end
 
   def active_school_teachers
-    school_year = @school.school_years.active.first
-    school_year ? school_year.users.teacher : User.none
+    active_school_year ? active_school_year.users.teacher : User.none
+  end
+
+  def active_school_year
+    @active_school_year ||= @school.school_years.active.first
   end
 end

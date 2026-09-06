@@ -110,7 +110,7 @@ class Admin::TeachersController < Admin::BaseController
     scope = policy_scope(User)
             .teacher
             .with_attached_avatar
-            .includes(school_year: :school, assigned_classroom: :school)
+            .includes(school_year: :school, assigned_classroom: { school_year: :school })
     scope = scope.where(active: @teacher_status == 'active') unless @teacher_status == 'all'
 
     if @selected_school
@@ -217,7 +217,7 @@ class Admin::TeachersController < Admin::BaseController
     elsif !school_selection_invalid? && school.nil?
       @classroom_selection_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.school_required_for_classrooms'))
-    elsif school && classroom.school_id != school.id
+    elsif school && classroom.school_year.school_id != school.id
       @classroom_selection_invalid = true
       @teacher.errors.add(:base, t('admin.teachers.errors.classroom_school_mismatch'))
     end
@@ -253,7 +253,11 @@ class Admin::TeachersController < Admin::BaseController
   def load_school_assignment_form
     current_school_id = @teacher.annual_school&.id
     @schools = School.active.or(School.where(id: current_school_id)).order(:name, :id).load
-    @classrooms_by_school = Classroom.where(school_id: @schools.map(&:id)).order(:grade, :name, :id).group_by(&:school_id)
+    @classrooms_by_school = Classroom.joins(:school_year)
+      .where(school_years: { school_id: @schools.map(&:id), status: "active" })
+      .includes(:school_year)
+      .order(:grade, :class_label, :id)
+      .group_by { |classroom| classroom.school_year.school_id }
     load_selected_school
     @selected_classroom_id = teacher_assignment_params.key?(:classroom_id) ?
       teacher_assignment_params[:classroom_id].presence&.to_i : @teacher.assigned_classroom&.id

@@ -10,7 +10,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_grade: 4)
-    create(:classroom, school: school, grade: 4, teacher: teacher)
+    create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
     result = described_class.call
 
@@ -18,7 +18,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     expect(result.issue_count).to eq(0)
   end
 
-  it 'finds a teacher assigned to a classroom in another school' do
+  it 'finds a teacher assigned to a classroom in another school year' do
     teacher_school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: teacher_school, annual_grade: 4)
@@ -30,7 +30,8 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     expect(result.count_for(:teacher_classroom_school_mismatch)).to eq(1)
     expect(result.samples_for(:teacher_classroom_school_mismatch)).to include(
       include('classroom_id' => classroom.id, 'user_id' => teacher.id,
-              'teacher_school_id' => teacher_school.id)
+              'teacher_school_year_id' => teacher.school_year_id,
+              'classroom_school_year_id' => classroom.school_year_id)
     )
   end
 
@@ -38,7 +39,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school, annual_grade: 4)
-    classroom = create(:classroom, school: school, grade: 5)
+    classroom = create(:classroom, annual_school: school, grade: 5)
     assign_without_validation(classroom, teacher)
 
     result = described_class.call
@@ -67,7 +68,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school, annual_grade: 4)
-    classroom = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4)
     teacher.update_columns(active: false)
     assign_without_validation(classroom, teacher)
 

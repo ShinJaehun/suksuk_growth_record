@@ -3,7 +3,7 @@
     <%= select_tag :classroom_id,
           options_for_select(
             [[t("admin.teachers.index.unassigned_grade"), ""]] +
-              classrooms.map { |classroom| [classroom.name, classroom.id] },
+              classrooms.map { |classroom| [classroom_display_name(classroom), classroom.id] },
             selected_classroom_id
           ),
           class: "block w-full rounded border border-slate-300 px-3 py-2",

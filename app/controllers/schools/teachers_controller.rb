@@ -123,7 +123,9 @@ class Schools::TeachersController < ApplicationController
   end
 
   def school_teacher_classrooms(teacher)
-    [teacher.assigned_classroom].compact.select { |classroom| classroom.school_id == @school.id }
+    [teacher.assigned_classroom].compact.select do |classroom|
+      classroom.school_year_id == active_school_year.id
+    end
   end
 
   def teacher_school_role_label(teacher)
@@ -156,7 +158,7 @@ class Schools::TeachersController < ApplicationController
   end
 
   def load_new_form
-    @classrooms = @school.classrooms.order(:grade, :name, :id).load
+    @classrooms = active_school_year.classrooms.order(:grade, :class_label, :id).load
     @selected_classroom_id = nil unless defined?(@selected_classroom_id)
   end
 
@@ -170,7 +172,7 @@ class Schools::TeachersController < ApplicationController
     raw_id = params[:classroom_id].to_s
     return @selected_classroom_id = nil if raw_id.blank?
 
-    classroom = raw_id.match?(/\A[1-9]\d*\z/) ? @school.classrooms.find_by(id: raw_id) : nil
+    classroom = raw_id.match?(/\A[1-9]\d*\z/) ? active_school_year.classrooms.find_by(id: raw_id) : nil
     unless classroom
       @classroom_assignments_invalid = true
       @teacher.errors.add(:base, t("schools.teachers.errors.classroom_not_found"))
@@ -193,7 +195,7 @@ class Schools::TeachersController < ApplicationController
   end
 
   def load_edit_form
-    @classrooms = @school.classrooms.order(:grade, :name, :id).load
+    @classrooms = active_school_year.classrooms.order(:grade, :class_label, :id).load
     @selected_classroom_id = params.key?(:classroom_id) ? selected_classroom_id : @teacher.assigned_classroom&.id
   end
 

@@ -4,22 +4,27 @@ RSpec.describe Classrooms::IndexContext do
   let(:school) { create(:school) }
 
   it 'orders supplied classrooms by grade and then reverse creation time with schools loaded' do
-    older = create(:classroom, school: school, grade: 4, created_at: 2.days.ago)
-    newer = create(:classroom, school: school, grade: 4, created_at: 1.day.ago)
-    lower_grade = create(:classroom, school: school, grade: 3, created_at: Time.current)
-    create(:classroom, school: school, created_at: Time.current)
+    older = create(:classroom, annual_school: school, grade: 4, created_at: 2.days.ago)
+    newer = create(:classroom, annual_school: school, grade: 4, created_at: 1.day.ago)
+    lower_grade = create(:classroom, annual_school: school, grade: 3, created_at: Time.current)
+    create(:classroom, annual_school: school, created_at: Time.current)
     scope = Classroom.where(id: [older.id, newer.id, lower_grade.id])
 
     classrooms = described_class.new(classrooms_scope: scope).classrooms.load
 
     expect(classrooms).to eq([lower_grade, newer, older])
-    expect(classrooms).to all(satisfy { |classroom| classroom.association(:school).loaded? })
+    expect(classrooms).to all(
+      satisfy do |classroom|
+        classroom.association(:school_year).loaded? &&
+          classroom.school_year.association(:school).loaded?
+      end
+    )
   end
 
   it 'counts and preloads the single active teacher preview' do
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: classroom.school)
+                     annual_school: classroom.school_year.school)
     teacher.avatar.attach(
       io: StringIO.new('avatar'),
       filename: 'avatar.png',
@@ -28,7 +33,7 @@ RSpec.describe Classrooms::IndexContext do
     assign_teacher(classroom, teacher)
     outside_classroom = create(:classroom)
     outside_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: outside_classroom.school)
+                             annual_school: outside_classroom.school_year.school)
     assign_teacher(outside_classroom, outside_teacher)
     context = described_class.new(classrooms_scope: Classroom.where(id: classroom.id))
     previews = context.teacher_previews.fetch(classroom.id)
@@ -41,7 +46,7 @@ RSpec.describe Classrooms::IndexContext do
   end
 
   it 'counts active student memberships and returns at most five student previews with avatars loaded' do
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
     students = 6.times.map do |index|
       create(:user, :student, name: "학생 #{index + 1}")
     end

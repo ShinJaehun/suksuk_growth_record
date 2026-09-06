@@ -10,7 +10,7 @@ RSpec.describe 'School overview', type: :request do
   end
 
   it 'shows only school summary and settings entry to an admin' do
-    classroom = create(:classroom, school: school, name: '상세 학급 이름')
+    classroom = create(:classroom, annual_school: school, class_label: '상세 학급 이름')
     teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       name: '상세 교사 이름')
@@ -33,7 +33,7 @@ RSpec.describe 'School overview', type: :request do
     settings_link = overview.at_css(%(a[href="#{edit_school_path(school)}"]))
     expect(settings_link).to be_present
     expect(settings_link['data-turbo-frame']).to be_nil
-    expect(response.body).not_to include(classroom.name, teacher.name)
+    expect(response.body).not_to include(classroom.class_label, teacher.name)
     expect(overview.at_css(%(a[href="#{new_classroom_path}"]))).to be_nil
     expect(overview.at_css(%(a[href="#{new_school_teacher_path(school)}"]))).to be_nil
   end

@@ -13,7 +13,7 @@
 - 일반 선생님은 `User.role == "teacher"`이고 `User.school_role == "member"`인 사용자다.
 - teacher의 학교는 `User.school_year.school`이다.
 - teacher와 classroom의 현재 담당 관계는 nullable `Classroom.teacher_id`로 표현한다.
-- `Classroom`은 `School`에 속하며 기존 학년 정책은 [Classroom Grade Foundation](classroom_grade_foundation.md)을 따른다.
+- `Classroom`은 `SchoolYear`에 속하고 학교는 `classroom.school_year.school`로 결정하며 기존 학년 정책은 [Classroom Grade Foundation](classroom_grade_foundation.md)을 따른다.
 
 ## 운영 영역 구조
 
@@ -74,7 +74,7 @@ manager lifecycle은 manager 수나 다른 active manager 존재 여부와 관�
 
 - 자기 학교의 active·inactive classroom 조회
 - 자기 학교에 classroom 추가
-- 교실 이름과 학년 등 구조 정보 수정
+- 반과 학년 등 구조 정보 수정
 - 단일 담당 teacher 배정·해제
 - classroom 활성/비활성 전환과 재활성화
 
@@ -87,7 +87,7 @@ manager lifecycle은 manager 수나 다른 active manager 존재 여부와 관�
 - 담당 active classroom이 0개이면 접근 가능한 담당 교실이 없다는 정상 안내 상태를 보여준다.
 - 담당 active classroom이 1개이면 `/classrooms` 목록 대신 해당 `/classrooms/:id`로 바로 진입한다.
 - 담당 active classroom에서는 학생 명부, 학생 정보, 학생 PIN 등 기존 운영 권한을 사용할 수 있다.
-- 교실 이름·학년, 담당 teacher, classroom 활성 상태, 학교 구조를 변경할 수 없다.
+- 반·학년, 담당 teacher, classroom 활성 상태, 학교 구조를 변경할 수 없다.
 
 ## Teacher와 Classroom의 단일 담당 관계
 
@@ -184,7 +184,7 @@ teacher를 classroom에 배정할 때 다음을 모두 만족해야 한다.
 
 - 대상 사용자는 active teacher다.
 - 대상 classroom은 active다.
-- teacher의 `User.school_year.school_id`와 `Classroom.school_id`가 같다.
+- teacher와 Classroom의 `school_year_id`가 같다.
 - teacher의 SchoolYear와 School이 active다.
 - teacher의 `User.grade`와 `Classroom.grade`가 같고 grade가 `nil`이 아니다.
 - teacher에게 다른 담당 classroom이 없다.
@@ -379,7 +379,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 8. teacher의 담당 classroom은 없거나 정확히 하나이고 classroom의 담당 teacher도 없거나 정확히 한 명이다.
 9. 한 teacher가 두 classroom을 동시에 담당하거나 한 classroom을 두 teacher가 동시에 담당할 수 없다.
 10. teacher assignment의 canonical source는 nullable `Classroom.teacher_id`이며 신규 teacher `ClassroomMembership`을 생성하지 않는다.
-11. teacher와 classroom을 연결하면 양쪽 school과 grade가 각각 같아야 한다.
+11. teacher와 classroom을 연결하면 양쪽 SchoolYear와 grade가 각각 같아야 한다.
 12. inactive teacher나 inactive classroom은 신규 assignment 대상이 될 수 없다.
 13. 다른 teacher가 담당 중인 classroom을 직접 제출해도 배정할 수 없다.
 14. teacher grade가 `nil`이면 classroom도 미배정이어야 한다.
@@ -415,7 +415,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 
 ## 제약
 
-- 이 spec 단계에서는 구현, migration, route 변경 또는 기존 endpoint 삭제를 하지 않는다.
+- 현재 runtime은 Classroom의 SchoolYear와 `class_label` cutover를 반영하며 후속 lifecycle 구조는 별도 spec에서 구현한다.
 - lifecycle 구현은 학생 membership과 과거 서비스 기록을 파괴하지 않아야 한다. classroom lifecycle은 현재 teacher assignment를 보존하며, teacher lifecycle에서 teacher를 비활성화할 때만 현재 assignment를 해제한다.
 - 기존 Pundit 경계를 우회하는 별도 조회나 update 경로를 만들지 않는다.
 - 일반 운영 책임 이동과 bulk management 구현은 단계적으로 진행할 수 있지만 최종 권한 경계는 이 문서를 따른다.
@@ -426,7 +426,7 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 - `/admin` bulk management 실제 구현
 - teacher 또는 classroom 물리 삭제 기능 확대
 - teacher의 복수 classroom 담당 또는 classroom의 복수 teacher 담당
-- `class_label` 도입(이 current-runtime spec의 범위 밖이며 장기 target은 별도 canonical을 따름)
+- HomeroomAssignment와 StudentEnrollment 도입
 - 교사 비밀번호 관리 또는 초기화 정책
 - global admin 역할 편집
 - manager 승격·강등 UI 변경

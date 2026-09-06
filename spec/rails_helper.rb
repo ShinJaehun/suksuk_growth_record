@@ -16,8 +16,7 @@ module TeacherAssignmentHelpers
   def assign_teacher(classroom, teacher)
     attributes = { grade: classroom.grade }
     if teacher.school_year.nil?
-      attributes[:school_year] = classroom.school.school_years.active.first ||
-        FactoryBot.create(:school_year, :active, school: classroom.school)
+      attributes[:school_year] = classroom.school_year
     end
     attributes[:login_id] = FactoryBot.generate(:annual_teacher_login_id) if teacher.login_id.blank?
     attributes[:school_role] = "member" if teacher.school_role.blank?

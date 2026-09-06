@@ -28,7 +28,7 @@
       <dl class="grid gap-3 text-sm sm:grid-cols-3">
         <div>
           <dt class="font-medium text-slate-500"><%= t("admin.teachers.form.school_label") %></dt>
-          <dd class="mt-1 text-slate-900"><%= @locked_classroom.school.name %></dd>
+          <dd class="mt-1 text-slate-900"><%= @locked_classroom.school_year.school.name %></dd>
         </div>
         <div>
           <dt class="font-medium text-slate-500"><%= t("filters.grade.label") %></dt>
@@ -36,10 +36,10 @@
         </div>
         <div>
           <dt class="font-medium text-slate-500"><%= t("admin.teachers.form.classrooms_label") %></dt>
-          <dd class="mt-1 text-slate-900"><%= @locked_classroom.name %></dd>
+          <dd class="mt-1 text-slate-900"><%= classroom_display_name(@locked_classroom) %></dd>
         </div>
       </dl>
-      <%= hidden_field_tag :school_id, @locked_classroom.school_id %>
+      <%= hidden_field_tag :school_id, @locked_classroom.school_year.school_id %>
       <%= hidden_field_tag :membership_grade, @membership_grade %>
       <%= hidden_field_tag :classroom_id, @locked_classroom.id %>
     <% elsif current_user.admin? %>

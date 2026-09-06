@@ -5,6 +5,7 @@ class SchoolYear < ApplicationRecord
 
   belongs_to :school
   has_many :users, dependent: :restrict_with_error
+  has_many :classrooms, dependent: :restrict_with_error
 
   enum :status,
     {

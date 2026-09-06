@@ -1,12 +1,12 @@
 require 'rails_helper'
 
 RSpec.describe 'Classroom members', type: :request do
-  let(:classroom) { create(:classroom, name: '2반') }
+  let(:classroom) { create(:classroom, class_label: '2반') }
   let(:admin) { create(:user, :admin) }
   let(:teacher) do
     create(:user, :teacher, :active_annual_teacher,
-      annual_school: classroom.school,
-      name: '담당 교사')
+           annual_school: classroom.school_year.school,
+           name: '담당 교사')
   end
 
   def insert_legacy_teacher_membership!(user:, classroom:)
@@ -272,7 +272,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'rejects a manager who is not assigned to the classroom' do
-    teacher.update!(school_role: "manager")
+    teacher.update!(school_role: 'manager')
     sign_in teacher
 
     get classroom_members_path(classroom)
@@ -281,7 +281,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'allows a manager assigned as the classroom teacher to manage members' do
-    teacher.update!(school_role: "manager")
+    teacher.update!(school_role: 'manager')
     assign_teacher(classroom, teacher)
     student = create(:user, :student, name: '활성 학생')
     create(:classroom_membership, classroom: classroom, user: student, role: :student)
@@ -529,7 +529,7 @@ RSpec.describe 'Classroom members', type: :request do
       }
 
       expect(response).to redirect_to(classroom_members_path(classroom))
-      expect(student.reload.attributes.values_at('gender', 'avatar_key')).to eq(['girl', 'girl01'])
+      expect(student.reload.attributes.values_at('gender', 'avatar_key')).to eq(%w[girl girl01])
     end
 
     it 'swaps two active student numbers without violating the unique index' do
@@ -838,7 +838,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects a manager who is not assigned to the classroom' do
-      teacher.update!(school_role: "manager")
+      teacher.update!(school_role: 'manager')
       student = create(:user, :student, name: '유지')
       membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
       sign_in teacher

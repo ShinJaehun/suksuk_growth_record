@@ -49,7 +49,7 @@ RSpec.describe 'Navigation', type: :request do
 
   it 'links a teacher with one classroom directly to that classroom' do
     classroom = create(:classroom)
-    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school)
+    teacher = create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school)
     assign_teacher(classroom, teacher)
     sign_in teacher
 

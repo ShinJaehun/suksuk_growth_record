@@ -48,17 +48,9 @@ RSpec.describe School, type: :model do
     expect(school.color_key).to eq("emerald")
   end
 
-  it "can have many classrooms" do
-    school = create(:school)
-    first_classroom = create(:classroom, school: school)
-    second_classroom = create(:classroom, school: school)
-
-    expect(school.classrooms).to contain_exactly(first_classroom, second_classroom)
-  end
-
   it "does not cascade delete classrooms" do
     school = create(:school)
-    create(:classroom, school: school)
+    create(:classroom, annual_school: school)
 
     expect { school.destroy }.not_to change(Classroom, :count)
     expect(school).not_to be_destroyed
@@ -77,10 +69,10 @@ RSpec.describe School, type: :model do
 
   it "keeps related records when deactivated" do
     school = create(:school)
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
 
     school.update!(active: false)
 
-    expect(classroom.reload.school).to eq(school)
+    expect(classroom.reload.school_year.school).to eq(school)
   end
 end

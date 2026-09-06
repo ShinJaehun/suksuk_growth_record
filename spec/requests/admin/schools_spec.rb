@@ -28,7 +28,7 @@ RSpec.describe 'Admin schools', type: :request do
   end
 
   it 'shows schools and classroom counts in the admin schools index' do
-    create_list(:classroom, 2, school: school)
+    create_list(:classroom, 2, annual_school: school)
     sign_in admin
 
     get schools_path
@@ -70,14 +70,14 @@ RSpec.describe 'Admin schools', type: :request do
   end
 
   it 'deactivates and reactivates a school without removing related data' do
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
     teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
     sign_in admin
 
     patch deactivate_admin_school_path(school)
 
     expect(school.reload).to be_inactive
-    expect(classroom.reload.school).to eq(school)
+    expect(classroom.reload.school_year.school).to eq(school)
     expect(teacher.reload.annual_school).to eq(school)
 
     patch reactivate_admin_school_path(school, status: 'inactive')
@@ -126,11 +126,11 @@ RSpec.describe 'Admin schools', type: :request do
   it 'creates a school with exactly one active SchoolYear from the submitted operational year' do
     sign_in admin
 
-    expect {
+    expect do
       post admin_schools_path,
-        params: { school: { name: '푸른초등학교', operational_year: 2028 } }
-    }.to change(School, :count).by(1)
-      .and change(SchoolYear, :count).by(1)
+           params: { school: { name: '푸른초등학교', operational_year: 2028 } }
+    end.to change(School, :count).by(1)
+                                 .and change(SchoolYear, :count).by(1)
 
     expect(response).to redirect_to(schools_path)
     created_school = School.find_by!(name: '푸른초등학교')
@@ -188,10 +188,10 @@ RSpec.describe 'Admin schools', type: :request do
   it 'rejects a blank operational year without persisting either record' do
     sign_in admin
 
-    expect {
+    expect do
       post admin_schools_path,
-        params: { school: { name: '연도 없음 학교', operational_year: '' } }
-    }.not_to change { [School.count, SchoolYear.count] }
+           params: { school: { name: '연도 없음 학교', operational_year: '' } }
+    end.not_to(change { [School.count, SchoolYear.count] })
 
     expect(response).to have_http_status(:unprocessable_content)
   end
@@ -199,10 +199,10 @@ RSpec.describe 'Admin schools', type: :request do
   it 'rejects an invalid operational year without persisting either record' do
     sign_in admin
 
-    expect {
+    expect do
       post admin_schools_path,
-        params: { school: { name: '잘못된 연도 학교', operational_year: 'invalid' } }
-    }.not_to change { [School.count, SchoolYear.count] }
+           params: { school: { name: '잘못된 연도 학교', operational_year: 'invalid' } }
+    end.not_to(change { [School.count, SchoolYear.count] })
 
     expect(response).to have_http_status(:unprocessable_content)
   end
@@ -210,10 +210,10 @@ RSpec.describe 'Admin schools', type: :request do
   it 'rolls back the school when initial SchoolYear validation fails' do
     sign_in admin
 
-    expect {
+    expect do
       post admin_schools_path,
-        params: { school: { name: '원자성 학교', operational_year: 999 } }
-    }.not_to change { [School.count, SchoolYear.count] }
+           params: { school: { name: '원자성 학교', operational_year: 999 } }
+    end.not_to(change { [School.count, SchoolYear.count] })
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(School.find_by(name: '원자성 학교')).to be_nil
@@ -283,8 +283,8 @@ RSpec.describe 'Admin schools', type: :request do
 
   it 'keeps the admin namespace closed to an annual manager without a membership' do
     manager = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      annual_school_role: "manager")
+                     annual_school: school,
+                     annual_school_role: 'manager')
     sign_in manager
 
     get new_admin_school_path

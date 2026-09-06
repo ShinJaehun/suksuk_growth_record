@@ -2,7 +2,8 @@ ko:
   activerecord:
     attributes:
       classroom:
-        school: "학교"
+        school_year: "학교"
+        class_label: "반"
         grade: "학년"
       classroom_membership:
         student_number: "출석번호"
@@ -12,7 +13,7 @@ ko:
       models:
         classroom:
           attributes:
-            school:
+            school_year:
               immutable: "생성된 교실의 소속 학교는 변경할 수 없습니다."
             base:
               students_present: "학생이 있는 교실은 삭제할 수 없습니다."
@@ -23,7 +24,7 @@ ko:
               inactive_school_year: "활성 학년도의 선생님만 담당자로 지정할 수 있습니다."
               inactive_school: "활성 학교의 선생님만 담당자로 지정할 수 있습니다."
               school_year_required: "학교 소속이 있는 선생님만 담당자로 지정할 수 있습니다."
-              school_mismatch: "선생님과 학급의 학교가 일치해야 합니다."
+              school_mismatch: "선생님과 학급의 학년도가 일치해야 합니다."
               grade_required: "학년이 지정된 선생님만 담당자로 지정할 수 있습니다."
               grade_mismatch: "선생님과 학급의 학년이 일치해야 합니다."
               already_assigned: "이미 다른 선생님이 담당하는 학급입니다."

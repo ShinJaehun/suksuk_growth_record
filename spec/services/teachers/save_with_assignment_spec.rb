@@ -41,7 +41,7 @@ RSpec.describe Teachers::SaveWithAssignment do
   it "preserves an inactive classroom assignment during a profile update" do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
     classroom.update!(active: false)
 
     result = save(teacher: teacher, school: school, grade: 4,
@@ -55,8 +55,8 @@ RSpec.describe Teachers::SaveWithAssignment do
   it "rejects changing, removing, or moving an inactive classroom assignment" do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
-    destination = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
+    destination = create(:classroom, annual_school: school, grade: 4)
     classroom.update!(active: false)
 
     expect(save(teacher: teacher, school: school, grade: 5, classroom: classroom)).not_to be_success
@@ -72,8 +72,8 @@ RSpec.describe Teachers::SaveWithAssignment do
   it "assigns, moves, and removes one matching active classroom" do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 5)
-    first = create(:classroom, school: school, grade: 5)
-    second = create(:classroom, school: school, grade: 5)
+    first = create(:classroom, annual_school: school, grade: 5)
+    second = create(:classroom, annual_school: school, grade: 5)
 
     expect(save(teacher: teacher, school: school, grade: 5, classroom: first)).to be_success
     expect(first.reload.teacher).to eq(teacher)
@@ -90,9 +90,9 @@ RSpec.describe Teachers::SaveWithAssignment do
     other_teacher = annual_teacher(school: school, grade: 5)
     invalid_classrooms = [
       create(:classroom, grade: 5),
-      create(:classroom, school: school, grade: 6),
-      create(:classroom, school: school, grade: 5, active: false),
-      create(:classroom, school: school, grade: 5, teacher: other_teacher)
+      create(:classroom, annual_school: school, grade: 6),
+      create(:classroom, annual_school: school, grade: 5, active: false),
+      create(:classroom, annual_school: school, grade: 5, teacher: other_teacher)
     ]
 
     invalid_classrooms.each do |classroom|
@@ -112,7 +112,7 @@ RSpec.describe Teachers::SaveWithAssignment do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 4)
     teacher.update!(active: false)
-    classroom = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4)
     expect(save(teacher: teacher, school: school, grade: 4, classroom: classroom)).not_to be_success
 
     inactive_school = create(:school, active: false)
@@ -131,9 +131,9 @@ RSpec.describe Teachers::SaveWithAssignment do
   it "rejects moving an existing annual teacher to another school" do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 4, school_role: "manager", name: "변경 전")
-    current_classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    current_classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
     destination_school = create(:school)
-    destination_classroom = create(:classroom, school: destination_school, grade: 5)
+    destination_classroom = create(:classroom, annual_school: destination_school, grade: 5)
 
     result = save(teacher: teacher, school: destination_school, grade: 5,
       classroom: destination_classroom, attributes: { name: "변경 후" })
@@ -148,7 +148,7 @@ RSpec.describe Teachers::SaveWithAssignment do
   it "rejects detaching an annual teacher when school is nil" do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 4)
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
     expect(save(teacher: teacher, school: nil, grade: nil)).not_to be_success
     expect(teacher.reload).to have_attributes(school_year: school.school_years.active.first, grade: 4)
@@ -158,7 +158,7 @@ RSpec.describe Teachers::SaveWithAssignment do
   it "rolls back profile, grade, and assignment changes on failure" do
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 5)
-    classroom = create(:classroom, school: school, grade: 5, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 5, teacher: teacher)
 
     result = save(teacher: teacher, school: school, grade: 4, attributes: { name: "" })
 

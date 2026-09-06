@@ -1,24 +1,28 @@
 # app/controllers/classrooms_controller.rb
-require "set"
 
 class ClassroomsController < ApplicationController
   before_action :authenticate_user!
-  before_action :redirect_students_to_mypage!, only: [:index, :show]
-  before_action :set_classroom, only: [
-    :show, :destroy
+  before_action :redirect_students_to_mypage!, only: %i[index show]
+  before_action :set_classroom, only: %i[
+    show destroy
   ]
   before_action :set_lifecycle_classroom, only: %i[deactivate reactivate]
 
   def index
     # index는 policy_scope만 요구(verify_policy_scoped 훅 통과)
-    classrooms_scope = policy_scope(Classroom).joins(:school).merge(School.active)
+    classrooms_scope = policy_scope(Classroom)
+                       .joins(school_year: :school)
+                       .merge(SchoolYear.active)
+                       .merge(School.active)
     if current_user.active_teacher? && !current_user_school_manager?
       assigned_landing_path = regular_teacher_landing_path_for(current_user)
       return redirect_to(assigned_landing_path) unless assigned_landing_path == classrooms_path
     end
 
     prepare_school_filter if current_user.admin?
-    classrooms_scope = classrooms_scope.where(school_id: @selected_school.id) if current_user.admin? && @selected_school
+    if current_user.admin? && @selected_school
+      classrooms_scope = classrooms_scope.where(school_years: { school_id: @selected_school.id })
+    end
     @selected_grade = grade_filter
     classrooms_scope = classrooms_scope.where(grade: @selected_grade) if @selected_grade
     context = Classrooms::IndexContext.new(classrooms_scope: classrooms_scope)
@@ -69,22 +73,22 @@ class ClassroomsController < ApplicationController
   def new
     authorize Classroom
     @classroom = Classroom.new
-    assign_manager_school
+    assign_classroom_school_year
     prepare_classroom_form
   end
 
   def create
     authorize Classroom
     @classroom = Classroom.new
-    assign_manager_school
+    assign_classroom_school_year
     @classroom.assign_attributes(classroom_params)
 
-    if @classroom.school&.inactive?
-      @classroom.errors.add(:school, t("school_status.inactive_school"))
+    if @classroom.school_year&.school&.inactive?
+      @classroom.errors.add(:school_year, t('school_status.inactive_school'))
       prepare_classroom_form
       render :new, status: :unprocessable_content
     elsif @classroom.save
-      redirect_to classroom_path(@classroom), notice: t("classrooms.create.success")
+      redirect_to classroom_path(@classroom), notice: t('classrooms.create.success')
     else
       prepare_classroom_form
       render :new, status: :unprocessable_content
@@ -96,17 +100,17 @@ class ClassroomsController < ApplicationController
 
     if @classroom.destroy
       redirect_to classrooms_path,
-        notice: t("classrooms.destroy.success"),
-        status: :see_other
+                  notice: t('classrooms.destroy.success'),
+                  status: :see_other
     else
       redirect_to edit_classroom_path(@classroom),
-        alert: classroom_destroy_error_message,
-        status: :see_other
+                  alert: classroom_destroy_error_message,
+                  status: :see_other
     end
   rescue ActiveRecord::InvalidForeignKey, ActiveRecord::RecordNotDestroyed
     redirect_to edit_classroom_path(@classroom),
-      alert: t("classrooms.destroy.failure"),
-      status: :see_other
+                alert: t('classrooms.destroy.failure'),
+                status: :see_other
   end
 
   def deactivate
@@ -132,25 +136,25 @@ class ClassroomsController < ApplicationController
   def update_classroom_status(active)
     if @classroom.update(active: active)
       redirect_to classrooms_path,
-        notice: t(active ? "classroom_status.reactivated" : "classroom_status.deactivated"),
-        status: :see_other
+                  notice: t(active ? 'classroom_status.reactivated' : 'classroom_status.deactivated'),
+                  status: :see_other
     else
       redirect_to classroom_path(@classroom),
-        alert: t("classroom_status.failure"),
-        status: :see_other
+                  alert: t('classroom_status.failure'),
+                  status: :see_other
     end
   end
 
   def classroom_destroy_error_message
-    @classroom.errors.full_messages.to_sentence.presence || t("classrooms.destroy.failure")
+    @classroom.errors.full_messages.to_sentence.presence || t('classrooms.destroy.failure')
   end
 
   def classroom_params
     permitted = []
-    permitted.concat(%i[name grade]) if structure_settings_allowed?
+    permitted.concat(%i[class_label grade]) if structure_settings_allowed?
     permitted << :school_id if current_user.admin?
 
-    params.require(:classroom).permit(*permitted.uniq)
+    params.require(:classroom).permit(*permitted.uniq).except(:school_id)
   end
 
   def structure_settings_allowed?
@@ -192,10 +196,16 @@ class ClassroomsController < ApplicationController
     value.to_i
   end
 
-  def assign_manager_school
-    return unless current_user_school_manager?
+  def assign_classroom_school_year
+    if current_user.admin?
+      school_id = params.dig(:classroom, :school_id)
+      return if school_id.blank?
 
-    @classroom.school = current_user.annual_school
+      school = policy_scope(School).active.find_by(id: school_id)
+      @classroom.school_year = school&.school_years&.active&.first
+    elsif current_user_school_manager?
+      @classroom.school_year = current_user.school_year
+    end
   end
 
   def redirect_students_to_mypage!
@@ -205,10 +215,9 @@ class ClassroomsController < ApplicationController
   end
 
   def classrooms_index_title_key
-    return "classrooms.index.admin_title" if current_user.admin?
-    return "classrooms.index.manager_title" if current_user_school_manager?
+    return 'classrooms.index.admin_title' if current_user.admin?
+    return 'classrooms.index.manager_title' if current_user_school_manager?
 
-    "classrooms.index.teacher_title"
+    'classrooms.index.teacher_title'
   end
-
 end

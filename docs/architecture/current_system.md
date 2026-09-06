@@ -26,7 +26,7 @@
 
 ## 학교와 교실
 
-- 모든 `Classroom`은 하나의 active/inactive lifecycle과 변경 불가능한 `school_id`를 가진다.
+- 모든 `Classroom`은 하나의 변경 불가능한 `SchoolYear`, normalized `class_label`, active/inactive lifecycle을 가진다. 학교는 `classroom.school_year.school`로 결정한다.
 - `Classroom.grade`는 필수 정수 1부터 6이며 표시·filter·정렬 정책은 canonical grade spec을 따른다.
 - global admin은 모든 학교 범위, manager는 자기 학교 범위에서 school과 classroom을 관리한다.
 - 일반 teacher는 담당 active classroom만 운영한다.
@@ -58,7 +58,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 
 - teacher는 담당 classroom이 없거나 하나다.
 - classroom은 담당 teacher가 없거나 한 명이다.
-- 신규 assignment 시 teacher와 classroom은 같은 school과 grade를 가지며 둘 다 active여야 한다.
+- 신규 assignment 시 teacher와 classroom은 같은 SchoolYear와 grade를 가지며 teacher, classroom, SchoolYear, School이 active여야 한다.
 - 신규 teacher `ClassroomMembership`은 만들지 않는다.
 - `ClassroomMembership`은 학생 classroom 소속에 사용한다.
 - teacher 비활성화 시 현재 `teacher_id`를 해제하고 재활성화 때 자동 복원하지 않는다.
@@ -71,7 +71,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 - global admin은 모든 학교, manager는 자기 학교 teacher만 관리한다.
 - 일반 teacher는 접근할 수 없다.
 - teacher form은 학교, 학년, 단일 학급 순서로 구성한다.
-- 학교와 학년이 유효할 때만 같은 school·grade의 active 미배정 classroom을 후보로 조회한다.
+- 학교와 학년이 유효할 때만 같은 SchoolYear·grade의 active 미배정 classroom을 후보로 조회한다.
 - teacher 생성 시 최초 password를 입력할 수 있지만 기존 teacher update에서는 manager가 password를 변경할 수 없다.
 - teacher 목록은 annual school, `User.grade`, 단일 classroom과 lifecycle 상태를 표시한다.
 

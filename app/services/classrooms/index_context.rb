@@ -4,7 +4,9 @@ class Classrooms::IndexContext
   end
 
   def classrooms
-    @classrooms ||= @classrooms_scope.includes(:school, teacher: { avatar_attachment: :blob }).order(:grade, created_at: :desc)
+    @classrooms ||= @classrooms_scope
+      .includes(school_year: :school, teacher: { avatar_attachment: :blob })
+      .order(:grade, created_at: :desc)
   end
 
   def teacher_counts

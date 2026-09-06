@@ -11,8 +11,8 @@ RSpec.describe ClassroomPolicy do
   describe "Scope" do
     let(:school) { create(:school) }
     let(:other_school) { create(:school) }
-    let!(:classroom) { create(:classroom, school: school) }
-    let!(:other_classroom) { create(:classroom, school: other_school) }
+    let!(:classroom) { create(:classroom, annual_school: school) }
+    let!(:other_classroom) { create(:classroom, annual_school: other_school) }
 
     it "returns every classroom for an admin" do
       admin = create(:user, :admin)
@@ -27,7 +27,7 @@ RSpec.describe ClassroomPolicy do
     end
 
     it "returns only assigned classrooms for a regular teacher" do
-      assigned_classroom = create(:classroom, school: school)
+      assigned_classroom = create(:classroom, annual_school: school)
       teacher = annual_teacher(school: school, grade: assigned_classroom.grade)
       assign_teacher(assigned_classroom, teacher)
       expect(Pundit.policy_scope!(teacher, Classroom)).to contain_exactly(assigned_classroom)
@@ -51,7 +51,7 @@ RSpec.describe ClassroomPolicy do
   describe "#show?" do
     it "permits a manager to view an unassigned classroom in their school" do
       school = create(:school)
-      classroom = create(:classroom, school: school)
+      classroom = create(:classroom, annual_school: school)
       manager = annual_teacher(school: school, school_role: "manager")
 
       expect(described_class.new(manager, classroom).show?).to eq(true)
@@ -67,7 +67,7 @@ RSpec.describe ClassroomPolicy do
 
   describe "#view_student_data?" do
     let(:school) { create(:school) }
-    let(:classroom) { create(:classroom, school: school) }
+    let(:classroom) { create(:classroom, annual_school: school) }
 
     it "permits an admin" do
       expect(described_class.new(create(:user, :admin), classroom).view_student_data?).to eq(true)
@@ -106,7 +106,7 @@ RSpec.describe ClassroomPolicy do
 
   describe "classroom operation permissions" do
     let(:school) { create(:school) }
-    let(:classroom) { create(:classroom, school: school) }
+    let(:classroom) { create(:classroom, annual_school: school) }
     let(:manager) do
       annual_teacher(school: school, school_role: "manager", grade: classroom.grade)
     end
@@ -132,7 +132,7 @@ RSpec.describe ClassroomPolicy do
 
   describe "settings permissions" do
     let(:school) { create(:school) }
-    let(:classroom) { create(:classroom, school: school) }
+    let(:classroom) { create(:classroom, annual_school: school) }
 
     it "allows an admin to render structure fields before a new classroom has a school" do
       policy = described_class.new(create(:user, :admin), Classroom.new)
@@ -198,8 +198,8 @@ RSpec.describe ClassroomPolicy do
 
   describe "lifecycle permissions" do
     let(:school) { create(:school) }
-    let(:active_classroom) { create(:classroom, school: school) }
-    let(:inactive_classroom) { create(:classroom, school: school, active: false) }
+    let(:active_classroom) { create(:classroom, annual_school: school) }
+    let(:inactive_classroom) { create(:classroom, annual_school: school, active: false) }
 
     it "allows an admin to deactivate active and reactivate inactive classrooms" do
       admin = create(:user, :admin)
@@ -251,7 +251,7 @@ RSpec.describe ClassroomPolicy do
 
   describe "#destroy?" do
     let(:school) { create(:school) }
-    let(:classroom) { create(:classroom, school: school) }
+    let(:classroom) { create(:classroom, annual_school: school) }
 
     it "permits an admin" do
       expect(described_class.new(create(:user, :admin), classroom).destroy?).to eq(true)

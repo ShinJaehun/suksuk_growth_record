@@ -16,12 +16,15 @@ class SchoolsController < ApplicationController
     redirect_to school_path(@schools.first) and return if current_user.active_teacher? && @schools.one?
 
     school_ids = @schools.map(&:id)
-    @classroom_counts = Classroom.where(school_id: school_ids).group(:school_id).count
     active_year_ids = SchoolYear.active
       .where(school_id: school_ids)
       .pluck(:school_id, :id)
       .group_by(&:first)
       .filter_map { |_school_id, rows| rows.first.last if rows.one? }
+    @classroom_counts = Classroom.joins(:school_year)
+      .where(school_year_id: active_year_ids)
+      .group("school_years.school_id")
+      .count
     annual_teachers = User.teacher.active
       .where(school_year_id: active_year_ids)
       .includes(:school_year)

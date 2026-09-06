@@ -34,7 +34,7 @@ RSpec.describe "Role landing pages", type: :request do
   it "routes a regular teacher with one assigned classroom to that classroom" do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher, annual_school: school)
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
     assign_teacher(classroom, teacher)
     sign_in teacher
 

@@ -27,7 +27,7 @@ class Classrooms::SettingsController < ApplicationController
 
   def classroom_params
     permitted = []
-    permitted.concat(%i[name grade]) if structure_settings_allowed?
+    permitted.concat(%i[class_label grade]) if structure_settings_allowed?
     params.require(:classroom).permit(*permitted.uniq)
   end
 
@@ -38,9 +38,9 @@ class Classrooms::SettingsController < ApplicationController
   def school_change_attempt?
     return false unless structure_settings_allowed?
     return false unless params.require(:classroom).key?(:school_id)
-    return false if params.dig(:classroom, :school_id).to_s == @classroom.school_id.to_s
+    return false if params.dig(:classroom, :school_id).to_s == @classroom.school_year.school_id.to_s
 
-    @classroom.errors.add(:school, :immutable)
+    @classroom.errors.add(:school_year, :immutable)
     true
   end
 end

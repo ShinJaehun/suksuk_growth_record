@@ -46,9 +46,9 @@ ko:
       teacher_empty: "담당 교사 없음"
     form:
       basic_info: "교실 기본 정보"
-      name_label: "교실 이름"
-      name_placeholder: "예: 4학년 1반"
-      name_hint: "교실 이름은 50자 이내로 입력해 주세요."
+      class_label_label: "반"
+      class_label_placeholder: "예: 1, 가, 햇살"
+      class_label_hint: "반 이름은 50자 이내로 입력해 주세요. 끝의 ‘반’은 자동으로 정리됩니다."
       school_label: "학교"
       school_prompt: "학교 선택"
       grade_label: "학년"

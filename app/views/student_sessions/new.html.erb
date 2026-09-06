@@ -3,7 +3,7 @@
     <h1 class="text-xl font-bold text-slate-900">학생 PIN 로그인</h1>
 
     <% if @classroom %>
-      <p class="mt-2 text-sm text-slate-600"><%= @classroom.name %></p>
+      <p class="mt-2 text-sm text-slate-600"><%= classroom_display_name(@classroom) %></p>
 
       <%= form_with url: @student_session_form_url,
             method: :post,

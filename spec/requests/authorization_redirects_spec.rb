@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Authorization redirects", type: :request do
   let(:school) { create(:school) }
-  let(:classroom) { create(:classroom, school: school) }
+  let(:classroom) { create(:classroom, annual_school: school) }
   let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
 
   it "redirects a teacher with no remaining classrooms to the classrooms index" do

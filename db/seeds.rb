@@ -215,17 +215,17 @@ classroom_teacher = seed_account!(
 puts '== 교실 생성 =='
 
 classroom = Classroom.find_or_initialize_by(
-  school: school,
+  school_year: school_year,
   grade: 4,
-  name: '1반'
+  class_label: '1'
 )
 
 classroom.save!
 
 empty_classroom = Classroom.find_or_initialize_by(
-  school: school,
+  school_year: school_year,
   grade: 4,
-  name: '2반'
+  class_label: '2'
 )
 
 empty_classroom.save!
@@ -263,7 +263,7 @@ puts "  비밀번호: #{demo_password}"
 puts
 puts '학생'
 puts "  학교: #{school.name}"
-puts "  교실: #{classroom.grade}학년 #{classroom.name}"
+puts "  교실: #{classroom.grade}학년 #{classroom.class_label}반"
 puts "  인원: #{students.count}명"
 puts "  PIN: #{demo_student_pin}"
 puts

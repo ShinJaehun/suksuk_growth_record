@@ -252,7 +252,7 @@ RSpec.describe ClassroomMembership, type: :model do
 
   it "rejects new teacher memberships" do
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: first_classroom.school)
+      annual_school: first_classroom.school_year.school)
     membership = build(:classroom_membership, user: teacher,
                                               classroom: first_classroom, role: "teacher")
 
@@ -273,7 +273,7 @@ RSpec.describe ClassroomMembership, type: :model do
   it "rejects a student membership for a teacher user" do
     membership = described_class.new(
       user: create(:user, :teacher, :active_annual_teacher,
-        annual_school: first_classroom.school),
+        annual_school: first_classroom.school_year.school),
       classroom: first_classroom,
       role: "student"
     )

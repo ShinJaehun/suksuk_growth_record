@@ -17,7 +17,7 @@ RSpec.describe 'Admin school managers', type: :request do
   end
 
   it 'promotes a member without changing assignments' do
-    classroom = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4)
     assign_teacher(classroom, teacher)
     sign_in admin
 
@@ -47,7 +47,7 @@ RSpec.describe 'Admin school managers', type: :request do
 
   it 'demotes a manager without changing assignments' do
     teacher.update!(school_role: 'manager')
-    classroom = create(:classroom, school: school, grade: 4)
+    classroom = create(:classroom, annual_school: school, grade: 4)
     assign_teacher(classroom, teacher)
     sign_in admin
 

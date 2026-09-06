@@ -21,7 +21,8 @@ class UserPolicy < ApplicationPolicy
 
       # 담임인 반 학생들 정보만 조회 가능
       classroom = user.assigned_classroom
-      return classroom&.active? && classroom.school.active? &&
+      return classroom&.active? && classroom.school_year.active? &&
+        classroom.school_year.school.active? &&
         ClassroomMembership.exists?(user_id: record.id, classroom_id: classroom.id, role: "student")
     end
     # 학생은 본인만
@@ -47,7 +48,8 @@ class UserPolicy < ApplicationPolicy
     return false unless user&.active_teacher?
 
     classroom = user.assigned_classroom
-    classroom&.active? && classroom.school.active? &&
+    classroom&.active? && classroom.school_year.active? &&
+      classroom.school_year.school.active? &&
       ClassroomMembership.exists?(user_id: record.id, classroom_id: classroom.id, role: "student")
   end
 

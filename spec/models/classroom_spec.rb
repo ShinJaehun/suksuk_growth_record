@@ -8,7 +8,7 @@ RSpec.describe Classroom, type: :model do
       **attributes)
   end
   it "generates a student login token" do
-    classroom = create(:classroom, name: "토큰 교실")
+    classroom = create(:classroom, class_label: "토큰 교실")
 
     expect(classroom.student_login_token).to be_present
   end
@@ -25,52 +25,60 @@ RSpec.describe Classroom, type: :model do
     expect(described_class.inactive).to contain_exactly(inactive_classroom)
   end
 
-  it "allows a name with 50 characters" do
-    classroom = build(:classroom, name: "가" * 50)
+  it "allows a class label with 50 characters" do
+    classroom = build(:classroom, class_label: "가" * 50)
 
     expect(classroom).to be_valid
   end
 
-  it "can belong to a school" do
+  it "belongs to a school year" do
     school = create(:school)
-    classroom = build(:classroom, school: school)
+    classroom = build(:classroom, annual_school: school)
 
-    expect(classroom.school).to eq(school)
+    expect(classroom.school_year.school).to eq(school)
     expect(classroom).to be_valid
   end
 
-  it "rejects a blank school" do
-    classroom = build(:classroom, school: nil)
+  it "rejects a blank school year" do
+    classroom = build(:classroom, school_year: nil)
 
     expect(classroom).not_to be_valid
-    expect(classroom.errors[:school]).to be_present
+    expect(classroom.errors[:school_year]).to be_present
   end
 
-  it "rejects a school id that does not exist" do
-    classroom = build(:classroom, school: nil, school_id: School.maximum(:id).to_i + 10_000)
+  it "normalizes a class label" do
+    classroom = build(:classroom, class_label: " 가반 ")
+
+    classroom.validate
+
+    expect(classroom.class_label).to eq("가")
+  end
+
+  it "rejects a blank normalized class label" do
+    classroom = build(:classroom, class_label: " 반 ")
 
     expect(classroom).not_to be_valid
-    expect(classroom.errors[:school]).to be_present
+    expect(classroom.errors[:class_label]).to be_present
   end
 
-  it "rejects changing the school of an empty persisted classroom" do
-    original_school = create(:school)
-    classroom = create(:classroom, school: original_school)
+  it "rejects changing the school year of a persisted classroom" do
+    classroom = create(:classroom)
+    original_school_year = classroom.school_year
 
-    expect(classroom.update(school: create(:school))).to eq(false)
-    expect(classroom.errors.added?(:school, :immutable)).to eq(true)
-    expect(classroom.reload.school).to eq(original_school)
+    expect(classroom.update(school_year: create(:school_year, :active))).to eq(false)
+    expect(classroom.errors.added?(:school_year, :immutable)).to eq(true)
+    expect(classroom.reload.school_year).to eq(original_school_year)
   end
 
-  it "allows updating non-school settings" do
+  it "allows updating non-school-year settings" do
     classroom = create(:classroom)
 
     expect(classroom.update(
-      name: "변경 교실",
+      class_label: "변경반",
       grade: 6
     )).to eq(true)
     expect(classroom.reload).to have_attributes(
-      name: "변경 교실",
+      class_label: "변경",
       grade: 6
     )
   end
@@ -104,10 +112,25 @@ RSpec.describe Classroom, type: :model do
     expect(classroom).not_to be_valid
   end
 
-  it "rejects a name with more than 50 characters" do
-    classroom = build(:classroom, name: "가" * 51)
+  it "rejects a class label with more than 50 characters" do
+    classroom = build(:classroom, class_label: "가" * 51)
 
     expect(classroom).not_to be_valid
+  end
+
+  it "rejects a duplicate label in the same school year and grade" do
+    classroom = create(:classroom, grade: 4, class_label: "1")
+
+    duplicate = build(:classroom, school_year: classroom.school_year, grade: 4, class_label: "1반")
+
+    expect(duplicate).not_to be_valid
+  end
+
+  it "allows the same label in another school year" do
+    first = create(:classroom, grade: 4, class_label: "1")
+    other_year = create(:school_year, :active)
+
+    expect(build(:classroom, school_year: other_year, grade: 4, class_label: "1")).to be_valid
   end
 
   it "returns only active student memberships from students" do
@@ -124,7 +147,7 @@ RSpec.describe Classroom, type: :model do
     it "allows deletion when a teacher is assigned and there are no students" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
-      classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+      classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
       expect(classroom.destroy).to be_truthy
       expect(Classroom.exists?(classroom.id)).to eq(false)
@@ -155,24 +178,34 @@ RSpec.describe Classroom, type: :model do
 
 
   describe "teacher assignment" do
-    it "allows one active teacher from the same school and grade" do
+    it "allows one active teacher from the same school year and grade" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
-      classroom = build(:classroom, school: school, grade: 4, teacher: teacher)
+      classroom = build(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
       expect(classroom).to be_valid
+    end
+
+    it "rejects a teacher from another school year in the same school" do
+      school = create(:school)
+      classroom_year = create(:school_year, :active, school: school, year: 2026)
+      teacher_year = create(:school_year, :planning, school: school, year: 2027)
+      teacher = create(:user, :teacher, school_year: teacher_year,
+        login_id: "next-year-teacher", school_role: "member", grade: 4)
+
+      expect(build(:classroom, school_year: classroom_year, grade: 4, teacher: teacher)).not_to be_valid
     end
 
     it "rejects planning and archived annual teachers without replacing the assignment" do
       school = create(:school)
       current_teacher = annual_teacher(school: school, grade: 4)
-      assigned_classroom = create(:classroom, school: school, grade: 4, teacher: current_teacher)
+      assigned_classroom = create(:classroom, annual_school: school, grade: 4, teacher: current_teacher)
 
       %i[planning archived].each_with_index do |status, offset|
         school_year = create(:school_year, status, school: school, year: 2027 + offset)
         candidate = create(:user, :teacher, school_year: school_year,
           login_id: "#{status}-teacher", school_role: "member", grade: 4)
-        classroom = build(:classroom, school: school, grade: 4, teacher: candidate)
+        classroom = build(:classroom, annual_school: school, grade: 4, teacher: candidate)
 
         expect(classroom).not_to be_valid
         expect(assigned_classroom.reload.teacher).to eq(current_teacher)
@@ -182,9 +215,9 @@ RSpec.describe Classroom, type: :model do
     it "rejects assigning one teacher to two classrooms" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
-      create(:classroom, school: school, grade: 4, teacher: teacher)
+      create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
-      duplicate = build(:classroom, school: school, grade: 4, teacher: teacher)
+      duplicate = build(:classroom, annual_school: school, grade: 4, teacher: teacher)
       expect(duplicate).not_to be_valid
     end
 
@@ -192,9 +225,9 @@ RSpec.describe Classroom, type: :model do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
       invalid = [
-        build(:classroom, school: create(:school), grade: 4, teacher: teacher),
-        build(:classroom, school: school, grade: 5, teacher: teacher),
-        build(:classroom, school: school, grade: 4, active: false, teacher: teacher),
+        build(:classroom, annual_school: create(:school), grade: 4, teacher: teacher),
+        build(:classroom, annual_school: school, grade: 5, teacher: teacher),
+        build(:classroom, annual_school: school, grade: 4, active: false, teacher: teacher),
         build(:classroom, teacher: create(:user, :student))
       ]
 
@@ -204,7 +237,7 @@ RSpec.describe Classroom, type: :model do
     it "preserves its teacher through deactivation and reactivation" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
-      classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+      classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
       classroom.update!(active: false)
       expect(classroom.reload.teacher).to eq(teacher)
@@ -218,8 +251,8 @@ RSpec.describe Classroom, type: :model do
       school = create(:school)
       first_teacher = annual_teacher(school: school, grade: 4)
       second_teacher = annual_teacher(school: school, grade: 4)
-      unassigned = create(:classroom, school: school, grade: 4, active: false)
-      assigned = create(:classroom, school: school, grade: 4, teacher: first_teacher)
+      unassigned = create(:classroom, annual_school: school, grade: 4, active: false)
+      assigned = create(:classroom, annual_school: school, grade: 4, teacher: first_teacher)
       assigned.update!(active: false)
 
       expect(unassigned.update(teacher: second_teacher)).to eq(false)
@@ -230,7 +263,7 @@ RSpec.describe Classroom, type: :model do
     it "releases an inactive classroom assignment when its teacher is deactivated" do
       school = create(:school)
       teacher = annual_teacher(school: school, grade: 4)
-      classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+      classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
       classroom.update!(active: false)
 
       teacher.update!(active: false)

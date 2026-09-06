@@ -2,7 +2,7 @@ class Classroom < ApplicationRecord
   MAX_ACTIVE_STUDENTS = 30
   has_secure_token :student_login_token
 
-  belongs_to :school
+  belongs_to :school_year
   belongs_to :teacher, class_name: 'User', optional: true, inverse_of: :assigned_classroom
 
   # Student memberships protect a classroom from deletion.
@@ -12,6 +12,8 @@ class Classroom < ApplicationRecord
 
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
+
+  before_validation :normalize_class_label, if: :class_label_changed?
 
   def inactive?
     !active?
@@ -25,23 +27,31 @@ class Classroom < ApplicationRecord
     classroom_memberships.student.active.count
   end
 
-  validates :name, length: { maximum: 50 }
+  validates :class_label, presence: true, length: { maximum: 50 }
+  validates :class_label, format: { without: /반\z/ }, allow_blank: true
+  validates :class_label, uniqueness: { scope: %i[school_year_id grade] }
   validates :grade, numericality: {
     only_integer: true,
     greater_than_or_equal_to: 1,
     less_than_or_equal_to: 6
   }
-  validate :school_must_not_change, on: :update
+  validate :school_year_must_not_change, on: :update
   validates :teacher_id, uniqueness: true, allow_nil: true
   validate :teacher_assignment_must_be_valid
   validate :teacher_assignment_must_not_replace_existing_teacher
 
   private
 
-  def school_must_not_change
-    return unless will_save_change_to_school_id?
+  def normalize_class_label
+    normalized = class_label.to_s.strip
+    normalized = normalized.delete_suffix("반").strip
+    self.class_label = normalized.presence
+  end
 
-    errors.add(:school, :immutable)
+  def school_year_must_not_change
+    return unless will_save_change_to_school_year_id?
+
+    errors.add(:school_year, :immutable)
   end
 
   def prevent_destroy_with_students
@@ -61,9 +71,9 @@ class Classroom < ApplicationRecord
     errors.add(:teacher, :school_year_required) unless teacher.school_year
     return unless teacher.school_year
 
-    errors.add(:teacher, :inactive_school_year) unless teacher.school_year.active?
-    errors.add(:teacher, :inactive_school) unless teacher.annual_school&.active?
-    errors.add(:teacher, :school_mismatch) unless teacher.annual_school&.id == school_id
+    errors.add(:teacher, :inactive_school_year) unless school_year&.active? && teacher.school_year.active?
+    errors.add(:teacher, :inactive_school) unless school_year&.school&.active?
+    errors.add(:teacher, :school_mismatch) unless teacher.school_year_id == school_year_id
     errors.add(:teacher, :grade_required) if teacher.grade.nil?
     errors.add(:teacher, :grade_mismatch) unless teacher.grade == grade
   end

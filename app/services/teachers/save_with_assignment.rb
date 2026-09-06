@@ -85,7 +85,7 @@ module Teachers
       return if teacher.errors.any? || classroom.nil?
 
       add_error(:school_required_for_classrooms) unless school
-      add_error(:classroom_school_mismatch) if school && classroom.school_id != school.id
+      add_error(:classroom_school_mismatch) unless classroom.school_year_id == target_school_year&.id
       add_error(:classroom_grade_mismatch) unless grade && classroom.grade == grade
       add_error(:inactive_teacher) unless teacher.active?
       add_error(:inactive_classroom) unless classroom.active? || classroom == current_classroom

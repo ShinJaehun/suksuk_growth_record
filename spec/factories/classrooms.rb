@@ -1,7 +1,15 @@
 FactoryBot.define do
   factory :classroom do
-    association :school
-    sequence(:name) { |n| "Classroom #{n}" }
+    transient do
+      annual_school { nil }
+    end
+
+    school_year do
+      school = annual_school || FactoryBot.create(:school)
+      school.school_years.active.first ||
+        FactoryBot.create(:school_year, :active, school: school)
+    end
+    sequence(:class_label) { |n| n.to_s }
     grade { 4 }
   end
 end

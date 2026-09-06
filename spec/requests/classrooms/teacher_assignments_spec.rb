@@ -10,7 +10,7 @@ RSpec.describe "Classroom teacher assignment boundary", type: :request do
   end
 
   it "does not expose teacher assignment inputs on classroom forms" do
-    classroom = create(:classroom, school: school)
+    classroom = create(:classroom, annual_school: school)
     sign_in admin
 
     get edit_classroom_path(classroom)
@@ -21,14 +21,14 @@ RSpec.describe "Classroom teacher assignment boundary", type: :request do
   end
 
   it "ignores a forged teacher assignment while updating a classroom" do
-    classroom = create(:classroom, school: school, grade: 4, teacher: teacher)
+    classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
     other_teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_grade: 4)
     sign_in admin
 
     patch classroom_path(classroom), params: {
-      classroom: { name: "변경 학급", grade: 4, teacher_id: other_teacher.id }
+      classroom: { class_label: "변경 학급", grade: 4, teacher_id: other_teacher.id }
     }
 
     expect(response).to redirect_to(classroom_path(classroom))

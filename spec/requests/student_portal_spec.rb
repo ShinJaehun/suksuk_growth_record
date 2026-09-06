@@ -4,7 +4,7 @@ RSpec.describe 'Student portal flow', type: :request do
   describe 'student landing and access boundaries' do
     let(:student) { create(:user, :student, student_pin: '1234') }
     let(:classroom) { create(:classroom) }
-    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
+    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
@@ -112,8 +112,8 @@ RSpec.describe 'Student portal flow', type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('학생 정보·PIN 수정')
       expect(response.body).to include('교실로 돌아가기')
-      expect(response.body).not_to include("#{classroom.name} 교실로 돌아가기")
-      expect(response.body).to include(classroom.name)
+      expect(response.body).not_to include("#{classroom.class_label} 교실로 돌아가기")
+      expect(response.body).to include(classroom.class_label)
       expect(response.body).not_to include('내 마이페이지')
       expect(response.body).not_to include('내 소속 교실')
     end
@@ -143,7 +143,7 @@ RSpec.describe 'Student portal flow', type: :request do
   describe 'student account deletion boundary' do
     let(:student) { create(:user, :student) }
     let(:classroom) { create(:classroom) }
-    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
+    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')
@@ -175,7 +175,7 @@ RSpec.describe 'Student portal flow', type: :request do
   describe 'managed student account page' do
     let(:student) { create(:user, :student, student_pin: '1234') }
     let(:classroom) { create(:classroom) }
-    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school) }
+    let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
 
     before do
       create(:classroom_membership, user: student, classroom: classroom, role: 'student')

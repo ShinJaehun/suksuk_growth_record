@@ -5,45 +5,43 @@
 학교는 조직·권한·운영 lifecycle의 상위 경계이며 교실과 교실 운영 기록은 그 아래에 속한다.
 
 ```text
-School 1 ─ N Classroom
-
 School
-└── Classroom
-    ├── teacher_id (optional, unique when present)
-    ├── student ClassroomMembership
-    └── 운영 기록
+└── SchoolYear
+    └── Classroom
+        ├── teacher_id (optional, unique when present)
+        ├── student ClassroomMembership
+        └── 운영 기록
 ```
 
 ## 교실 경계
 
-- 모든 `Classroom`은 생성 시 하나의 `School`을 가져야 한다.
-- 저장된 `Classroom.school_id`는 운영 기록이나 구성원의 유무와 관계없이 변경할 수 없다.
+- 모든 `Classroom`은 생성 시 하나의 `SchoolYear`를 가져야 하며 학교는 `classroom.school_year.school`로 결정한다.
+- 저장된 `Classroom.school_year_id`는 운영 기록이나 구성원의 유무와 관계없이 변경할 수 없다.
 - 학교를 잘못 선택한 빈 교실은 다른 학교로 이동하지 않고 삭제한 뒤 다시 만든다.
 - 교실에 귀속된 학생 소속과 공통 운영 기록은 다른 학교로 옮기거나 재해석하지 않는다.
 
 ## 교사 소속과 담당 교실
 
 ```text
-Teacher 1 ─ 0..1 SchoolMembership
+SchoolYear 1 ─ N Teacher
 Teacher 0..1 ─ 0..1 Classroom
 ```
 
 현재 담당 교사는 nullable `Classroom.teacher_id`로 표현하며 다음을 모두 만족해야 한다.
 
 - 연결된 `User.role`이 `teacher`다.
-- 교사에게 `SchoolMembership`이 있다.
-- 교사의 학교와 `Classroom.school_id`가 같다.
-- 교사의 `SchoolMembership.grade`와 `Classroom.grade`가 같다.
+- 교사와 Classroom의 `school_year_id`가 같다.
+- 교사의 `User.grade`와 `Classroom.grade`가 같다.
 - 교사와 교실이 모두 active다.
 - 한 교사는 최대 한 교실, 한 교실은 최대 한 교사와 연결된다.
 
-학교 소속이 없는 teacher 계정 자체는 허용하지만 교실 담당자로 배정할 수 없다. 신규 teacher `ClassroomMembership`은 만들지 않으며 `ClassroomMembership`은 학생의 교실 소속에 사용한다.
+정상 teacher는 SchoolYear에 속하며 SchoolYear가 없는 teacher는 교실 담당자로 배정할 수 없다. `ClassroomMembership`은 학생의 교실 소속에 사용한다.
 
 teacher assignment는 nullable `Classroom.teacher_id`, `users` foreign key와 null이 아닌 값에 대한 unique index로 1:1 관계를 보장한다. `ClassroomMembership`은 student membership에만 사용한다.
 
 ## 학생의 학교
 
-학생에게 별도 `SchoolMembership`을 만들지 않는다. 학생의 학교는 active student `ClassroomMembership`이 연결하는 교실의 학교를 통해 결정한다.
+학생의 학교는 active student `ClassroomMembership`이 연결하는 `classroom.school_year.school`을 통해 결정한다.
 
 ## 학교 비활성화
 
