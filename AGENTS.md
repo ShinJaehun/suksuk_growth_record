@@ -104,12 +104,22 @@
 - 전체 `git diff` 출력은 피한다.
 - 전체 코드베이스 검색은 꼭 필요할 때만 한다.
 - 긴 계획, 긴 최종 요약, 전체 테스트 로그 출력을 피한다.
+- 한 번의 Codex run에서는 하나의 좁고 명확한 구현 책임만 처리한다.
+- migration/model, service/domain behavior, controller/policy/UI, 광범위한 spec 정리, 문서 갱신을 한 run에 모두 몰아넣지 않는다.
+- canonical spec 작성과 product implementation은 반드시 별도 run으로 처리한다.
+- 구현 범위가 여러 계층에 걸치면 migration/model → service/domain → controller/policy/runtime → spec/docs처럼 필요한 단위로 나누어 진행한다.
+- 이전 run에서 dependency inventory가 이미 끝났다면 다음 run에서 같은 범위를 다시 광범위하게 탐색하지 않는다.
+- 작업 중 추가 정리나 후속 책임을 발견해도 현재 책임의 정확성에 필수적이지 않다면 현재 run에 추가하지 않는다.
+- context compaction이 발생했거나 context가 크게 누적된 session에서는 새로운 대규모 작업을 시작하지 않는다.
+- usage-limit 경고가 나타난 뒤에는 현재 run의 범위를 확장하지 않는다.
+- 큰 context를 유지하기 위해 기존 Codex session을 계속 재사용하지 않는다. 다음의 의미 있는 구현 단위는 새 session에서 시작하는 것을 우선한다.
+- "토큰을 절약하라"는 지시만으로 충분하다고 보지 않는다. 실제 읽는 파일 수와 수정 계층, 구현 책임 자체를 줄인다.
 - 작업 완료 후에는 변경 파일 목록과 사용자가 실행할 테스트 명령만 짧게 제시한다.
 - 전체 테스트, 전체 diff 확인, 커밋, push, merge는 기본적으로 사용자가 직접 수행한다.
 - 사용자가 명시적으로 요청하지 않는 한 Codex가 직접 커밋하지 않는다.
 - `git add .`는 사용하지 않는다.
 - 커밋이 필요한 경우에도 사용자가 명시한 파일만 `git add <file>` 형식으로 스테이징한다.
-- 한 세션에서는 가능하면 하나의 기능이나 하나의 작은 문서 정리만 처리한다.
+- 한 세션에서 하나의 큰 기능 전체를 끝내려 하지 않는다. 같은 feature branch라도 여러 개의 작은 Codex run/session으로 나눌 수 있다.
 
 ---
 
