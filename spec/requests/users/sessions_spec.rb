@@ -7,18 +7,15 @@ RSpec.describe 'Users::Sessions', type: :request do
   let(:teacher_school_year) { create(:school_year, :active, school: teacher_school) }
   let(:teacher) do
     create(:user, :teacher,
-      password: 'password123',
-      school_year: teacher_school_year,
-      login_id: 'teacher1',
-      school_role: 'member')
+           password: 'password123',
+           school_year: teacher_school_year,
+           login_id: 'teacher1',
+           school_role: 'member')
   end
   let(:admin) { create(:user, :admin, password: 'password123') }
-  let(:student) { create(:user, :student, student_pin: '1234') }
   let(:classroom) { create(:classroom) }
 
-  before do
-    create(:classroom_membership, classroom: classroom, user: student, role: 'student')
-  end
+  let!(:student) { create(:student, classroom: classroom, student_pin: '1234') }
 
   around do |example|
     original_cache = Rails.cache
@@ -55,7 +52,7 @@ RSpec.describe 'Users::Sessions', type: :request do
   end
 
   it 'uses the same admin-auth failure boundary for correct and wrong teacher passwords' do
-    responses = ['password123', 'wrong-password'].map do |password|
+    responses = %w[password123 wrong-password].map do |password|
       post user_session_path, params: { user: { email: teacher.email, password: password } }
       [response.status, response.body]
     end
@@ -193,7 +190,10 @@ RSpec.describe 'Users::Sessions', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(student_profile_path)
+    expect(session[:student_id]).to eq(student.id)
+    expect(session[:student_login_classroom_id]).to eq(classroom.id)
+    expect(controller.current_user).to be_nil
   end
 
   it "blocks an inactive school's PIN page and restores it after reactivation" do
@@ -216,11 +216,12 @@ RSpec.describe 'Users::Sessions', type: :request do
     }
     classroom.school_year.school.update!(active: false)
 
-    get classroom_student_path(classroom, student)
+    get student_profile_path
 
     expect(response).to redirect_to(
       public_student_login_path(student_login_token: classroom.student_login_token)
     )
+    expect(session[:student_id]).to be_nil
     expect(controller.current_user).to be_nil
   end
 end

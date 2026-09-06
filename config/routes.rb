@@ -20,6 +20,9 @@ Rails.application.routes.draw do
   delete "/student_logout", to: "student_sessions#destroy", as: :destroy_student_session
   get "/c/:student_login_token/login", to: "student_sessions#new", as: :public_student_login
   post "/c/:student_login_token/login", to: "student_sessions#create"
+  get "/student", to: "student_profile#show", as: :student_profile
+  get "/student/pin/edit", to: "student_profile#edit", as: :edit_student_pin
+  patch "/student/pin", to: "student_profile#update", as: :student_pin
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

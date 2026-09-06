@@ -5,6 +5,8 @@ ko:
 
   student_sessions:
     signed_in: "로그인했습니다."
+    signed_out: "사용을 끝냈습니다."
+    logout: "사용 끝내기"
     invalid: "교실, 학생, PIN을 확인해 주세요."
     throttled: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요."
 

@@ -4,12 +4,13 @@ RSpec.describe 'Student PIN sessions', type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:classroom) { create(:classroom) }
-  let(:student) { create(:user, :student, student_pin: '1234') }
+  let!(:student) { create(:student, classroom: classroom, student_pin: '1234') }
+  let(:legacy_student) { create(:user, :student, student_pin: '1234') }
   let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
   let(:remote_ip) { '203.0.113.10' }
 
   before do
-    create(:classroom_membership, classroom: classroom, user: student, role: 'student')
+    create(:classroom_membership, classroom: classroom, user: legacy_student, role: 'student')
     assign_teacher(classroom, teacher)
   end
 
@@ -42,23 +43,22 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   it 'does not expose all classrooms and students on the global login page' do
     other_classroom = create(:classroom, class_label: '다른 교실')
-    other_student = create(:user, :student, name: '다른 학생', student_pin: '5678')
-    create(:classroom_membership, classroom: other_classroom, user: other_student, role: 'student')
+    other_student = create(:student, classroom: other_classroom, name: '다른 학생', student_pin: '5678')
 
     get new_student_session_path
+    document = Nokogiri::HTML(response.body)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('교실별 로그인 주소')
-    expect(response.body).not_to include(classroom.class_label)
     expect(response.body).not_to include(student.name)
-    expect(response.body).not_to include(other_classroom.class_label)
     expect(response.body).not_to include(other_student.name)
+    expect(document.css('a[href^="/c/"]')).to be_empty
+    expect(document.css('select[name="student_id"]')).to be_empty
   end
 
   it 'shows only students from the classroom login page' do
     other_classroom = create(:classroom)
-    other_student = create(:user, :student, name: '다른 학생', student_pin: '5678')
-    create(:classroom_membership, classroom: other_classroom, user: other_student, role: 'student')
+    other_student = create(:student, classroom: other_classroom, name: '다른 학생', student_pin: '5678')
 
     get public_student_login_path(student_login_token: classroom.student_login_token)
 
@@ -84,8 +84,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
   end
 
   it 'does not show inactive students on the classroom login page' do
-    inactive_student = create(:user, :student, name: '비활성 학생', student_pin: '5678')
-    create(:classroom_membership, classroom: classroom, user: inactive_student, role: 'student', status: 'inactive')
+    inactive_student = create(:student, classroom: classroom, name: '비활성 학생', student_pin: '5678', active: false)
 
     get public_student_login_path(student_login_token: classroom.student_login_token)
 
@@ -107,8 +106,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   it 'shows only students from the token classroom login page' do
     other_classroom = create(:classroom)
-    other_student = create(:user, :student, name: '다른 학생', student_pin: '5678')
-    create(:classroom_membership, classroom: other_classroom, user: other_student, role: 'student')
+    other_student = create(:student, classroom: other_classroom, name: '다른 학생', student_pin: '5678')
 
     get public_student_login_path(student_login_token: classroom.student_login_token)
 
@@ -175,7 +173,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
       }
     end
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(student_profile_path)
     expect(logs).to include('/c/[FILTERED]/login')
     expect(logs).not_to include(token)
     expect(logs).not_to include('1234')
@@ -238,7 +236,8 @@ RSpec.describe 'Student PIN sessions', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(student_profile_path)
+    expect(session[:student_id]).to eq(student.id)
   end
 
   it 'signs in a student through the token classroom login route' do
@@ -247,7 +246,8 @@ RSpec.describe 'Student PIN sessions', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(student_profile_path)
+    expect(session[:student_id]).to eq(student.id)
     expect(session[:student_login_classroom_id]).to eq(classroom.id)
   end
 
@@ -259,6 +259,16 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     expect(session[:student_login_classroom_id]).to eq(classroom.id)
     expect(session[:student_last_seen_at]).to be_present
+    expect(controller.current_user).to be_nil
+  end
+
+  it 'clears an existing Devise User session when Student login succeeds' do
+    sign_in teacher
+
+    post_student_pin(pin: '1234')
+
+    expect(controller.current_user).to be_nil
+    expect(session[:student_id]).to eq(student.id)
   end
 
   it 'keeps a student signed in within the TTL and refreshes last seen' do
@@ -270,7 +280,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
     end
 
     travel_to Time.zone.local(2026, 5, 22, 10, 5, 0) do
-      get classroom_student_path(classroom, student)
+      get student_profile_path
     end
 
     expect(response).to have_http_status(:ok)
@@ -281,10 +291,40 @@ RSpec.describe 'Student PIN sessions', type: :request do
     post_student_pin(pin: '1234')
     classroom.update!(active: false)
 
-    get user_path(student)
+    get student_profile_path
 
     expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
     expect(controller.current_user).to be_nil
+  end
+
+  it 'ends an existing Student session when the SchoolYear is no longer active' do
+    post_student_pin(pin: '1234')
+    classroom.school_year.update_columns(status: 'archived')
+
+    get student_profile_path
+
+    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(session[:student_id]).to be_nil
+  end
+
+  it 'ends an existing Student session when the SchoolYear is planning' do
+    post_student_pin(pin: '1234')
+    classroom.school_year.update_columns(status: 'planning')
+
+    get student_profile_path
+
+    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(session[:student_id]).to be_nil
+  end
+
+  it 'ends an existing Student session when the School is inactive' do
+    post_student_pin(pin: '1234')
+    classroom.school_year.school.update!(active: false)
+
+    get student_profile_path
+
+    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(session[:student_id]).to be_nil
   end
 
   it 'redirects an expired student session to the classroom PIN login page' do
@@ -296,34 +336,20 @@ RSpec.describe 'Student PIN sessions', type: :request do
     end
 
     travel_to Time.zone.local(2026, 5, 22, 10, 21, 1) do
-      get classroom_student_path(classroom, student)
+      get student_profile_path
     end
 
     expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
     expect(controller.current_user).to be_nil
   end
 
-  it 'falls back to the global student login page when an expired session has no classroom' do
-    sign_in student
-
-    travel_to Time.zone.local(2026, 5, 22, 10, 0, 0) do
-      get classroom_student_path(classroom, student)
-    end
-
-    travel_to Time.zone.local(2026, 5, 22, 10, 21, 1) do
-      get user_path(student)
-    end
-
-    expect(response).to redirect_to(new_student_session_path)
-    expect(controller.current_user).to be_nil
-  end
-
   it 'initializes missing student last seen without expiring the session' do
-    sign_in student
+    post_student_pin(pin: '1234')
+    session.delete(:student_last_seen_at)
 
-    get user_path(student)
+    get student_profile_path
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to have_http_status(:ok)
     expect(session[:student_last_seen_at]).to be_present
   end
 
@@ -341,17 +367,15 @@ RSpec.describe 'Student PIN sessions', type: :request do
   end
 
   it 'falls back to the global student login page without a stored classroom' do
-    sign_in student
-
     delete destroy_student_session_path
 
     expect(response).to redirect_to(new_student_session_path)
   end
 
   it 'shows a student-specific logout link on the self page' do
-    sign_in student
+    post_student_pin(pin: '1234')
 
-    get classroom_student_path(classroom, student)
+    get student_profile_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('사용 끝내기')
@@ -411,7 +435,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
       post_student_pin(pin: '1234')
     end
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(student_profile_path)
   end
 
   it 'resets failed attempts after a successful PIN login before throttling' do
@@ -427,24 +451,22 @@ RSpec.describe 'Student PIN sessions', type: :request do
   end
 
   it 'does not throttle a different student on the same IP' do
-    other_student = create(:user, :student, student_pin: '5678')
-    create(:classroom_membership, classroom: classroom, user: other_student, role: 'student')
+    other_student = create(:student, classroom: classroom, student_pin: '5678')
     5.times { post_student_pin(pin: '0000') }
 
     post_student_pin(pin: '5678', target_student: other_student)
 
-    expect(response).to redirect_to(classroom_student_path(classroom, other_student))
+    expect(response).to redirect_to(student_profile_path)
   end
 
   it 'does not throttle a different classroom on the same IP' do
     other_classroom = create(:classroom)
-    other_student = create(:user, :student, student_pin: '5678')
-    create(:classroom_membership, classroom: other_classroom, user: other_student, role: 'student')
+    other_student = create(:student, classroom: other_classroom, student_pin: '5678')
     5.times { post_student_pin(pin: '0000') }
 
     post_student_pin(pin: '5678', target_student: other_student, target_classroom: other_classroom)
 
-    expect(response).to redirect_to(classroom_student_path(other_classroom, other_student))
+    expect(response).to redirect_to(student_profile_path)
   end
 
   it 'does not throttle the same student from a different IP' do
@@ -452,7 +474,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     post_student_pin(pin: '1234', ip: '203.0.113.11')
 
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(student_profile_path)
   end
 
   it 'keeps invalid token handling outside PIN throttling' do
@@ -477,7 +499,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
   end
 
   it 'rejects an inactive student with a valid PIN' do
-    classroom.classroom_memberships.find_by!(user: student).inactive!
+    student.update!(active: false)
 
     post public_student_login_path(student_login_token: classroom.student_login_token), params: {
       student_id: student.id,
@@ -489,14 +511,14 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(controller.current_user).to be_nil
   end
 
-  it 'signs out a student whose membership becomes inactive after PIN login' do
+  it 'signs out a Student who becomes inactive after PIN login' do
     post public_student_login_path(student_login_token: classroom.student_login_token), params: {
       student_id: student.id,
       student_pin: '1234'
     }
-    classroom.classroom_memberships.find_by!(user: student).inactive!
+    student.update!(active: false)
 
-    get classroom_student_path(classroom, student)
+    get student_profile_path
 
     expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
     expect(controller.current_user).to be_nil
@@ -504,8 +526,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   it 'rejects a student outside the classroom' do
     other_classroom = create(:classroom)
-    other_student = create(:user, :student, student_pin: '5678')
-    create(:classroom_membership, classroom: other_classroom, user: other_student, role: 'student')
+    other_student = create(:student, classroom: other_classroom, student_pin: '5678')
 
     post public_student_login_path(student_login_token: classroom.student_login_token), params: {
       student_id: other_student.id,
@@ -518,7 +539,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
   it 'renders the managed student PIN field as an empty password input with the default PIN status' do
     sign_in teacher
 
-    get edit_classroom_student_path(classroom, student)
+    get edit_classroom_student_path(classroom, legacy_student)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('type="password"')
@@ -526,14 +547,14 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(response.body).to include('현재 PIN:')
     expect(response.body).to include('기본 PIN(1234)으로 설정됨')
     expect(response.body).to include('새 PIN을 입력하면 변경됩니다. 비워두면 기존 PIN을 유지합니다.')
-    expect(response.body).not_to include(student.student_pin_digest)
+    expect(response.body).not_to include(legacy_student.student_pin_digest)
   end
 
   it 'shows the custom PIN status after the managed PIN changes from 1234' do
-    student.update!(student_pin: '4321')
+    legacy_student.update!(student_pin: '4321')
     sign_in teacher
 
-    get edit_classroom_student_path(classroom, student)
+    get edit_classroom_student_path(classroom, legacy_student)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('현재 PIN:')
@@ -542,67 +563,58 @@ RSpec.describe 'Student PIN sessions', type: :request do
   end
 
   it 'shows the unset PIN status for a student without a PIN' do
-    student.update_column(:student_pin_digest, nil)
+    legacy_student.update_column(:student_pin_digest, nil)
     sign_in teacher
 
-    get edit_classroom_student_path(classroom, student)
+    get edit_classroom_student_path(classroom, legacy_student)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('현재 PIN:')
     expect(response.body).to include('미설정')
   end
 
-  it 'lets a teacher update the student PIN and then sign in with it' do
+  it 'keeps the legacy teacher PIN update behavior during the transition' do
     sign_in teacher
 
-    patch classroom_student_path(classroom, student), params: {
+    patch classroom_student_path(classroom, legacy_student), params: {
       user: {
-        name: student.name,
+        name: legacy_student.name,
         student_pin: '4321'
       }
     }
 
-    expect(response).to redirect_to(edit_classroom_student_path(classroom, student))
-    expect(User.find(student.id).authenticate_student_pin('4321')).to be_truthy
-
-    delete destroy_user_session_path
-
-    post public_student_login_path(student_login_token: classroom.student_login_token), params: {
-      student_id: student.id,
-      student_pin: '4321'
-    }
-
-    expect(response).to redirect_to(classroom_student_path(classroom, student))
+    expect(response).to redirect_to(edit_classroom_student_path(classroom, legacy_student))
+    expect(User.find(legacy_student.id).authenticate_student_pin('4321')).to be_truthy
   end
 
   it 'keeps the existing student PIN when the managed PIN field is blank' do
-    original_digest = student.student_pin_digest
+    original_digest = legacy_student.student_pin_digest
     sign_in teacher
 
-    patch classroom_student_path(classroom, student), params: {
+    patch classroom_student_path(classroom, legacy_student), params: {
       user: {
         name: '새 이름',
         student_pin: ''
       }
     }
 
-    expect(response).to redirect_to(edit_classroom_student_path(classroom, student))
-    expect(student.reload.student_pin_digest).to eq(original_digest)
-    expect(student.authenticate_student_pin('1234')).to be_truthy
+    expect(response).to redirect_to(edit_classroom_student_path(classroom, legacy_student))
+    expect(legacy_student.reload.student_pin_digest).to eq(original_digest)
+    expect(legacy_student.authenticate_student_pin('1234')).to be_truthy
   end
 
   it 'rejects an invalid managed student PIN format' do
-    original_digest = student.student_pin_digest
+    original_digest = legacy_student.student_pin_digest
     sign_in teacher
 
-    patch classroom_student_path(classroom, student), params: {
+    patch classroom_student_path(classroom, legacy_student), params: {
       user: {
-        name: student.name,
+        name: legacy_student.name,
         student_pin: '12ab'
       }
     }
 
     expect(response).to have_http_status(:unprocessable_content)
-    expect(student.reload.student_pin_digest).to eq(original_digest)
+    expect(legacy_student.reload.student_pin_digest).to eq(original_digest)
   end
 end

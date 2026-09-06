@@ -37,6 +37,17 @@ RSpec.describe ApplicationController, type: :controller do
     session[:student_login_classroom_id] = classroom_id
   end
 
+  def expect_student_session_rejected_to(classroom)
+    expect(response).to redirect_to(
+      public_student_login_path(
+        student_login_token: classroom.student_login_token
+      )
+    )
+    expect(session[:student_id]).to be_nil
+    expect(session[:student_login_classroom_id]).to be_nil
+    expect(session[:student_last_seen_at]).to be_nil
+  end
+
   it 'has no current Student without a student session' do
     get :index
 
@@ -67,7 +78,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect(response_body['student_id']).to be_nil
+    expect_student_session_rejected_to(student.classroom)
   end
 
   it 'rejects an inactive Classroom' do
@@ -77,7 +88,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect(response_body['student_id']).to be_nil
+    expect_student_session_rejected_to(student.classroom)
   end
 
   it 'rejects a planning SchoolYear' do
@@ -87,7 +98,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect(response_body['student_id']).to be_nil
+    expect_student_session_rejected_to(student.classroom)
   end
 
   it 'rejects an archived SchoolYear' do
@@ -97,7 +108,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect(response_body['student_id']).to be_nil
+    expect_student_session_rejected_to(student.classroom)
   end
 
   it 'rejects an inactive School' do
@@ -107,16 +118,27 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect(response_body['student_id']).to be_nil
+    expect_student_session_rejected_to(student.classroom)
   end
 
   it 'rejects a mismatched session Classroom' do
     student = create(:student)
-    set_student_session(student, classroom_id: create(:classroom).id)
+    other_classroom = create(:classroom)
+    set_student_session(student, classroom_id: other_classroom.id)
 
     get :index
 
-    expect(response_body['student_id']).to be_nil
+    expect_student_session_rejected_to(other_classroom)
+  end
+
+  it 'rejects a Student session without a stored Classroom' do
+    student = create(:student)
+    session[:student_id] = student.id
+
+    get :index
+
+    expect(response).to redirect_to(new_student_session_path)
+    expect(session[:student_id]).to be_nil
   end
 
   it 'uses the Devise User as the Pundit actor when both contexts exist' do

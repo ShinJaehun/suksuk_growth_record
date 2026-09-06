@@ -37,6 +37,16 @@ module UsersHelper
     image_tag(user_avatar_path(user, size: size), **options)
   end
 
+  def student_avatar_path(student)
+    avatar_key = student.avatar_key if Student::AVATAR_KEYS.include?(student.avatar_key) &&
+      avatar_asset_key?(student.avatar_key)
+    "avatars/#{avatar_key.presence || DEFAULT_AVATAR_KEY}.png"
+  end
+
+  def student_avatar_image(student, **options)
+    image_tag(student_avatar_path(student), **options)
+  end
+
   def available_avatar_key_for?(user, avatar_key)
     User.avatar_keys_for_role(user.role).include?(avatar_key) && avatar_asset_key?(avatar_key)
   end

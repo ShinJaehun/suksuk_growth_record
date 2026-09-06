@@ -29,10 +29,10 @@ class StudentSessionsController < ApplicationController
       sign_out(:user) if user_signed_in?
       reset_session
 
-      sign_in(:user, student)
+      session[:student_id] = student.id
       session[:student_login_classroom_id] = classroom_id
       session[:student_last_seen_at] = Time.current.to_i
-      redirect_to student_landing_path(student), notice: t('student_sessions.signed_in')
+      redirect_to student_profile_path, notice: t('student_sessions.signed_in')
     else
       throttled = attempt_limiter&.record_failure
       flash.now[:alert] = throttled ? t('student_sessions.throttled') : t('student_sessions.invalid')
@@ -41,10 +41,9 @@ class StudentSessionsController < ApplicationController
   end
 
   def destroy
-    classroom_id = session.delete(:student_login_classroom_id)
-    session.delete(:student_last_seen_at)
-    sign_out(:user) if current_user&.student?
-    redirect_to student_logout_redirect_path(classroom_id), notice: '사용을 끝냈습니다.'
+    classroom_id = session[:student_login_classroom_id]
+    clear_student_session
+    redirect_to student_logout_redirect_path(classroom_id), notice: t('student_sessions.signed_out')
   end
 
   private
@@ -79,15 +78,13 @@ class StudentSessionsController < ApplicationController
   end
 
   def load_students
-    @students = @classroom&.students&.order(:name) || User.none
+    @students = @classroom ? Student.active.where(classroom: @classroom).order(:name) : Student.none
   end
 
   def find_student_for_pin_login
     return nil unless @classroom
 
-    student = User.find_by(id: params[:student_id])
-    return nil unless student&.student?
-    return nil unless @classroom.classroom_memberships.exists?(user_id: student.id, role: 'student', status: 'active')
+    student = Student.active.find_by(id: params[:student_id], classroom_id: @classroom.id)
 
     student
   end
@@ -100,12 +97,6 @@ class StudentSessionsController < ApplicationController
       student_id: student.id,
       remote_ip: request.remote_ip
     )
-  end
-
-  def student_landing_path(student)
-    return classroom_student_path(@classroom, student) if @classroom
-
-    user_path(student)
   end
 
   def student_logout_redirect_path(classroom_id)

@@ -39,26 +39,6 @@ RSpec.describe 'Student portal flow', type: :request do
       expect(response).to redirect_to(user_path(student))
     end
 
-    it 'redirects a student self page to the login classroom and exposes only the nested PIN edit link' do
-      post public_student_login_path(student_login_token: classroom.student_login_token), params: {
-        student_id: student.id,
-        student_pin: '1234'
-      }
-
-      get user_path(student)
-
-      expect(response).to redirect_to(classroom_student_path(classroom, student))
-      follow_redirect!
-
-      document = Nokogiri::HTML(response.body)
-      pin_link = document.at_css(
-        %(a[href="#{edit_classroom_student_path(classroom, student)}"])
-      )
-
-      expect(pin_link&.text&.strip).to eq(I18n.t("students.show.actions.edit_pin"))
-      expect(response.body).not_to include(I18n.t("students.show.actions.edit_profile_and_pin"))
-    end
-
     it 'does not invent a classroom-scoped destination without an active membership' do
       classroom.classroom_memberships.find_by!(user: student).destroy!
       sign_in student
