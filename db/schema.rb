@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_06_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -72,18 +72,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100000) do
     t.index ["school_id"], name: "index_classrooms_on_school_id"
     t.index ["student_login_token"], name: "index_classrooms_on_student_login_token", unique: true
     t.index ["teacher_id"], name: "index_classrooms_on_teacher_id", unique: true, where: "(teacher_id IS NOT NULL)"
-  end
-
-  create_table "school_memberships", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.integer "grade"
-    t.integer "role", default: 0, null: false
-    t.bigint "school_id", null: false
-    t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
-    t.index ["school_id"], name: "index_school_memberships_on_school_id"
-    t.index ["school_id"], name: "index_school_memberships_on_unique_manager_school", unique: true, where: "(role = 10)"
-    t.index ["user_id"], name: "index_school_memberships_on_user_id", unique: true
   end
 
   create_table "school_years", force: :cascade do |t|
@@ -157,8 +145,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_100000) do
   add_foreign_key "classroom_memberships", "users", on_delete: :cascade
   add_foreign_key "classrooms", "schools"
   add_foreign_key "classrooms", "users", column: "teacher_id"
-  add_foreign_key "school_memberships", "schools"
-  add_foreign_key "school_memberships", "users", on_delete: :cascade
   add_foreign_key "school_years", "schools"
   add_foreign_key "teacher_credential_events", "users", column: "actor_user_id"
   add_foreign_key "teacher_credential_events", "users", column: "teacher_user_id"

@@ -52,7 +52,7 @@ manager의 canonical source는 active annual teacher의 `User.school_role == "ma
 
 ## 4. Annual teacher 역할
 
-교사의 학교는 `User.school_year.school`, 학교 단위 역할은 `User.school_role`, 학년은 `User.grade`가 canonical source다. `school_role`은 `member` 또는 `manager`이며 한 active SchoolYear의 manager는 최대 한 명이다. `SchoolMembership`은 compatibility residue로서 mapping, reconciliation, integrity 확인과 cleanup에만 사용하고 normal runtime authority의 read/write 또는 fallback source로 사용하지 않는다.
+교사의 학교는 `User.school_year.school`, 학교 단위 역할은 `User.school_role`, 학년은 `User.grade`가 canonical source다. `school_role`은 `member` 또는 `manager`이며 한 active SchoolYear의 manager는 최대 한 명이다. Teacher의 학교 소속과 권한에는 별도 membership read/write 또는 fallback을 두지 않는다.
 
 학급 담당 교사는 학급과 같은 학교와 학년을 가진 active teacher이며 그 `SchoolYear`와 `School`도 active여야 한다. `Classroom.teacher_id`는 한 teacher에게 최대 하나의 classroom만 연결하도록 DB uniqueness를 적용한다. 학교 manager의 운영 화면은 자기 학교의 단일 담당 관계만 변경하고 annual identity나 manager 역할은 변경하지 않는다.
 

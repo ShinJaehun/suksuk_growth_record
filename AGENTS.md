@@ -60,7 +60,7 @@
 - view에서 직접 복잡한 권한 조건을 늘리지 않는다.
 - Teacher와 Classroom의 1:1 담당 관계는 `Classroom.teacher_id`를 canonical source로 사용한다.
 - 교사의 현재 학교, 학교 역할과 학년은 각각 `User.school_year.school`, `User.school_role`, `User.grade`를 기준으로 한다.
-- `SchoolMembership`은 mapping, reconciliation, integrity 확인과 향후 cleanup을 위한 compatibility residue이며 normal runtime authority source가 아니다.
+- teacher의 학교 소속과 권한에는 별도 membership model을 두지 않는다.
 - 학생 소속은 student `ClassroomMembership`을 기준으로 한다.
 - Teacher, Student membership, Classroom lifecycle은 각각의 canonical spec과 상태 source를 따른다.
 - 위 구조는 현재 runtime 기준이며 후속 `HomeroomAssignment`, `StudentEnrollment` target은 `docs/specs/school_year_architecture.md`와 구분한다.

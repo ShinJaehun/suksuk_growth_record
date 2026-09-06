@@ -119,7 +119,7 @@ Teacher lifecycle은 기존 `User.active`를 사용한다.
 - 로그인할 수 없다.
 - 새 담당 classroom에 배정될 수 없다.
 - 일반 운영 권한을 갖지 않는다.
-- `SchoolMembership`과 과거 서비스 기록을 삭제하지 않는다.
+- 과거 서비스 기록을 삭제하지 않는다.
 - 비활성화 transaction에서 현재 담당 classroom의 `teacher_id`를 `nil`로 변경한다.
 
 비활성화는 삭제가 아니다. 재활성화하면 membership과 과거 기록은 유지하지만 과거 담당 classroom은 자동 복원하지 않는다. 필요하면 활성 조건과 권한 검증 아래 다시 명시적으로 배정한다.
@@ -265,7 +265,7 @@ global admin은 관리 가능한 teacher의 `User.grade`를 설정·수정할 �
 
 teacher 운영 목록에서 기본 학년 표시는 `User.grade`를 사용하고 값이 없으면 미배정 또는 기존 locale의 동일 의미를 표시한다. 학급은 `Classroom.teacher_id`로 연결된 단일 classroom을 표시하고 없으면 미배정으로 표시한다.
 
-`SchoolMembership`은 mapping, reconciliation, integrity 확인과 cleanup을 위한 compatibility residue이며 normal runtime authority source가 아니다. 별도 Grade model이나 table은 만들지 않는다.
+Teacher의 학교 소속과 권한은 annual User에만 저장하며 별도 membership fallback을 두지 않는다. 별도 Grade model이나 table은 만들지 않는다.
 
 ## 운영 후보 선택 UI의 확장성
 

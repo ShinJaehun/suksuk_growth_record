@@ -42,7 +42,7 @@
 - 한 active SchoolYear의 manager는 없거나 한 명이며 canonical source는 `User.school_role == "manager"`다.
 - manager가 없는 임시 상태는 허용하지만 한 school에 둘 이상을 둘 수 없다. global admin은 manager 수에 포함하지 않는다.
 - manager 지정·교체·해제는 global admin만 수행하고 `School.manager_id`는 추가하지 않는다.
-- `SchoolMembership`은 mapping, reconciliation, integrity 확인과 cleanup을 위한 compatibility residue이며 normal runtime authority source가 아니다.
+- teacher의 학교 소속과 권한에는 별도 membership model을 두지 않는다.
 
 ## Teacher assignment
 

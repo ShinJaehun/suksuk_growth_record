@@ -1,6 +1,8 @@
 ko:
   admin:
     school_managers:
+      errors:
+        inactive_manager: "비활성 교사는 학교 관리자로 지정할 수 없습니다."
       create:
         success: "학교 관리자를 지정했습니다."
       destroy:
@@ -27,7 +29,7 @@ ko:
       new_title: "선생님 추가"
       edit_title: "운영 설정"
       info_title: "기본 정보"
-      school_membership_title: "학교 소속 및 운영 권한"
+      school_assignment_title: "학교 소속 및 운영 권한"
       back_to_index: "선생님 목록으로 돌아가기"
       edit:
         target: "%{name} 선생님"

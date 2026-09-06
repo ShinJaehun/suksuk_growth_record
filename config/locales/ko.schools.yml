@@ -12,11 +12,6 @@ ko:
     confirm_deactivate: "이 학교를 비활성화하면 선생님과 학생의 학교·교실 운영이 중단됩니다. 기존 교실과 활동 기록은 삭제되지 않습니다."
     inactive_school: "현재 사용할 수 없는 학교입니다."
 
-  school_memberships:
-    errors:
-      user_must_be_teacher: "는 선생님 계정이어야 합니다."
-      inactive_manager: "비활성 교사는 학교 관리자로 지정할 수 없습니다."
-
   schools:
     index:
       title: "학교"

@@ -5,16 +5,6 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     classroom.update_columns(teacher_id: teacher.id)
   end
 
-  def insert_school_membership!(user:, school:)
-    membership = SchoolMembership.new(
-      user: user,
-      school: school,
-      role: :member
-    )
-    membership.save!(validate: false)
-    membership
-  end
-
   it 'is clean for a valid teacher assignment' do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
@@ -86,19 +76,6 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     expect(result.count_for(:inactive_teacher_assignment)).to eq(1)
     expect(result.samples_for(:inactive_teacher_assignment)).to include(
       include('classroom_id' => classroom.id, 'user_id' => teacher.id)
-    )
-  end
-
-  it 'finds a school membership whose user is not a teacher' do
-    student = create(:user, :student)
-    school = create(:school)
-    insert_school_membership!(user: student, school: school)
-
-    result = described_class.call
-
-    expect(result.count_for(:invalid_school_membership_user_role)).to eq(1)
-    expect(result.samples_for(:invalid_school_membership_user_role)).to include(
-      include('user_id' => student.id, 'teacher_school_id' => school.id, 'user_role' => 'student')
     )
   end
 

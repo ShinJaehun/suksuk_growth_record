@@ -7,7 +7,7 @@ RSpec.describe "Teacher operations", type: :request do
       annual_school: school,
       annual_school_role: "manager",
       annual_grade: 4)
-    create(:school_membership, :manager, school: school, grade: 4, user: user).user
+    user
   end
 
   def annual_teacher(school:, grade: nil)
@@ -26,7 +26,6 @@ RSpec.describe "Teacher operations", type: :request do
     expect(response).to have_http_status(:ok)
 
     member = create(:user, :teacher, :active_annual_teacher, annual_school: school)
-    create(:school_membership, school: school, user: member)
     sign_in member
     get teachers_path
     expect(response).to redirect_to(root_path)
@@ -102,7 +101,7 @@ RSpec.describe "Teacher operations", type: :request do
       email: nil,
       password_change_required: true
     )
-    expect(teacher.school_membership).to be_nil
+    expect(teacher.annual_school).to eq(school)
     expect(teacher.teacher_credential_events.where(action: "temporary_password_issued")).to exist
     expect(teacher.assigned_classroom).to be_nil
   end

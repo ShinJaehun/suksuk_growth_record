@@ -12,8 +12,6 @@ class School < ApplicationRecord
 
   has_many :classrooms, dependent: :restrict_with_error
   has_many :school_years, dependent: :restrict_with_error
-  has_many :school_memberships, dependent: :restrict_with_error
-  has_many :teachers, through: :school_memberships, source: :user
 
   before_validation :assign_color_key, on: :create
 

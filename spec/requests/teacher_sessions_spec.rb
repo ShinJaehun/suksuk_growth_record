@@ -16,7 +16,6 @@ RSpec.describe "Teacher sessions", type: :request do
       school_role: "member",
       password:
     }.merge(attributes))
-    create(:school_membership, school:, user: teacher)
     teacher
   end
 

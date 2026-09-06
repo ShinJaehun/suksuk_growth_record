@@ -33,7 +33,6 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
       password_change_required: true
     )
     expect(teacher.annual_school).to eq(school)
-    expect(teacher.school_membership).to be_nil
     expect(teacher.assigned_classroom).to eq(classroom)
   end
 
@@ -54,7 +53,6 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
       school_role: 'member',
       grade: 4
     )
-    expect(teacher.school_membership).to be_nil
     expect(teacher.assigned_classroom).to be_nil
   end
 
@@ -106,7 +104,6 @@ RSpec.describe 'Admin teacher school and classroom assignments', type: :request 
     expect(teacher.name).not_to eq('변경된 이름')
     expect(old_classroom.reload.teacher).to eq(teacher)
     expect(new_classroom.reload.teacher).to be_nil
-    expect(teacher.school_membership).to be_nil
   end
 
   it 'rejects invalid classroom choices without partial changes' do

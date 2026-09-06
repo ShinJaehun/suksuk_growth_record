@@ -23,7 +23,6 @@ RSpec.describe Teachers::SaveWithAssignment do
     expect(result).to be_success
     expect(teacher).to have_attributes(school_year: school.school_years.active.first,
       login_id: "newteacher", school_role: "member", grade: 5, password_change_required: true)
-    expect(teacher.school_membership).to be_nil
     expect(result.temporary_password).to be_present
     expect(teacher.teacher_credential_events.temporary_password_issued).to exist
   end

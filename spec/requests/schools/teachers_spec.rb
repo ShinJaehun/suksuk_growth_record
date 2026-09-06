@@ -9,16 +9,14 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
       annual_school_role: "manager",
       annual_grade: 4,
       name: '학교 관리자')
-    create(:school_membership, :manager, school: school, grade: 4,
-                                                 user: user).user
+    user
   end
   let(:member) do
     user = create(:user, :teacher, :active_annual_teacher,
       annual_school: school,
       annual_grade: 4,
       name: '소속 교사')
-    create(:school_membership, school: school, grade: 4,
-                               user: user).user
+    user
   end
 
   def teacher_params(email: 'new@example.com')
@@ -61,7 +59,6 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
       email: nil,
       password_change_required: true
     )
-    expect(teacher.school_membership).to be_nil
     expect(teacher.teacher_credential_events.where(action: "temporary_password_issued")).to exist
     expect(teacher.assigned_classroom).to eq(classroom)
   end
@@ -118,7 +115,6 @@ RSpec.describe 'School teachers compatibility endpoints', type: :request do
     other_manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: other_school,
       annual_school_role: "manager")
-    create(:school_membership, :manager, school: other_school, user: other_manager)
     sign_in other_manager
 
     get school_teachers_path(school)

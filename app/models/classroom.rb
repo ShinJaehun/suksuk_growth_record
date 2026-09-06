@@ -58,7 +58,7 @@ class Classroom < ApplicationRecord
     errors.add(:teacher, :inactive) unless teacher.active?
     errors.add(:teacher, :inactive_classroom) if !active? && will_save_change_to_teacher_id?
 
-    errors.add(:teacher, :school_membership_required) unless teacher.school_year
+    errors.add(:teacher, :school_year_required) unless teacher.school_year
     return unless teacher.school_year
 
     errors.add(:teacher, :inactive_school_year) unless teacher.school_year.active?

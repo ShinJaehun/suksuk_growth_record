@@ -54,8 +54,6 @@ class User < ApplicationRecord
   has_many :classroom_memberships, dependent: :destroy
   has_many :classrooms, through: :classroom_memberships
   belongs_to :school_year, optional: true
-  has_one :school_membership, dependent: :destroy
-  has_one :school, through: :school_membership
   has_one :assigned_classroom,
     class_name: "Classroom",
     foreign_key: :teacher_id,

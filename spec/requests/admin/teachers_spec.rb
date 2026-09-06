@@ -376,10 +376,8 @@ RSpec.describe 'Admin teachers', type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: manager_school,
       annual_school_role: "manager")
-    create(:school_membership, :manager, school: manager_school, user: manager)
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
-    create(:school_membership, school: teacher_school, user: regular_teacher)
     student = create(:user, :student)
 
     [manager, regular_teacher, student].each do |user|
@@ -394,10 +392,8 @@ RSpec.describe 'Admin teachers', type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: manager_school,
       annual_school_role: "manager")
-    create(:school_membership, :manager, school: manager_school, user: manager)
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
-    create(:school_membership, school: teacher_school, user: regular_teacher)
     student = create(:user, :student)
 
     [manager, regular_teacher, student].each do |user|
@@ -459,10 +455,8 @@ RSpec.describe 'Admin teachers', type: :request do
     manager = create(:user, :teacher, :active_annual_teacher,
       annual_school: manager_school,
       annual_school_role: "manager")
-    manager_membership = create(:school_membership, :manager, school: manager_school, user: manager)
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
-    create(:school_membership, school: teacher_school, user: regular_teacher)
     student = create(:user, :student)
 
     sign_in admin
@@ -471,26 +465,26 @@ RSpec.describe 'Admin teachers', type: :request do
     expect(response.body).to include(teachers_path)
     expect(response.body).to include(schools_path, classrooms_path)
     expect(response.body).not_to include(admin_teachers_path)
-    expect(response.body).not_to include(school_teachers_path(manager_membership.school))
+    expect(response.body).not_to include(school_teachers_path(manager_school))
 
-    sign_in manager_membership.user
-    assigned_classroom = create(:classroom, school: manager_membership.school)
-    assign_teacher(assigned_classroom, manager_membership.user)
-    get school_teachers_path(manager_membership.school)
+    sign_in manager
+    assigned_classroom = create(:classroom, school: manager_school)
+    assign_teacher(assigned_classroom, manager)
+    get school_teachers_path(manager_school)
     document = Nokogiri::HTML(response.body)
     expect(response.body).not_to include(admin_teachers_path)
-    expect(response.body).to include(school_path(manager_membership.school))
+    expect(response.body).to include(school_path(manager_school))
     expect(response.body).to include(classrooms_path)
     expect(response.body).to include(teachers_path)
     expect(document.css(%(a[href="#{teachers_path}"])).size).to eq(2)
-    expect(response.body).not_to include(school_path(manager_membership.school, anchor: 'school-teachers'))
+    expect(response.body).not_to include(school_path(manager_school, anchor: 'school-teachers'))
 
     sign_in regular_teacher
     get classrooms_path
     expect(response.body).not_to include(admin_teachers_path)
     expect(response.body).not_to include(teachers_path)
-    expect(response.body).not_to include(school_teachers_path(manager_membership.school))
-    expect(response.body).not_to include(school_path(manager_membership.school))
+    expect(response.body).not_to include(school_teachers_path(manager_school))
+    expect(response.body).not_to include(school_path(manager_school))
 
     sign_in student
     get user_path(student)
@@ -502,7 +496,6 @@ RSpec.describe 'Admin teachers', type: :request do
     other_school = create(:school)
     classroom = create(:classroom, school: school, grade: 4, name: '1반')
     other_classroom = create(:classroom, school: other_school, grade: 6, name: '6학년 기러기반')
-    create(:school_membership, school: school, user: teacher)
     sign_in admin
 
     get edit_admin_teacher_path(teacher)
@@ -521,13 +514,11 @@ RSpec.describe 'Admin teachers', type: :request do
     assigned_teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: school, annual_grade: 4)
     classroom = create(:classroom, school: school, grade: assigned_teacher.grade)
-    membership = create(:school_membership, school: school, user: assigned_teacher)
     assign_teacher(classroom, assigned_teacher)
     sign_in admin
 
     patch deactivate_admin_teacher_path(assigned_teacher)
     expect(assigned_teacher.reload).to be_inactive
-    expect(membership.reload).to be_present
     expect(classroom.reload.teacher).to be_nil
 
     get admin_teachers_path(status: 'inactive', school_id: school.id)

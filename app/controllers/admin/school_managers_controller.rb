@@ -5,38 +5,39 @@ module Admin
 
     def create
       teacher = active_school_year.users.teacher.find(params.require(:user_id))
-      unless teacher.active?
-        return redirect_to edit_school_path(@school),
-          alert: t("school_memberships.errors.inactive_manager"),
-          status: :see_other
-      end
-
-      existing_manager = active_school_year.users.teacher
-        .where(school_role: "manager")
-        .where.not(id: teacher.id)
-        .exists?
-      if existing_manager
-        return redirect_to edit_school_path(@school), status: :see_other
-      end
+      manager_assigned = false
 
       User.transaction do
         active_school_year.lock!
-        if active_school_year.users.teacher.where(school_role: "manager").where.not(id: teacher.id).exists?
-          raise ActiveRecord::Rollback
+        teacher.lock!
+
+        if teacher.active?
+          current_manager = active_school_year.users.teacher
+            .where(school_role: "manager")
+            .where.not(id: teacher.id)
+            .first
+          current_manager&.update!(school_role: "member")
+          teacher.update!(school_role: "manager") unless teacher.school_manager?
+          manager_assigned = true
         end
-        teacher.update!(school_role: "manager")
       end
 
-      if teacher.reload.school_manager?
+      if manager_assigned
         render_manager_success("admin.school_managers.create.success")
       else
-        redirect_to edit_school_path(@school), status: :see_other
+        redirect_to edit_school_path(@school),
+          alert: t("admin.school_managers.errors.inactive_manager"),
+          status: :see_other
       end
     end
 
     def destroy
-      teacher = active_school_year.users.teacher.find_by!(id: params[:user_id], school_role: "manager")
-      teacher.update!(school_role: "member")
+      User.transaction do
+        active_school_year.lock!
+        teacher = active_school_year.users.teacher
+          .find_by!(id: params[:user_id], school_role: "manager")
+        teacher.update!(school_role: "member")
+      end
       render_manager_success("admin.school_managers.destroy.success")
     end
 

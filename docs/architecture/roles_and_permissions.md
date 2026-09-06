@@ -75,7 +75,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 
 담당 변경은 기존 classroom의 `teacher_id` 해제와 새 classroom의 `teacher_id` 설정을 한 transaction에서 처리한다. 관계를 해제해도 학생 membership이나 과거 서비스 기록을 삭제하지 않는다.
 
-`SchoolMembership`은 compatibility residue로서 mapping, reconciliation, integrity 확인과 cleanup에만 사용하며 runtime policy의 fallback source가 아니다.
+Teacher의 학교 소속과 권한은 annual User에만 저장하며 별도 membership fallback을 두지 않는다.
 
 ## Student membership 경계
 

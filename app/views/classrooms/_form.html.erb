@@ -40,7 +40,7 @@
                 <p class="text-sm text-rose-600"><%= (classroom.errors.full_messages_for(:school) + classroom.errors.full_messages_for(:school_id)).uniq.to_sentence %></p>
               <% end %>
             </div>
-          <% elsif classroom.persisted? || current_user.school_membership&.manager? %>
+          <% elsif classroom.persisted? || current_user.school_manager? %>
             <div class="space-y-2">
               <span class="block text-sm font-semibold text-slate-800"><%= t("classrooms.form.school_label") %></span>
               <p class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"><%= classroom.school.name %></p>

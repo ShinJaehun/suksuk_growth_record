@@ -41,7 +41,11 @@ def seed_account!(
   role:,
   password:,
   gender: nil,
-  avatar_key: nil
+  avatar_key: nil,
+  school_year: nil,
+  login_id: nil,
+  school_role: nil,
+  grade: nil
 )
   user = User.find_or_initialize_by(email: email)
 
@@ -50,6 +54,10 @@ def seed_account!(
     role: role,
     gender: gender,
     avatar_key: avatar_key,
+    school_year: school_year,
+    login_id: login_id,
+    school_role: school_role,
+    grade: grade,
     password: password,
     password_confirmation: password
   )
@@ -158,6 +166,18 @@ seed_account!(
   avatar_key: 'admin'
 )
 
+puts '== 학교 생성 =='
+
+school = School.find_or_initialize_by(
+  name: '쑥쑥초등학교'
+)
+
+school.save!
+
+school_year = school.school_years.active.first_or_initialize
+school_year.year ||= Date.current.month < 3 ? Date.current.year - 1 : Date.current.year
+school_year.save!
+
 puts '== 교사 계정 생성 =='
 
 school_manager = seed_account!(
@@ -165,6 +185,10 @@ school_manager = seed_account!(
   name: '학교 관리자 교사',
   role: 'teacher',
   password: demo_password,
+  school_year: school_year,
+  login_id: 'manager',
+  school_role: 'manager',
+  grade: 4,
   gender: 'male',
   avatar_key: first_seed_avatar_key(
     'male',
@@ -177,48 +201,16 @@ classroom_teacher = seed_account!(
   name: '4학년 1반 담임',
   role: 'teacher',
   password: demo_password,
+  school_year: school_year,
+  login_id: 'teacher',
+  school_role: 'member',
+  grade: 4,
   gender: 'female',
   avatar_key: first_seed_avatar_key(
     'female',
     'teacherF01'
   )
 )
-
-puts '== 학교 생성 =='
-
-school = School.find_or_initialize_by(
-  name: '쑥쑥초등학교'
-)
-
-school.save!
-
-puts '== 학교 교사 소속 생성 =='
-
-manager_school_membership =
-  SchoolMembership.find_or_initialize_by(
-    user: school_manager
-  )
-
-manager_school_membership.assign_attributes(
-  school: school,
-  role: 'manager',
-  grade: 4
-)
-
-manager_school_membership.save!
-
-teacher_school_membership =
-  SchoolMembership.find_or_initialize_by(
-    user: classroom_teacher
-  )
-
-teacher_school_membership.assign_attributes(
-  school: school,
-  role: 'member',
-  grade: 4
-)
-
-teacher_school_membership.save!
 
 puts '== 교실 생성 =='
 

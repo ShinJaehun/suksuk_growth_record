@@ -8,7 +8,6 @@ module SchoolStructure
       teacher_without_school: 'teacher without school',
       teacher_classroom_school_mismatch: 'teacher/classroom school mismatch',
       teacher_classroom_grade_mismatch: 'teacher/classroom grade mismatch',
-      invalid_school_membership_user_role: 'invalid school membership user role',
       inactive_teacher_assignment: 'inactive teacher assignment'
     }.freeze
 
@@ -56,10 +55,6 @@ module SchoolStructure
           teacher_classroom_grade_mismatch: issue(
             teacher_grade_mismatch_scope,
             sample_scope: classroom_assignment_sample_scope(teacher_grade_mismatch_scope)
-          ),
-          invalid_school_membership_user_role: issue(
-            invalid_school_membership_scope,
-            sample_scope: invalid_school_membership_sample_scope
           ),
           inactive_teacher_assignment: issue(
             inactive_teacher_assignment_scope,
@@ -124,21 +119,6 @@ module SchoolStructure
       Classroom.joins(teacher: :school_year)
         .where.not(teacher_id: nil)
         .where('users.grade IS NULL OR users.grade <> classrooms.grade')
-    end
-
-    def invalid_school_membership_scope
-      SchoolMembership
-        .joins(:user)
-        .where.not(users: { role: 'teacher' })
-    end
-
-    def invalid_school_membership_sample_scope
-      invalid_school_membership_scope.select(
-        'school_memberships.id AS school_membership_id',
-        'school_memberships.user_id AS user_id',
-        'school_memberships.school_id AS teacher_school_id',
-        'users.role AS user_role'
-      )
     end
 
     def inactive_teacher_assignment_scope

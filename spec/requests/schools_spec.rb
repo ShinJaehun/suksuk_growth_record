@@ -39,7 +39,7 @@ RSpec.describe 'School workspaces', type: :request do
     expect(other_school_card.at_css('.bg-violet-500')).to be_present
   end
 
-  it 'uses annual teachers for counts and manager identity despite conflicting legacy memberships' do
+  it 'uses annual teachers for counts and manager identity' do
     active_manager = manager
     active_member = member
     active_manager.update!(name: '연간 관리자')
@@ -48,8 +48,6 @@ RSpec.describe 'School workspaces', type: :request do
       annual_school: school,
       name: '비활성 교사',
       active: false)
-    create(:school_membership, :manager, school: school, user: active_member)
-    create(:school_membership, school: school, user: active_manager)
     sign_in admin
 
     get schools_path
