@@ -7,13 +7,12 @@ class ApplicationController < ActionController::Base
   helper_method :navigation_context, :current_student, :student_signed_in?
 
   before_action :configure_permitted_parameters, if: :devise_controller?
+  before_action :expire_legacy_student_user_session
   before_action :expire_ineligible_teacher_session
   before_action :require_teacher_password_change
   before_action :expire_student_session_if_inactive
 
   def after_sign_in_path_for(resource_or_scope)
-    return user_path(resource_or_scope) if resource_or_scope.is_a?(User) && resource_or_scope.student?
-
     role_landing_path_for(resource_or_scope)
   end
 
@@ -111,6 +110,15 @@ class ApplicationController < ActionController::Base
                               end
   end
 
+  def expire_legacy_student_user_session
+    return unless current_user&.student?
+
+    sign_out(:user)
+    return if is_a?(StudentSessionsController)
+
+    redirect_to new_user_session_path
+  end
+
   def expire_ineligible_teacher_session
     return unless current_user&.teacher?
     return if current_user.active? && current_user.school_year&.active? && current_user.school_year.school.active?
@@ -174,7 +182,6 @@ class ApplicationController < ActionController::Base
   end
 
   def role_landing_path_for(user)
-    return user_path(user) if user.student?
     return schools_path if user.admin?
 
     return school_path(user.annual_school) if user.school_manager? && user.annual_school&.active?

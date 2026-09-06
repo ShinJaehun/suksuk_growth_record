@@ -7,8 +7,8 @@ RSpec.describe 'School workspaces', type: :request do
   let(:member) { create(:user, :teacher, :active_annual_teacher, annual_school: school) }
   let(:manager) do
     create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      annual_school_role: "manager")
+           annual_school: school,
+           annual_school_role: 'manager')
   end
 
   it 'allows an admin to view every school workspace' do
@@ -45,9 +45,9 @@ RSpec.describe 'School workspaces', type: :request do
     active_manager.update!(name: '연간 관리자')
     active_member.update!(name: '연간 일반 교사')
     inactive_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      name: '비활성 교사',
-      active: false)
+                              annual_school: school,
+                              name: '비활성 교사',
+                              active: false)
     sign_in admin
 
     get schools_path
@@ -108,15 +108,19 @@ RSpec.describe 'School workspaces', type: :request do
     end
   end
 
-  it 'rejects an unassigned teacher and a student' do
+  it 'rejects an unassigned teacher and expires a legacy student User session' do
     unassigned_school = create(:school)
     unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: unassigned_school)
+                                annual_school: unassigned_school)
 
     [unassigned_teacher, create(:user, :student)].each do |user|
       sign_in user
       get school_path(school)
-      expect(response).to have_http_status(:not_found)
+      if user.student?
+        expect(response).to redirect_to(new_user_session_path)
+      else
+        expect(response).to have_http_status(:not_found)
+      end
     end
   end
 

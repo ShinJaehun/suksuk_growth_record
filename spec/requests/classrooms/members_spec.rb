@@ -813,7 +813,7 @@ RSpec.describe 'Classroom members', type: :request do
       expect(student.reload.name).to eq('유지')
     end
 
-    it 'rejects a student' do
+    it 'expires a legacy student User session' do
       student = create(:user, :student, name: '본인')
       membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
       sign_in student
@@ -824,7 +824,7 @@ RSpec.describe 'Classroom members', type: :request do
         }
       }
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(new_user_session_path)
       expect(student.reload.name).to eq('본인')
     end
 
@@ -962,14 +962,14 @@ RSpec.describe 'Classroom members', type: :request do
       expect(active_student.reload.authenticate_student_pin('1234')).to be_truthy
     end
 
-    it 'rejects a student' do
+    it 'expires a legacy student User session' do
       active_student = create(:user, :student, student_pin: '1234')
       create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
       sign_in active_student
 
       patch classroom_member_student_pin_path(classroom), params: { student_pin: '4321' }
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(new_user_session_path)
       expect(active_student.reload.authenticate_student_pin('1234')).to be_truthy
     end
 

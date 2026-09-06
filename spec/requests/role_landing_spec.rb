@@ -43,10 +43,13 @@ RSpec.describe "Role landing pages", type: :request do
     expect(response).to redirect_to(classroom_path(classroom))
   end
 
-  it "keeps the student landing behavior" do
+  it "expires a legacy student User session before landing" do
     student = create(:user, :student)
     sign_in student
+
     get root_path
-    expect(response).to redirect_to(user_path(student))
+
+    expect(response).to redirect_to(new_user_session_path)
+    expect(controller.current_user).to be_nil
   end
 end

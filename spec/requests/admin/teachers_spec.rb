@@ -5,7 +5,7 @@ RSpec.describe 'Admin teachers', type: :request do
   let(:teacher_school) { create(:school) }
   let(:teacher) do
     create(:user, :teacher, :active_annual_teacher,
-      annual_school: teacher_school, name: '담당 교사')
+           annual_school: teacher_school, name: '담당 교사')
   end
 
   it 'shows the teacher management index to an admin' do
@@ -13,16 +13,16 @@ RSpec.describe 'Admin teachers', type: :request do
     other_school = create(:school, name: '나래초등학교')
     classroom = create(:classroom, annual_school: school, grade: 4, class_label: '1')
     manager = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      annual_school_role: 'manager',
-      annual_grade: 4,
-      name: '담당 교사')
+                     annual_school: school,
+                     annual_school_role: 'manager',
+                     annual_grade: 4,
+                     name: '담당 교사')
     member_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      name: '일반 선생님')
+                            annual_school: school,
+                            name: '일반 선생님')
     unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: other_school,
-      name: '미배정 선생님')
+                                annual_school: other_school,
+                                name: '미배정 선생님')
     assign_teacher(classroom, manager)
     sign_in admin
 
@@ -61,14 +61,14 @@ RSpec.describe 'Admin teachers', type: :request do
     school = create(:school, name: '새싹초등학교')
     other_school = create(:school, name: '나래초등학교')
     school_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      name: '새싹 선생님')
+                            annual_school: school,
+                            name: '새싹 선생님')
     other_school_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: other_school,
-      name: '나래 선생님')
+                                  annual_school: other_school,
+                                  name: '나래 선생님')
     unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: other_school,
-      name: '미배정 선생님')
+                                annual_school: other_school,
+                                name: '미배정 선생님')
     sign_in admin
 
     get admin_teachers_path, params: { school_id: school.id }
@@ -127,19 +127,19 @@ RSpec.describe 'Admin teachers', type: :request do
     school = create(:school)
     other_school = create(:school)
     school_active = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      name: 'A 활성')
+                           annual_school: school,
+                           name: 'A 활성')
     school_inactive = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      name: 'A 비활성',
-      active: false)
+                             annual_school: school,
+                             name: 'A 비활성',
+                             active: false)
     other_active = create(:user, :teacher, :active_annual_teacher,
-      annual_school: other_school,
-      name: 'B 활성')
+                          annual_school: other_school,
+                          name: 'B 활성')
     other_inactive = create(:user, :teacher, :active_annual_teacher,
-      annual_school: other_school,
-      name: 'B 비활성',
-      active: false)
+                            annual_school: other_school,
+                            name: 'B 비활성',
+                            active: false)
     sign_in admin
 
     get admin_teachers_path(school_id: school.id, status: 'inactive')
@@ -155,9 +155,9 @@ RSpec.describe 'Admin teachers', type: :request do
     first_school = create(:school)
     second_school = create(:school)
     school_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: first_school, name: '첫 학교 선생님')
+                            annual_school: first_school, name: '첫 학교 선생님')
     other_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: second_school, name: '다른 학교 선생님')
+                           annual_school: second_school, name: '다른 학교 선생님')
     sign_in admin
 
     get admin_teachers_path, params: { school_id: 'missing' }
@@ -374,8 +374,8 @@ RSpec.describe 'Admin teachers', type: :request do
   it 'blocks non-admin users from the teacher management index' do
     manager_school = create(:school)
     manager = create(:user, :teacher, :active_annual_teacher,
-      annual_school: manager_school,
-      annual_school_role: "manager")
+                     annual_school: manager_school,
+                     annual_school_role: 'manager')
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
     student = create(:user, :student)
@@ -383,24 +383,26 @@ RSpec.describe 'Admin teachers', type: :request do
     [manager, regular_teacher, student].each do |user|
       sign_in user
       get admin_teachers_path
-      expect(response).to redirect_to(root_path)
+      expected_path = user.student? ? new_user_session_path : root_path
+      expect(response).to redirect_to(expected_path)
     end
   end
 
   it 'blocks non-admin users from teacher management actions' do
     manager_school = create(:school)
     manager = create(:user, :teacher, :active_annual_teacher,
-      annual_school: manager_school,
-      annual_school_role: "manager")
+                     annual_school: manager_school,
+                     annual_school_role: 'manager')
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
     student = create(:user, :student)
 
     [manager, regular_teacher, student].each do |user|
       sign_in user
+      expected_path = user.student? ? new_user_session_path : root_path
 
       get new_admin_teacher_path
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(expected_path)
 
       expect do
         post admin_teachers_path, params: {
@@ -411,20 +413,20 @@ RSpec.describe 'Admin teachers', type: :request do
           }
         }
       end.not_to(change { User.teacher.count })
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(expected_path)
 
       get edit_admin_teacher_path(teacher)
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(expected_path)
 
       patch admin_teacher_path(teacher), params: { school_id: '' }
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(expected_path)
 
       patch deactivate_admin_teacher_path(teacher)
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(expected_path)
 
       teacher.update!(active: false)
       patch reactivate_admin_teacher_path(teacher)
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(expected_path)
       teacher.update!(active: true)
     end
   end
@@ -453,8 +455,8 @@ RSpec.describe 'Admin teachers', type: :request do
   it 'shows the canonical teacher management navigation link to admins and managers' do
     manager_school = create(:school)
     manager = create(:user, :teacher, :active_annual_teacher,
-      annual_school: manager_school,
-      annual_school_role: "manager")
+                     annual_school: manager_school,
+                     annual_school_role: 'manager')
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
     student = create(:user, :student)
@@ -512,7 +514,7 @@ RSpec.describe 'Admin teachers', type: :request do
   it 'filters teacher status and releases the assignment on deactivation' do
     school = create(:school)
     assigned_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school, annual_grade: 4)
+                              annual_school: school, annual_grade: 4)
     classroom = create(:classroom, annual_school: school, grade: assigned_teacher.grade)
     assign_teacher(classroom, assigned_teacher)
     sign_in admin
@@ -552,8 +554,8 @@ RSpec.describe 'Admin teachers', type: :request do
     inactive_school = create(:school)
     school_year = create(:school_year, :active, school: inactive_school)
     assigned_teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: inactive_school,
-      annual_grade: 4)
+                              annual_school: inactive_school,
+                              annual_grade: 4)
     classroom = create(:classroom, annual_school: inactive_school, grade: 4, teacher: assigned_teacher)
     inactive_school.update!(active: false)
     sign_in admin
