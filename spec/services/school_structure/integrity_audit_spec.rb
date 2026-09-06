@@ -13,8 +13,8 @@ RSpec.describe SchoolStructure::IntegrityAudit do
   it 'is clean for a valid teacher assignment' do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school,
-      annual_grade: 4)
+                     annual_school: school,
+                     annual_grade: 4)
     create(:classroom, annual_school: school, grade: 4, teacher: teacher)
 
     result = described_class.call
@@ -23,10 +23,40 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     expect(result.issue_count).to eq(0)
   end
 
+  it 'is clean for a valid planning SchoolYear assignment' do
+    school = create(:school)
+    school_year = create(:school_year, :planning, school: school)
+    classroom = create(:classroom, school_year: school_year, grade: 4)
+    teacher = create(
+      :user,
+      :teacher,
+      school_year: school_year,
+      login_id: 'planning-audit-teacher',
+      school_role: 'member',
+      grade: 4
+    )
+    create(:homeroom_assignment, classroom: classroom, teacher: teacher)
+
+    result = described_class.call
+
+    expect(result).to be_clean
+    expect(result.issue_count).to eq(0)
+  end
+
+  it 'does not report preserved archived assignment history for an inactive teacher' do
+    assignment = create(:homeroom_assignment)
+    assignment.classroom.school_year.update!(status: 'archived')
+    assignment.teacher.update!(active: false)
+
+    result = described_class.call
+
+    expect(result.count_for(:inactive_teacher_assignment)).to eq(0)
+  end
+
   it 'finds a teacher assigned to a classroom in another school year' do
     teacher_school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: teacher_school, annual_grade: 4)
+                     annual_school: teacher_school, annual_grade: 4)
     classroom = create(:classroom, grade: 4)
     assign_without_validation(classroom, teacher)
 
@@ -43,7 +73,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
   it 'finds a teacher assigned to a classroom in another grade' do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school, annual_grade: 4)
+                     annual_school: school, annual_grade: 4)
     classroom = create(:classroom, annual_school: school, grade: 5)
     assign_without_validation(classroom, teacher)
 
@@ -57,7 +87,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
 
   it 'finds student classroom memberships whose user is not a student' do
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: create(:school))
+                     annual_school: create(:school))
     membership = build(:classroom_membership, user: teacher, role: 'student')
     membership.save!(validate: false)
 
@@ -72,7 +102,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
   it 'finds an inactive teacher assignment' do
     school = create(:school)
     teacher = create(:user, :teacher, :active_annual_teacher,
-      annual_school: school, annual_grade: 4)
+                     annual_school: school, annual_grade: 4)
     classroom = create(:classroom, annual_school: school, grade: 4)
     assign_without_validation(classroom, teacher)
     teacher.update_columns(active: false)
@@ -99,7 +129,7 @@ RSpec.describe SchoolStructure::IntegrityAudit do
     school = create(:school)
     2.times do
       teacher = create(:user, :teacher, :active_annual_teacher,
-        annual_school: school, annual_grade: 4)
+                       annual_school: school, annual_grade: 4)
       assign_without_validation(create(:classroom, grade: 5), teacher)
     end
 

@@ -20,7 +20,6 @@ ko:
       grade: "%{grade}학년"
       grades: "%{grades}학년"
       grade_unspecified: "학년 미지정"
-      additional_teachers: "외 %{count}명"
       teacher_empty: "담당 선생님 없음"
       student_count: "학생 %{count}명"
       student_empty: "학생 없음"

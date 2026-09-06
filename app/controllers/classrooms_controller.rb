@@ -11,9 +11,6 @@ class ClassroomsController < ApplicationController
   def index
     # index는 policy_scope만 요구(verify_policy_scoped 훅 통과)
     classrooms_scope = policy_scope(Classroom)
-                       .joins(school_year: :school)
-                       .merge(SchoolYear.active)
-                       .merge(School.active)
     if current_user.active_teacher? && !current_user_school_manager?
       assigned_landing_path = regular_teacher_landing_path_for(current_user)
       return redirect_to(assigned_landing_path) unless assigned_landing_path == classrooms_path
@@ -29,8 +26,7 @@ class ClassroomsController < ApplicationController
     @classrooms = context.classrooms
     @classrooms_index_title = t(classrooms_index_title_key)
     classroom_ids = @classrooms.map(&:id)
-    @classroom_teacher_counts = context.teacher_counts
-    @classroom_teacher_previews = context.teacher_previews
+    @classroom_teachers = context.teachers
     @classroom_student_counts = context.student_counts
     @classroom_student_previews = context.student_previews
     assigned_classroom_ids =
@@ -66,8 +62,7 @@ class ClassroomsController < ApplicationController
     @can_manage_classroom_members = policy(@classroom).manage_members?
     context = Classrooms::ShowContext.new(classroom: @classroom)
     @student_memberships = context.student_memberships
-    @students = context.students
-    @homeroom_teachers = context.homeroom_teachers
+    @homeroom_teacher = context.homeroom_teacher
   end
 
   def new

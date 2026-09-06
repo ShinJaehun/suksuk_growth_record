@@ -45,9 +45,7 @@
   <% if @classrooms.any? %>
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <% @classrooms.each do |classroom| %>
-        <% teacher_count = @classroom_teacher_counts.fetch(classroom.id, 0) %>
-        <% teacher_previews = @classroom_teacher_previews.fetch(classroom.id, []) %>
-        <% teacher = teacher_previews.first %>
+        <% teacher = @classroom_teachers[classroom.id] %>
         <% student_count = @classroom_student_counts.fetch(classroom.id, 0) %>
         <% student_previews = @classroom_student_previews.fetch(classroom.id, []) %>
 
@@ -67,22 +65,13 @@
             <div class="space-y-3">
               <% if teacher %>
                 <div class="flex min-w-0 items-center gap-2">
-                  <div class="flex max-w-28 shrink-0 -space-x-2 overflow-hidden">
-                    <% teacher_previews.each do |teacher_preview| %>
-                      <%= user_avatar_image(
-                            teacher_preview,
-                            size: 128,
-                            class: "h-10 w-10 rounded-xl border-2 border-white bg-slate-100 object-cover",
-                            alt: "#{display_name(teacher_preview)} avatar"
-                          ) %>
-                    <% end %>
-                  </div>
-                  <div class="flex min-w-0 items-center gap-1 text-sm">
-                    <span class="min-w-0 truncate font-semibold text-slate-800"><%= display_name(teacher) %></span>
-                    <% if teacher_count > 1 %>
-                      <span class="shrink-0 whitespace-nowrap text-slate-500"><%= t("classrooms.index.additional_teachers", count: teacher_count - 1) %></span>
-                    <% end %>
-                  </div>
+                  <%= user_avatar_image(
+                        teacher,
+                        size: 128,
+                        class: "h-10 w-10 shrink-0 rounded-xl border-2 border-white bg-slate-100 object-cover",
+                        alt: "#{display_name(teacher)} avatar"
+                      ) %>
+                  <span class="min-w-0 truncate text-sm font-semibold text-slate-800"><%= display_name(teacher) %></span>
                 </div>
               <% else %>
                 <p class="text-sm text-slate-500"><%= t("classrooms.index.teacher_empty") %></p>

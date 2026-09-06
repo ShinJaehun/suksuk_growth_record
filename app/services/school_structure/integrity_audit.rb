@@ -113,7 +113,7 @@ module SchoolStructure
 
     def role_mismatch_scope
       classroom_membership_scope.where(classroom_memberships: { role: 'student' })
-        .where.not(users: { role: 'student' })
+                                .where.not(users: { role: 'student' })
     end
 
     def assignment_identity_sample_scope(scope)
@@ -137,8 +137,10 @@ module SchoolStructure
     end
 
     def inactive_teacher_assignment_scope
-      current_assignment_scope.joins(classroom: { school_year: :school })
-        .where('users.active = FALSE OR school_years.status <> ? OR schools.active = FALSE', 'active')
+      current_assignment_scope
+        .joins(classroom: :school_year)
+        .where(users: { active: false })
+        .where(school_years: { status: %w[planning active] })
     end
 
     def current_assignment_scope
@@ -151,12 +153,12 @@ module SchoolStructure
 
     def duplicate_current_classroom_assignment_scope
       HomeroomAssignment.current
-        .where(classroom_id: HomeroomAssignment.current.group(:classroom_id).having('COUNT(*) > 1').select(:classroom_id))
+                        .where(classroom_id: HomeroomAssignment.current.group(:classroom_id).having('COUNT(*) > 1').select(:classroom_id))
     end
 
     def duplicate_current_teacher_assignment_scope
       HomeroomAssignment.current
-        .where(teacher_id: HomeroomAssignment.current.group(:teacher_id).having('COUNT(*) > 1').select(:teacher_id))
+                        .where(teacher_id: HomeroomAssignment.current.group(:teacher_id).having('COUNT(*) > 1').select(:teacher_id))
     end
 
     def issue(scope, sample_scope: classroom_sample_scope(scope))

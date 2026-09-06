@@ -58,9 +58,9 @@ module Teachers
       end
 
       result
-    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
       @temporary_password = nil
-      copy_persistence_errors(error)
+      copy_persistence_errors(e)
       result
     end
 
@@ -88,9 +88,7 @@ module Teachers
       add_error(:login_id_required) if teacher.login_id.blank?
       add_error(:membership_grade_invalid) if invalid_grade?
       add_error(:classroom_not_found) if invalid_classroom_id?
-      if school&.inactive? && (teacher.annual_school != school || classroom)
-        add_inactive_school_error
-      end
+      add_inactive_school_error if school&.inactive? && (teacher.annual_school != school || classroom)
       return if teacher.errors.any? || classroom.nil?
 
       add_error(:school_required_for_classrooms) unless school
@@ -154,8 +152,7 @@ module Teachers
       if teacher.new_record?
         teacher.assign_attributes(
           school_year: target_school_year,
-          login_id: teacher.login_id.to_s.strip.downcase,
-          school_role: "member"
+          school_role: 'member'
         )
         credential = AnnualTeacherUsers::TemporaryCredential.call(
           teacher: teacher,
@@ -182,7 +179,7 @@ module Teachers
     end
 
     def add_inactive_school_error
-      teacher.errors.add(:base, I18n.t("school_status.inactive_school"))
+      teacher.errors.add(:base, I18n.t('school_status.inactive_school'))
     end
 
     def copy_persistence_errors(error)

@@ -5,18 +5,14 @@ class Classrooms::ShowContext
 
   def student_memberships
     @student_memberships ||= @classroom.classroom_memberships
-      .student
-      .active
-      .in_roster_order
-      .preload(user: { avatar_attachment: :blob })
+                                       .student
+                                       .active
+                                       .in_roster_order
+                                       .preload(user: { avatar_attachment: :blob })
   end
 
-  def students
-    @students ||= User.where(id: student_memberships.map(&:user_id))
+  def homeroom_teacher
+    teacher = @classroom.teacher
+    teacher if teacher&.active?
   end
-
-  def homeroom_teachers
-    @homeroom_teachers ||= [@classroom.teacher].compact.select(&:active?)
-  end
-
 end

@@ -21,7 +21,7 @@ RSpec.describe Classrooms::IndexContext do
     )
   end
 
-  it 'counts and preloads the single active teacher preview' do
+  it 'returns the single active teacher with the avatar loaded' do
     classroom = create(:classroom, annual_school: school)
     teacher = create(:user, :teacher, :active_annual_teacher,
                      annual_school: classroom.school_year.school)
@@ -36,13 +36,12 @@ RSpec.describe Classrooms::IndexContext do
                              annual_school: outside_classroom.school_year.school)
     assign_teacher(outside_classroom, outside_teacher)
     context = described_class.new(classrooms_scope: Classroom.where(id: classroom.id))
-    previews = context.teacher_previews.fetch(classroom.id)
+    loaded_teacher = context.teachers.fetch(classroom.id)
 
-    expect(context.teacher_counts).to eq(classroom.id => 1)
-    expect(previews).to eq([teacher])
-    expect(previews).not_to include(outside_teacher)
-    expect(previews.first.association(:avatar_attachment)).to be_loaded
-    expect(previews.first.avatar_attachment.association(:blob)).to be_loaded
+    expect(loaded_teacher).to eq(teacher)
+    expect(loaded_teacher).not_to eq(outside_teacher)
+    expect(loaded_teacher.association(:avatar_attachment)).to be_loaded
+    expect(loaded_teacher.avatar_attachment.association(:blob)).to be_loaded
   end
 
   it 'counts active student memberships and returns at most five student previews with avatars loaded' do
@@ -84,8 +83,7 @@ RSpec.describe Classrooms::IndexContext do
     context = described_class.new(classrooms_scope: Classroom.none)
 
     expect(context.classrooms).to be_empty
-    expect(context.teacher_counts).to eq({})
-    expect(context.teacher_previews).to eq({})
+    expect(context.teachers).to eq({})
     expect(context.student_counts).to eq({})
     expect(context.student_previews).to eq({})
   end
