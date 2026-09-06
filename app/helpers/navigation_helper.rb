@@ -23,8 +23,6 @@ module NavigationHelper
       ]
     elsif user.teacher?
       []
-    elsif user.student?
-      [navigation_item('navigation.my_page', user_path(user))]
     else
       []
     end
@@ -67,9 +65,9 @@ module NavigationHelper
       actor: user,
       student: false,
       display_name: user.name.presence || user.email,
-      edit_path: (edit_user_registration_path unless user.student?),
-      sign_out_label: t(user.student? ? 'navigation.account.finish' : 'navigation.account.sign_out'),
-      sign_out_path: user.student? ? destroy_student_session_path : destroy_user_session_path
+      edit_path: edit_user_registration_path,
+      sign_out_label: t('navigation.account.sign_out'),
+      sign_out_path: destroy_user_session_path
     }
   end
 

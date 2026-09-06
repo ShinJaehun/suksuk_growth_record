@@ -1,7 +1,6 @@
 require 'rails_helper'
 
 RSpec.describe 'Users::Registrations', type: :request do
-  let(:student) { create(:user, :student) }
   let(:teacher_school) { create(:school) }
   let(:teacher) do
     create(:user, :teacher, :active_annual_teacher,
@@ -41,14 +40,6 @@ RSpec.describe 'Users::Registrations', type: :request do
   end
 
   describe 'GET /users/edit' do
-    it 'expires a legacy student User session' do
-      sign_in student
-
-      get edit_user_registration_path
-
-      expect(response).to redirect_to(new_user_session_path)
-    end
-
     it 'allows teacher access' do
       sign_in teacher
 
@@ -87,21 +78,6 @@ RSpec.describe 'Users::Registrations', type: :request do
   end
 
   describe 'PATCH /users' do
-    it 'blocks profile updates from a legacy student User session' do
-      sign_in student
-
-      patch user_registration_path, params: {
-        user: {
-          name: '바뀐 학생 이름',
-          email: 'student@example.com'
-        }
-      }
-
-      expect(response).to redirect_to(new_user_session_path)
-      expect(student.reload.name).not_to eq('바뀐 학생 이름')
-      expect(student.email).to be_nil
-    end
-
     it 'updates teacher profile attributes without requiring the current password' do
       sign_in teacher
 
@@ -225,14 +201,6 @@ RSpec.describe 'Users::Registrations', type: :request do
   end
 
   describe 'GET /account/password/edit' do
-    it 'expires a legacy student User session' do
-      sign_in student
-
-      get edit_account_password_path
-
-      expect(response).to redirect_to(new_user_session_path)
-    end
-
     it 'allows teacher access' do
       sign_in teacher
 
@@ -244,23 +212,6 @@ RSpec.describe 'Users::Registrations', type: :request do
 
   describe 'PATCH /account/password' do
     let(:turbo_headers) { { 'ACCEPT' => 'text/vnd.turbo-stream.html' } }
-
-    it 'blocks password changes from a legacy student User session' do
-      sign_in student
-
-      patch account_password_path,
-            params: {
-              user: {
-                current_password: 'password123',
-                password: 'newpassword123',
-                password_confirmation: 'newpassword123'
-              }
-            },
-            headers: turbo_headers
-
-      expect(response).to redirect_to(new_user_session_path)
-      expect(student.reload.encrypted_password).to eq('')
-    end
 
     it 'rejects teacher password changes without the current password' do
       sign_in teacher

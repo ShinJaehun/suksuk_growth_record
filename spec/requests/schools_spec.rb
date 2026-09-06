@@ -108,20 +108,21 @@ RSpec.describe 'School workspaces', type: :request do
     end
   end
 
-  it 'rejects an unassigned teacher and expires a legacy student User session' do
+  it 'rejects an unassigned teacher and a Student session' do
     unassigned_school = create(:school)
     unassigned_teacher = create(:user, :teacher, :active_annual_teacher,
                                 annual_school: unassigned_school)
 
-    [unassigned_teacher, create(:user, :student)].each do |user|
-      sign_in user
-      get school_path(school)
-      if user.student?
-        expect(response).to redirect_to(new_user_session_path)
-      else
-        expect(response).to have_http_status(:not_found)
-      end
-    end
+    sign_in unassigned_teacher
+    get school_path(school)
+    expect(response).to have_http_status(:not_found)
+
+    student = create(:student, student_pin: '1234')
+    sign_out :user
+    post public_student_login_path(student_login_token: student.classroom.student_login_token),
+         params: { student_id: student.id, student_pin: '1234' }
+    get school_path(school)
+    expect(response).to redirect_to(new_user_session_path)
   end
 
   it 'does not expose school workspace links from the classrooms index' do

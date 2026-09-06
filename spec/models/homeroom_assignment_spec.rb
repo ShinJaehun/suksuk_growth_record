@@ -67,7 +67,7 @@ RSpec.describe HomeroomAssignment, type: :model do
     inactive_teacher = teacher_for(classroom, active: false)
 
     invalid = [
-      build(:homeroom_assignment, classroom: classroom, teacher: create(:user, :student)),
+      build(:homeroom_assignment, classroom: classroom, teacher: create(:user, :admin)),
       build(:homeroom_assignment, classroom: classroom, teacher: other_year_teacher),
       build(:homeroom_assignment, classroom: classroom, teacher: wrong_grade),
       build(:homeroom_assignment, classroom: classroom, teacher: inactive_teacher),

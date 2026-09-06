@@ -52,32 +52,27 @@ RSpec.describe User, type: :model do
       expect(teacher.dup.tap { |user| user.grade = 7 }).not_to be_valid
     end
 
-    it "requires admin and student annual authority fields to be absent" do
+    it "requires admin annual authority fields to be absent" do
       school_year = create(:school_year)
 
-      %i[admin student].each do |role|
-        user = build(:user, role, school_year: school_year, login_id: "annual-id",
-          school_role: "member", grade: 4)
+      user = build(:user, :admin, school_year: school_year, login_id: "annual-id",
+        school_role: "member", grade: 4)
 
-        expect(user).not_to be_valid
-      end
+      expect(user).not_to be_valid
     end
 
     it "enforces role-dependent annual fields at the database boundary" do
       teacher = create(:user, :teacher, :active_annual_teacher, annual_school: create(:school))
       admin = create(:user, :admin)
-      student = create(:user, :student)
 
       %i[school_year_id login_id school_role].each do |attribute|
         expect { teacher.update_columns(attribute => nil) }
           .to raise_error(ActiveRecord::StatementInvalid)
       end
-      [admin, student].each do |user|
-        expect do
-          user.update_columns(school_year_id: teacher.school_year_id,
-            login_id: "#{user.role}-login", school_role: "member", grade: 4)
-        end.to raise_error(ActiveRecord::StatementInvalid)
-      end
+      expect do
+        admin.update_columns(school_year_id: teacher.school_year_id,
+          login_id: "admin-login", school_role: "member", grade: 4)
+      end.to raise_error(ActiveRecord::StatementInvalid)
     end
 
     it "rejects an unknown school year at the database boundary" do
@@ -187,29 +182,19 @@ RSpec.describe User, type: :model do
       end.not_to raise_error
     end
 
-    it "keeps admin and student accounts free of annual fields" do
-      users = [create(:user, :admin), create(:user, :student)]
+    it "keeps admin accounts free of annual fields" do
+      admin = create(:user, :admin)
 
-      expect(users).to all(
-        have_attributes(
-          school_year_id: nil,
-          login_id: nil,
-          school_role: nil,
-          grade: nil
-        )
+      expect(admin).to have_attributes(
+        school_year_id: nil,
+        login_id: nil,
+        school_role: nil,
+        grade: nil
       )
     end
   end
 
   describe ".avatar_keys_for" do
-    it "returns boy avatar keys" do
-      expect(described_class.avatar_keys_for("boy")).to include("boy01", "boy23")
-    end
-
-    it "returns girl avatar keys" do
-      expect(described_class.avatar_keys_for("girl")).to include("girl01", "girl17")
-    end
-
     it "returns male teacher avatar keys" do
       expect(described_class.avatar_keys_for("male")).to eq(%w[teacherM01 teacherM02 teacherM03 teacherM04 teacherM05 teacherM06 teacherM07 teacherM08])
     end
@@ -228,12 +213,6 @@ RSpec.describe User, type: :model do
   end
 
   describe ".avatar_keys_for_role" do
-    it "returns only student avatars for students" do
-      expect(described_class.avatar_keys_for_role("student")).to eq(
-        described_class::BOY_AVATAR_KEYS + described_class::GIRL_AVATAR_KEYS
-      )
-    end
-
     it "returns only teacher avatars for teachers" do
       expect(described_class.avatar_keys_for_role("teacher")).to eq(
         described_class::TEACHER_MALE_AVATAR_KEYS + described_class::TEACHER_FEMALE_AVATAR_KEYS
@@ -248,13 +227,13 @@ RSpec.describe User, type: :model do
   end
 
   it "validates gender values" do
-    user = build(:user, gender: "other")
+    user = build(:user, :admin, gender: "other")
 
     expect(user).not_to be_valid
   end
 
   it "validates avatar_key values" do
-    user = build(:user, avatar_key: "boy99")
+    user = build(:user, :admin, avatar_key: "boy99")
 
     expect(user).not_to be_valid
   end
@@ -271,7 +250,6 @@ RSpec.describe User, type: :model do
   end
 
   it "rejects role-incompatible avatar_key changes" do
-    expect(build(:user, :student, avatar_key: "teacherM01")).not_to be_valid
     expect(build(:user, :teacher, avatar_key: "boy01")).not_to be_valid
     expect(build(:user, :admin, avatar_key: "girl01")).not_to be_valid
   end
@@ -285,28 +263,6 @@ RSpec.describe User, type: :model do
   end
 
   describe "role-specific Devise credentials" do
-    it "allows students without email or Devise password" do
-      student = build(:user, :student, email: nil, password: nil, student_pin: "1234")
-
-      expect(student).to be_valid
-      student.save!
-      expect(student.reload.email).to be_nil
-      expect(student.encrypted_password).to eq("")
-      expect(student.authenticate_student_pin("1234")).to be_truthy
-    end
-
-    it "allows multiple students with nil email" do
-      create(:user, :student, email: nil)
-
-      expect { create(:user, :student, email: nil) }.to change(described_class.student, :count).by(1)
-    end
-
-    it "keeps student PIN validation" do
-      student = build(:user, :student, student_pin: "12ab")
-
-      expect(student).not_to be_valid
-    end
-
     it "allows teacher email to be absent but requires it for admins" do
       expect(build(:user, :teacher, :active_annual_teacher,
         annual_school: create(:school), email: nil)).to be_valid
@@ -327,12 +283,6 @@ RSpec.describe User, type: :model do
       expect(build(:user, :admin, email: "STAFF@example.com")).not_to be_valid
     end
 
-    it "clears student email and Devise password assignments without normalization errors" do
-      student = create(:user, :student, email: "Student@Example.com", password: "password123")
-
-      expect(student.reload.email).to be_nil
-      expect(student.encrypted_password).to eq("")
-    end
   end
 
   describe "teacher account status" do
@@ -352,7 +302,6 @@ RSpec.describe User, type: :model do
     it "blocks only inactive teachers from Devise authentication" do
       expect(build(:user, :teacher, active: false).active_for_authentication?).to eq(false)
       expect(build(:user, :teacher).active_for_authentication?).to eq(true)
-      expect(build(:user, :student).active_for_authentication?).to eq(true)
       expect(build(:user, :admin).active_for_authentication?).to eq(true)
     end
   end

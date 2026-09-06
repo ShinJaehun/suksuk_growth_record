@@ -105,8 +105,7 @@ RSpec.describe 'Classroom students', type: :request do
       expect(response).to redirect_to(classroom_path(classroom))
     end
 
-    it 'creates a Student without a legacy membership or account with turbo stream' do
-      membership_count = ClassroomMembership.count
+    it 'creates a Student without a User account with turbo stream' do
       user_count = User.count
       expect do
         post classroom_students_path(classroom),
@@ -126,7 +125,6 @@ RSpec.describe 'Classroom students', type: :request do
       expect(response.body).to include('data-student-card', '1번')
       expect(student.classroom).to eq(classroom)
       expect(student.student_number).to eq(1)
-      expect(ClassroomMembership.count).to eq(membership_count)
       expect(User.count).to eq(user_count)
       expect(student.authenticate_student_pin('2345')).to be_truthy
     end

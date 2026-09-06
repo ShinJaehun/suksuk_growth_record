@@ -22,7 +22,7 @@ RSpec.describe 'School settings', type: :request do
     other_teacher = create(:user, :teacher, :active_annual_teacher,
       annual_school: other_school,
       name: '다른 학교 교사')
-    student = create(:user, :student, name: '학교 관리자 후보 제외 학생')
+    student = create(:student, name: '학교 관리자 후보 제외 학생')
 
     sign_in admin
 

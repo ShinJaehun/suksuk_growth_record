@@ -2,7 +2,6 @@ require 'rails_helper'
 
 RSpec.describe 'Home', type: :request do
   let(:admin) { create(:user, :admin) }
-  let(:student) { create(:user, :student) }
   let(:classroom) { create(:classroom) }
   let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
 
@@ -35,16 +34,6 @@ RSpec.describe 'Home', type: :request do
     get root_path
 
     expect(response).to redirect_to(schools_path)
-  end
-
-  it 'expires a legacy student User Devise session' do
-    create(:classroom_membership, classroom: classroom, user: student, role: 'student')
-    sign_in student
-
-    get root_path
-
-    expect(response).to redirect_to(new_user_session_path)
-    expect(controller.current_user).to be_nil
   end
 
   it 'labels the Devise sign in page as admin login' do

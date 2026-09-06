@@ -2,7 +2,6 @@
 
 class ClassroomsController < ApplicationController
   before_action :authenticate_user!
-  before_action :redirect_students_to_mypage!, only: %i[index show]
   before_action :set_classroom, only: %i[
     show destroy
   ]
@@ -201,12 +200,6 @@ class ClassroomsController < ApplicationController
     elsif current_user_school_manager?
       @classroom.school_year = current_user.school_year
     end
-  end
-
-  def redirect_students_to_mypage!
-    return unless current_user&.student?
-
-    redirect_to user_path(current_user)
   end
 
   def classrooms_index_title_key

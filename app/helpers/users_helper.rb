@@ -18,8 +18,6 @@ module UsersHelper
   def fallback_avatar_key(user)
     return "admin" if user.admin?
     return "teacherM01" if user.teacher?
-    return "boy01" if user.student?
-
     "boy01"
   end
 

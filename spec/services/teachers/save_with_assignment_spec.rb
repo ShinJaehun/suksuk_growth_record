@@ -122,7 +122,7 @@ RSpec.describe Teachers::SaveWithAssignment do
   end
 
   it "rejects a non-teacher, inactive teacher, and inactive school" do
-    expect(save(teacher: create(:user, :student), school: create(:school), grade: 4)).not_to be_success
+    expect(save(teacher: create(:user, :admin), school: create(:school), grade: 4)).not_to be_success
 
     school = create(:school)
     teacher = annual_teacher(school: school, grade: 4)

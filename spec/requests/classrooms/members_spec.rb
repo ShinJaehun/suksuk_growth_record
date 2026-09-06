@@ -9,18 +9,6 @@ RSpec.describe 'Classroom members', type: :request do
            name: '담당 교사')
   end
 
-  def insert_legacy_teacher_membership!(user:, classroom:)
-    ClassroomMembership.insert!({
-                                  user_id: user.id,
-                                  classroom_id: classroom.id,
-                                  role: 'teacher',
-                                  status: 'active',
-                                  student_number: nil,
-                                  created_at: Time.current,
-                                  updated_at: Time.current
-                                })
-  end
-
   def managed_student(classroom: nil, status: 'active', student_number: nil, **attributes)
     classroom ||= self.classroom
     attributes[:gender] = 'boy' unless attributes.key?(:gender)
@@ -225,8 +213,7 @@ RSpec.describe 'Classroom members', type: :request do
   end
 
   it 'renders an empty inactive filter state' do
-    active_student = create(:user, :student, name: '김활동')
-    create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
+    active_student = managed_student(name: '김활동')
     sign_in admin
 
     get classroom_members_path(classroom, status: 'inactive')
@@ -236,8 +223,7 @@ RSpec.describe 'Classroom members', type: :request do
     expect(response.body).not_to include(active_student.name)
   end
 
-  it 'does not count a legacy admin teacher membership as an assigned teacher' do
-    insert_legacy_teacher_membership!(user: admin, classroom: classroom)
+  it 'does not count an admin as an assigned teacher' do
     sign_in admin
 
     get classroom_members_path(classroom)
@@ -248,8 +234,8 @@ RSpec.describe 'Classroom members', type: :request do
     expect(response.body).not_to include('checked="checked"')
   end
 
-  it 'does not show a legacy admin teacher membership in the classrooms index preview' do
-    insert_legacy_teacher_membership!(user: admin, classroom: classroom)
+  it 'does not show an admin in the classrooms index preview' do
+    classroom
     sign_in admin
 
     get classrooms_path
@@ -278,8 +264,7 @@ RSpec.describe 'Classroom members', type: :request do
   it 'allows a manager assigned as the classroom teacher to manage members' do
     teacher.update!(school_role: 'manager')
     assign_teacher(classroom, teacher)
-    student = create(:user, :student, name: '활성 학생')
-    create(:classroom_membership, classroom: classroom, user: student, role: :student)
+    student = managed_student(name: '활성 학생')
     sign_in teacher
 
     get classroom_members_path(classroom)
@@ -783,8 +768,8 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects a teacher who does not manage the classroom' do
-      student = create(:user, :student, name: '유지')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
+      student = managed_student(name: '유지')
+      membership = student
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -799,8 +784,8 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'rejects a manager who is not assigned to the classroom' do
       teacher.update!(school_role: 'manager')
-      student = create(:user, :student, name: '유지')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
+      student = managed_student(name: '유지')
+      membership = student
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -813,28 +798,12 @@ RSpec.describe 'Classroom members', type: :request do
       expect(student.reload.name).to eq('유지')
     end
 
-    it 'expires a legacy student User session' do
-      student = create(:user, :student, name: '본인')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
-      sign_in student
-
-      patch classroom_member_student_names_path(classroom), params: {
-        students: {
-          membership.id => { name: '변경 시도' }
-        }
-      }
-
-      expect(response).to redirect_to(new_user_session_path)
-      expect(student.reload.name).to eq('본인')
-    end
-
     it 'fails when a membership outside the classroom is submitted' do
       assign_teacher(classroom, teacher)
-      student = create(:user, :student, name: '내 학생')
-      membership = create(:classroom_membership, classroom: classroom, user: student, role: 'student')
-      other_student = create(:user, :student, name: '다른 학생')
-      other_membership = create(:classroom_membership, classroom: create(:classroom), user: other_student,
-                                                       role: 'student')
+      student = managed_student(name: '내 학생')
+      membership = student
+      other_student = managed_student(classroom: create(:classroom), name: '다른 학생')
+      other_membership = other_student
       sign_in teacher
 
       patch classroom_member_student_names_path(classroom), params: {
@@ -851,9 +820,8 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects a membership outside the selected status filter' do
-      inactive_student = create(:user, :student, name: '비활성 유지')
-      inactive_membership = create(:classroom_membership, classroom: classroom, user: inactive_student,
-                                                          role: 'student', status: 'inactive')
+      inactive_student = managed_student(name: '비활성 유지', status: 'inactive')
+      inactive_membership = inactive_student
       sign_in admin
 
       patch classroom_member_student_names_path(classroom, status: 'active'), params: {
@@ -952,8 +920,7 @@ RSpec.describe 'Classroom members', type: :request do
     end
 
     it 'rejects a teacher who does not manage the classroom' do
-      active_student = create(:user, :student, student_pin: '1234')
-      create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
+      active_student = managed_student(student_pin: '1234')
       sign_in teacher
 
       patch classroom_member_student_pin_path(classroom), params: { student_pin: '4321' }
@@ -962,21 +929,9 @@ RSpec.describe 'Classroom members', type: :request do
       expect(active_student.reload.authenticate_student_pin('1234')).to be_truthy
     end
 
-    it 'expires a legacy student User session' do
-      active_student = create(:user, :student, student_pin: '1234')
-      create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
-      sign_in active_student
-
-      patch classroom_member_student_pin_path(classroom), params: { student_pin: '4321' }
-
-      expect(response).to redirect_to(new_user_session_path)
-      expect(active_student.reload.authenticate_student_pin('1234')).to be_truthy
-    end
-
     it 'keeps the modal open when PIN is blank' do
       assign_teacher(classroom, teacher)
-      active_student = create(:user, :student, student_pin: '1234')
-      create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
+      active_student = managed_student(student_pin: '1234')
       sign_in teacher
 
       patch classroom_member_student_pin_path(classroom),
@@ -991,8 +946,7 @@ RSpec.describe 'Classroom members', type: :request do
 
     it 'keeps the modal open when PIN is not four digits' do
       assign_teacher(classroom, teacher)
-      active_student = create(:user, :student, student_pin: '1234')
-      create(:classroom_membership, classroom: classroom, user: active_student, role: 'student')
+      active_student = managed_student(student_pin: '1234')
       sign_in teacher
 
       patch classroom_member_student_pin_path(classroom),

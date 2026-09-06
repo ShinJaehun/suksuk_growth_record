@@ -5,13 +5,6 @@ FactoryBot.define do
     sequence(:email) { |n| "user#{n}@example.com" }
     password { "password123" }
     name { "Test User" }
-    role { "student" }
-    trait :student do
-      role { "student" }
-      email { nil }
-      password { nil }
-    end
-
     trait :teacher do
       role { "teacher" }
       sequence(:email) { |n| "teacher#{n}@example.com" }

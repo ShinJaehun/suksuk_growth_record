@@ -153,8 +153,8 @@ RSpec.describe 'Admin school managers', type: :request do
     expect(teacher.reload).to be_school_manager
   end
 
-  it 'rejects a student target' do
-    target = create(:user, :student)
+  it 'rejects a non-teacher target' do
+    target = create(:user, :admin)
     sign_in admin
 
     post admin_school_school_managers_path(school), params: { user_id: target.id }

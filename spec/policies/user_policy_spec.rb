@@ -54,7 +54,7 @@ RSpec.describe UserPolicy do
       other_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: other_school)
 
       expect(described_class.new(manager, other_teacher).deactivate_teacher?).to eq(false)
-      expect(described_class.new(manager, create(:user, :student)).deactivate_teacher?).to eq(false)
+      expect(described_class.new(manager, create(:user, :admin)).deactivate_teacher?).to eq(false)
     end
   end
 end

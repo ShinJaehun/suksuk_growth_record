@@ -36,8 +36,7 @@ RSpec.describe ClassroomStudents::BulkRegistration do
     )
     expect(classroom.students.pluck(:student_number)).to contain_exactly(1, 2)
     expect(result.students).to all(satisfy { |student| student.authenticate_student_pin('2468') })
-    expect(ClassroomMembership.where(classroom: classroom).student).to be_empty
-    expect(User.student.where(name: ['첫 학생', '둘 학생'])).to be_empty
+    expect(User.where(name: ['첫 학생', '둘 학생'])).to be_empty
   end
 
   it 'rejects duplicate student numbers within the submitted roster' do

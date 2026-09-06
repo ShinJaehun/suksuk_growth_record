@@ -33,11 +33,10 @@ RSpec.describe ClassroomPolicy do
       expect(Pundit.policy_scope!(teacher, Classroom)).to contain_exactly(assigned_classroom)
     end
 
-    it "does not grant classroom scope to a legacy student User" do
-      student = create(:user, :student)
-      create(:classroom_membership, classroom: classroom, user: student, role: :student)
+    it "does not grant a Student scope to another classroom" do
+      student = create(:student, classroom: classroom)
 
-      expect(Pundit.policy_scope!(student, Classroom)).to be_empty
+      expect(Pundit.policy_scope!(student, Classroom)).not_to include(other_classroom)
     end
 
     it "returns only the Student actor's active classroom" do
@@ -52,9 +51,9 @@ RSpec.describe ClassroomPolicy do
       expect(Pundit.policy_scope!(student, Classroom)).to be_empty
     end
 
-    it "does not grant classroom scope to a legacy student User with an inactive membership" do
-      student = create(:user, :student)
-      create(:classroom_membership, classroom: classroom, user: student, role: :student, status: :inactive)
+    it "does not grant classroom scope to a Student in an inactive classroom" do
+      student = create(:student, classroom: classroom)
+      classroom.update!(active: false)
 
       expect(Pundit.policy_scope!(student, Classroom)).to be_empty
     end
@@ -108,9 +107,8 @@ RSpec.describe ClassroomPolicy do
       expect(described_class.new(manager, classroom).view_student_data?).to eq(true)
     end
 
-    it "does not grant student-data access to a legacy student User" do
-      student = create(:user, :student)
-      create(:classroom_membership, classroom: classroom, user: student, role: "student")
+    it "does not grant student-data access to a Student from another classroom" do
+      student = create(:student)
 
       expect(described_class.new(student, classroom).view_student_data?).to eq(false)
     end

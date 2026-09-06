@@ -38,7 +38,7 @@ RSpec.describe SchoolPolicy do
     end
 
     it "returns an empty relation for a student" do
-      student = create(:user, :student)
+      student = create(:student)
 
       expect(described_class::Scope.new(student, School).resolve).to be_empty
     end
@@ -87,7 +87,7 @@ RSpec.describe SchoolPolicy do
       admin = create(:user, :admin)
       manager = annual_teacher(school: school, school_role: "manager")
       member = annual_teacher(school: other_school)
-      student = create(:user, :student)
+      student = create(:student)
 
       expect(described_class.new(admin, school).manage_managers?).to eq(true)
       expect(described_class.new(manager, school).manage_managers?).to eq(false)
@@ -96,7 +96,7 @@ RSpec.describe SchoolPolicy do
     end
 
     it "rejects a student" do
-      [create(:user, :student)].each do |user|
+      [create(:student)].each do |user|
         policy = described_class.new(user, school)
 
         expect(policy.index?).to eq(false)
@@ -111,7 +111,7 @@ RSpec.describe SchoolPolicy do
       manager = annual_teacher(school: school, school_role: "manager")
       member = annual_teacher(school: school)
       other_manager = annual_teacher(school: other_school, school_role: "manager")
-      student = create(:user, :student)
+      student = create(:student)
 
       expect(described_class.new(admin, school).manage_teachers?).to eq(false)
       expect(described_class.new(manager, school).manage_teachers?).to eq(true)

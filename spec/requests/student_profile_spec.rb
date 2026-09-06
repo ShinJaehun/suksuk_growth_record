@@ -95,15 +95,15 @@ RSpec.describe "Student self service", type: :request do
     end
   end
 
-  it "does not update a legacy student User when changing its own PIN" do
-    legacy_student = create(:user, :student, student_pin: "1234")
-    original_digest = legacy_student.student_pin_digest
+  it "does not update another Student when changing its own PIN" do
+    other_student = create(:student, classroom: classroom, student_pin: "5678")
+    original_digest = other_student.student_pin_digest
     sign_in_student
 
     patch student_pin_path, params: {
       student: { student_pin: "4321", student_pin_confirmation: "4321" }
     }
 
-    expect(legacy_student.reload.student_pin_digest).to eq(original_digest)
+    expect(other_student.reload.student_pin_digest).to eq(original_digest)
   end
 end

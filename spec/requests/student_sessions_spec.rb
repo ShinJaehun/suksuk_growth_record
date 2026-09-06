@@ -5,12 +5,10 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
   let(:classroom) { create(:classroom) }
   let!(:student) { create(:student, classroom: classroom, student_pin: '1234') }
-  let(:legacy_student) { create(:user, :student, student_pin: '1234') }
   let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
   let(:remote_ip) { '203.0.113.10' }
 
   before do
-    create(:classroom_membership, classroom: classroom, user: legacy_student, role: 'student')
     assign_teacher(classroom, teacher)
   end
 

@@ -4,18 +4,11 @@ RSpec.describe 'Classroom student login link', type: :request do
   let(:classroom) { create(:classroom) }
   let(:teacher) { create(:user, :teacher, :active_annual_teacher, annual_school: classroom.school_year.school) }
   let(:admin) { create(:user, :admin) }
-  let(:student) { create(:user, :student) }
+  let(:student) { create(:student, classroom: classroom, student_pin: '1234') }
 
-  def insert_legacy_teacher_membership!(user:, classroom:)
-    ClassroomMembership.insert!({
-                                  user_id: user.id,
-                                  classroom_id: classroom.id,
-                                  role: 'teacher',
-                                  status: 'active',
-                                  student_number: nil,
-                                  created_at: Time.current,
-                                  updated_at: Time.current
-                                })
+  def sign_in_student
+    post public_student_login_path(student_login_token: classroom.student_login_token),
+         params: { student_id: student.id, student_pin: '1234' }
   end
 
   it 'shows the student login modal link without exposing the token URL on the classroom show page' do
@@ -47,9 +40,8 @@ RSpec.describe 'Classroom student login link', type: :request do
     expect(response.body).to include("#{teacher.name} avatar")
   end
 
-  it 'does not show a legacy admin teacher membership as a homeroom teacher' do
+  it 'does not show an admin as a homeroom teacher' do
     admin.update!(name: '레거시 관리자')
-    insert_legacy_teacher_membership!(user: admin, classroom: classroom)
     sign_in admin
 
     get classroom_path(classroom)
@@ -90,9 +82,8 @@ RSpec.describe 'Classroom student login link', type: :request do
     expect(response).to redirect_to(new_user_session_path)
   end
 
-  it 'does not expose the token student login URL to a legacy student User session' do
-    create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-    sign_in student
+  it 'does not expose the token student login URL to a Student session' do
+    sign_in_student
 
     get classroom_path(classroom)
 
@@ -100,9 +91,8 @@ RSpec.describe 'Classroom student login link', type: :request do
     expect(response.body).not_to include(classroom.student_login_token)
   end
 
-  it 'does not allow a legacy student User session to access the student login info modal' do
-    create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-    sign_in student
+  it 'does not allow a Student session to access the student login info modal' do
+    sign_in_student
 
     get student_login_info_classroom_path(classroom)
 
@@ -189,9 +179,8 @@ RSpec.describe 'Classroom student login link', type: :request do
     expect(response.body).not_to include(classroom.student_login_token)
   end
 
-  it 'does not allow a legacy student User session to download the QR PNG' do
-    create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-    sign_in student
+  it 'does not allow a Student session to download the QR PNG' do
+    sign_in_student
 
     get download_student_login_qr_classroom_path(classroom)
 
@@ -208,9 +197,8 @@ RSpec.describe 'Classroom student login link', type: :request do
     expect(response.body).not_to include(classroom.student_login_token)
   end
 
-  it 'does not allow a legacy student User session to access the QR page' do
-    create(:classroom_membership, user: student, classroom: classroom, role: 'student')
-    sign_in student
+  it 'does not allow a Student session to access the QR page' do
+    sign_in_student
 
     get student_login_qr_classroom_path(classroom)
 

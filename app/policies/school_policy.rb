@@ -1,8 +1,8 @@
 class SchoolPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
-      return scope.all if user&.admin?
-      return scope.active.where(id: user.annual_school.id) if user&.active_teacher? && user.annual_school
+      return scope.all if admin?
+      return scope.active.where(id: user.annual_school.id) if teacher? && user.annual_school
 
       scope.none
     end

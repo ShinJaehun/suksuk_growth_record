@@ -8,6 +8,14 @@ RSpec.describe 'Admin teachers', type: :request do
            annual_school: teacher_school, name: '담당 교사')
   end
 
+  def sign_in_actor(actor)
+    return sign_in(actor) if actor.is_a?(User)
+
+    sign_out :user
+    post public_student_login_path(student_login_token: actor.classroom.student_login_token),
+         params: { student_id: actor.id, student_pin: '1234' }
+  end
+
   it 'shows the teacher management index to an admin' do
     school = create(:school, name: '새싹초등학교', color_key: 'orange')
     other_school = create(:school, name: '나래초등학교')
@@ -378,12 +386,12 @@ RSpec.describe 'Admin teachers', type: :request do
                      annual_school_role: 'manager')
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
-    student = create(:user, :student)
+    student = create(:student, student_pin: '1234')
 
     [manager, regular_teacher, student].each do |user|
-      sign_in user
+      sign_in_actor(user)
       get admin_teachers_path
-      expected_path = user.student? ? new_user_session_path : root_path
+      expected_path = user.is_a?(Student) ? new_user_session_path : root_path
       expect(response).to redirect_to(expected_path)
     end
   end
@@ -395,11 +403,11 @@ RSpec.describe 'Admin teachers', type: :request do
                      annual_school_role: 'manager')
     teacher_school = create(:school)
     regular_teacher = create(:user, :teacher, :active_annual_teacher, annual_school: teacher_school)
-    student = create(:user, :student)
+    student = create(:student, student_pin: '1234')
 
     [manager, regular_teacher, student].each do |user|
-      sign_in user
-      expected_path = user.student? ? new_user_session_path : root_path
+      sign_in_actor(user)
+      expected_path = user.is_a?(Student) ? new_user_session_path : root_path
 
       get new_admin_teacher_path
       expect(response).to redirect_to(expected_path)

@@ -7,7 +7,6 @@ class ApplicationController < ActionController::Base
   helper_method :navigation_context, :current_student, :student_signed_in?
 
   before_action :configure_permitted_parameters, if: :devise_controller?
-  before_action :expire_legacy_student_user_session
   before_action :expire_ineligible_teacher_session
   before_action :require_teacher_password_change
   before_action :expire_student_session_if_inactive
@@ -108,15 +107,6 @@ class ApplicationController < ActionController::Base
                               else
                                 []
                               end
-  end
-
-  def expire_legacy_student_user_session
-    return unless current_user&.student?
-
-    sign_out(:user)
-    return if is_a?(StudentSessionsController)
-
-    redirect_to new_user_session_path
   end
 
   def expire_ineligible_teacher_session
