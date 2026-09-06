@@ -4,7 +4,7 @@ class ApplicationController < ActionController::Base
   include Pundit::Authorization
   include Pagy::Method
 
-  helper_method :navigation_context
+  helper_method :navigation_context, :current_student, :student_signed_in?
   
   before_action :configure_permitted_parameters, if: :devise_controller?
   before_action :expire_ineligible_teacher_session
@@ -36,6 +36,36 @@ class ApplicationController < ActionController::Base
   after_action :verify_policy_scoped, if: :pundit_verify_policy_scoped?
 
   protected
+
+  def current_student
+    return @current_student if defined?(@current_student)
+
+    student = Student.includes(classroom: { school_year: :school }).find_by(id: session[:student_id])
+    @current_student = student_session_eligible?(student) ? student : nil
+  end
+
+  def student_signed_in?
+    current_student.present?
+  end
+
+  def student_session_eligible?(student, classroom_id: session[:student_login_classroom_id])
+    return false unless student&.active?
+    return false if classroom_id.blank? || student.classroom_id.to_s != classroom_id.to_s
+
+    classroom = student.classroom
+    classroom.active? && classroom.school_year.active? && classroom.school_year.school.active?
+  end
+
+  def clear_student_session
+    session.delete(:student_id)
+    session.delete(:student_login_classroom_id)
+    session.delete(:student_last_seen_at)
+    remove_instance_variable(:@current_student) if defined?(@current_student)
+  end
+
+  def pundit_user
+    current_user || current_student
+  end
 
   def configure_permitted_parameters
     devise_parameter_sanitizer.permit(:sign_up, keys: [:name])

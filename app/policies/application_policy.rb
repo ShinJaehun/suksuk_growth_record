@@ -35,15 +35,15 @@ class ApplicationPolicy
   end
 
   def admin?
-    user&.admin?
+    user.is_a?(User) && user.admin?
   end
 
   def teacher?
-    user&.active_teacher?
+    user.is_a?(User) && user.active_teacher?
   end
 
   def student?
-    user&.student?
+    user.is_a?(Student) || (user.is_a?(User) && user.student?)
   end
 
   class Scope
@@ -56,6 +56,20 @@ class ApplicationPolicy
 
     def resolve
       scope.none
+    end
+
+    private
+
+    def admin?
+      user.is_a?(User) && user.admin?
+    end
+
+    def teacher?
+      user.is_a?(User) && user.active_teacher?
+    end
+
+    def student?
+      user.is_a?(Student) || (user.is_a?(User) && user.student?)
     end
   end
 end

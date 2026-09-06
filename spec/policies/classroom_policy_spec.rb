@@ -40,6 +40,18 @@ RSpec.describe ClassroomPolicy do
       expect(Pundit.policy_scope!(student, Classroom)).to contain_exactly(classroom)
     end
 
+    it "returns only the Student actor's active classroom" do
+      student = create(:student, classroom: classroom)
+
+      expect(Pundit.policy_scope!(student, Classroom)).to contain_exactly(classroom)
+    end
+
+    it "returns no classrooms for an inactive Student actor" do
+      student = create(:student, classroom: classroom, active: false)
+
+      expect(Pundit.policy_scope!(student, Classroom)).to be_empty
+    end
+
     it "excludes classrooms with only an inactive student membership" do
       student = create(:user, :student)
       create(:classroom_membership, classroom: classroom, user: student, role: :student, status: :inactive)
@@ -101,6 +113,13 @@ RSpec.describe ClassroomPolicy do
       create(:classroom_membership, classroom: classroom, user: student, role: "student")
 
       expect(described_class.new(student, classroom).view_student_data?).to eq(true)
+    end
+
+    it "permits an active Student actor only in its operational classroom" do
+      student = create(:student, classroom: classroom)
+
+      expect(described_class.new(student, classroom).view_student_data?).to eq(true)
+      expect(described_class.new(student, create(:classroom)).view_student_data?).to eq(false)
     end
   end
 
