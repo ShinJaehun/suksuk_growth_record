@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_08_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -111,6 +111,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_08_001000) do
     t.index ["active"], name: "index_schools_on_active"
   end
 
+  create_table "students", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "avatar_key"
+    t.bigint "classroom_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "student_number"
+    t.string "student_pin_digest"
+    t.datetime "updated_at", null: false
+    t.index ["classroom_id", "student_number"], name: "index_students_on_active_classroom_number", unique: true, where: "(active AND (student_number IS NOT NULL))"
+    t.index ["classroom_id"], name: "index_students_on_classroom_id"
+    t.check_constraint "student_number IS NULL OR student_number > 0", name: "chk_students_student_number_positive"
+  end
+
   create_table "teacher_credential_events", force: :cascade do |t|
     t.string "action", null: false
     t.bigint "actor_user_id", null: false
@@ -161,6 +175,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_08_001000) do
   add_foreign_key "homeroom_assignments", "classrooms"
   add_foreign_key "homeroom_assignments", "users", column: "teacher_id"
   add_foreign_key "school_years", "schools"
+  add_foreign_key "students", "classrooms"
   add_foreign_key "teacher_credential_events", "users", column: "actor_user_id"
   add_foreign_key "teacher_credential_events", "users", column: "teacher_user_id"
   add_foreign_key "users", "school_years"
