@@ -70,10 +70,10 @@ RSpec.describe 'Classroom deletion', type: :request do
     expect(classroom.reload.teacher).to eq(manager)
   end
 
-  it 'preserves an admin classroom when a student membership exists' do
+  it 'preserves an admin classroom when a Student exists' do
     admin = create(:user, :admin)
     classroom = create(:classroom, annual_school: school)
-    membership = create(:classroom_membership, classroom: classroom, role: 'student', status: 'inactive')
+    student = create(:student, classroom: classroom, active: false)
     sign_in admin
 
     expect do
@@ -82,7 +82,7 @@ RSpec.describe 'Classroom deletion', type: :request do
 
     expect(response).to redirect_to(edit_classroom_path(classroom))
     expect(response).to have_http_status(:see_other)
-    expect(ClassroomMembership.exists?(membership.id)).to eq(true)
+    expect(Student.exists?(student.id)).to eq(true)
     expect(flash[:alert]).to include(I18n.t('activerecord.errors.models.classroom.attributes.base.students_present'))
     expect(flash[:notice]).to be_nil
   end

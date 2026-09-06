@@ -8,7 +8,7 @@
 # 기존 데이터베이스:
 #   bin/rails db:seed
 #
-# 여러 번 실행해도 같은 기본 데이터를 재사용하도록 작성한다.
+# 새 구조를 기준으로 여러 번 실행해도 같은 기본 데이터를 재사용하도록 작성한다.
 
 unless Rails.env.development? || Rails.env.test?
   puts 'Demo seeds are only available in development and test environments.'
@@ -29,84 +29,66 @@ def first_seed_avatar_key(gender, fallback)
 end
 
 def seed_student_avatar_key(gender, index)
-  available_keys = existing_seed_avatar_keys(User.avatar_keys_for(gender))
+  available_keys = existing_seed_avatar_keys(Student.avatar_keys_for(gender))
   return if available_keys.empty?
 
   available_keys[index % available_keys.length]
 end
 
-def seed_account!(
+def seed_admin!(
   email:,
   name:,
-  role:,
   password:,
-  gender: nil,
-  avatar_key: nil,
-  school_year: nil,
-  login_id: nil,
-  school_role: nil,
-  grade: nil
+  avatar_key:
 )
-  user = User.find_or_initialize_by(email: email)
+  admin = User.find_or_initialize_by(
+    role: 'admin',
+    email: email
+  )
 
-  user.assign_attributes(
+  admin.assign_attributes(
     name: name,
-    role: role,
-    gender: gender,
+    role: 'admin',
     avatar_key: avatar_key,
-    school_year: school_year,
-    login_id: login_id,
-    school_role: school_role,
-    grade: grade,
     password: password,
     password_confirmation: password
   )
 
-  user.save!
-  user
+  admin.save!
+  admin
 end
 
-def seed_student!(
+def seed_teacher!(
+  school_year:,
+  login_id:,
   name:,
+  school_role:,
+  grade:,
+  password:,
   gender:,
-  avatar_key:,
-  student_pin:
+  avatar_key:
 )
-  student = User
-            .where(role: 'student', name: name)
-            .first_or_initialize
+  teacher = User.find_or_initialize_by(
+    role: 'teacher',
+    school_year: school_year,
+    login_id: login_id
+  )
 
-  student.assign_attributes(
+  teacher.assign_attributes(
     name: name,
-    role: 'student',
+    role: 'teacher',
+    school_year: school_year,
+    login_id: login_id,
+    school_role: school_role,
+    grade: grade,
     gender: gender,
     avatar_key: avatar_key,
-    student_pin: student_pin
+    password: password,
+    password_confirmation: password
   )
 
-  student.save!
-  student
-end
-
-def seed_classroom_membership!(
-  user:,
-  classroom:,
-  role:,
-  student_number: nil
-)
-  membership = ClassroomMembership.find_or_initialize_by(
-    user: user,
-    classroom: classroom
-  )
-
-  membership.assign_attributes(
-    role: role,
-    status: 'active',
-    student_number: student_number
-  )
-
-  membership.save!
-  membership
+  teacher.save!
+  teacher
 end
 
 def seed_students!(
@@ -121,47 +103,35 @@ def seed_students!(
   }
 
   count.times.map do |index|
+    student_number = index + 1
     gender = index.even? ? 'boy' : 'girl'
     avatar_index = gender_indexes.fetch(gender)
+
     gender_indexes[gender] += 1
 
-    student = seed_student!(
-      name: "#{name_prefix} 학생 #{format('%02d', index + 1)}",
+    student = Student.find_or_initialize_by(
+      classroom: classroom,
+      student_number: student_number
+    )
+
+    student.assign_attributes(
+      name: "#{name_prefix} 학생 #{format('%02d', student_number)}",
+      active: true,
       gender: gender,
       avatar_key: seed_student_avatar_key(gender, avatar_index),
       student_pin: student_pin
     )
 
-    # 학생은 동시에 하나의 활성 교실에만 소속될 수 있다.
-    ClassroomMembership
-      .where(
-        user: student,
-        role: 'student',
-        status: 'active'
-      )
-      .where.not(classroom: classroom)
-      .update_all(
-        status: 'inactive',
-        updated_at: Time.current
-      )
-
-    seed_classroom_membership!(
-      user: student,
-      classroom: classroom,
-      role: 'student',
-      student_number: index + 1
-    )
-
+    student.save!
     student
   end
 end
 
 puts '== 관리자 계정 생성 =='
 
-seed_account!(
+seed_admin!(
   email: 'a@a',
   name: '개발 관리자',
-  role: 'admin',
   password: demo_password,
   avatar_key: 'admin'
 )
@@ -174,21 +144,27 @@ school = School.find_or_initialize_by(
 
 school.save!
 
+puts '== 학년도 생성 =='
+
 school_year = school.school_years.active.first_or_initialize
-school_year.year ||= Date.current.month < 3 ? Date.current.year - 1 : Date.current.year
+
+school_year.year ||= if Date.current.month < 3
+                       Date.current.year - 1
+                     else
+                       Date.current.year
+                     end
+
 school_year.save!
 
 puts '== 교사 계정 생성 =='
 
-school_manager = seed_account!(
-  email: 'manager@example.com',
-  name: '학교 관리자 교사',
-  role: 'teacher',
-  password: demo_password,
+school_manager = seed_teacher!(
   school_year: school_year,
   login_id: 'manager',
+  name: '학교 관리자 교사',
   school_role: 'manager',
   grade: 4,
+  password: demo_password,
   gender: 'male',
   avatar_key: first_seed_avatar_key(
     'male',
@@ -196,15 +172,13 @@ school_manager = seed_account!(
   )
 )
 
-classroom_teacher = seed_account!(
-  email: 'teacher@example.com',
-  name: '4학년 1반 담임',
-  role: 'teacher',
-  password: demo_password,
+classroom_teacher = seed_teacher!(
   school_year: school_year,
   login_id: 'teacher',
+  name: '4학년 1반 담임',
   school_role: 'member',
   grade: 4,
+  password: demo_password,
   gender: 'female',
   avatar_key: first_seed_avatar_key(
     'female',
@@ -232,11 +206,18 @@ empty_classroom.save!
 
 puts '== 교실 담당 교사 배정 =='
 
-HomeroomAssignment.find_or_create_by!(classroom: classroom, ended_on: nil) do |assignment|
+HomeroomAssignment.find_or_create_by!(
+  classroom: classroom,
+  ended_on: nil
+) do |assignment|
   assignment.teacher = classroom_teacher
   assignment.started_on = Date.current
 end
-HomeroomAssignment.find_or_create_by!(classroom: empty_classroom, ended_on: nil) do |assignment|
+
+HomeroomAssignment.find_or_create_by!(
+  classroom: empty_classroom,
+  ended_on: nil
+) do |assignment|
   assignment.teacher = school_manager
   assignment.started_on = Date.current
 end
@@ -260,11 +241,15 @@ puts '  이메일: a@a'
 puts "  비밀번호: #{demo_password}"
 puts
 puts '학교 관리자 교사'
-puts '  이메일: manager@example.com'
+puts "  학교: #{school.name}"
+puts "  학년도: #{school_year.year}"
+puts '  로그인 ID: manager'
 puts "  비밀번호: #{demo_password}"
 puts
 puts '담임 교사'
-puts '  이메일: teacher@example.com'
+puts "  학교: #{school.name}"
+puts "  학년도: #{school_year.year}"
+puts '  로그인 ID: teacher'
 puts "  비밀번호: #{demo_password}"
 puts
 puts '학생'

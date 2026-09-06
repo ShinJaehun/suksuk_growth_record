@@ -9,9 +9,6 @@ class Classroom < ApplicationRecord
 
   has_many :students, dependent: :restrict_with_error
 
-  # Legacy student memberships remain until the cleanup migration.
-  has_many :classroom_memberships, dependent: :destroy
-  has_many :users, through: :classroom_memberships
   before_destroy :prevent_destroy_with_students, prepend: true
   before_destroy :prevent_destroy_with_homeroom_history, prepend: true
 
@@ -60,7 +57,7 @@ class Classroom < ApplicationRecord
   end
 
   def prevent_destroy_with_students
-    return unless students.exists? || classroom_memberships.student.exists?
+    return unless students.exists?
 
     errors.add(:base, :students_present)
     throw :abort

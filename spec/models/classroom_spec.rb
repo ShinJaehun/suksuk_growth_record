@@ -157,23 +157,23 @@ RSpec.describe Classroom, type: :model do
       expect(HomeroomAssignment.exists?(assignment.id)).to eq(true)
     end
 
-    it "rejects deletion when an active student membership exists" do
+    it "rejects deletion when an active student exists" do
       classroom = create(:classroom)
-      membership = create(:classroom_membership, classroom: classroom, role: "student", status: "active")
+      student = create(:student, classroom: classroom, active: true)
 
       expect(classroom.destroy).to eq(false)
       expect(Classroom.exists?(classroom.id)).to eq(true)
-      expect(ClassroomMembership.exists?(membership.id)).to eq(true)
+      expect(Student.exists?(student.id)).to eq(true)
       expect(classroom.errors.details[:base]).to include(error: :students_present)
     end
 
-    it "rejects deletion when an inactive student membership exists" do
+    it "rejects deletion when an inactive student exists" do
       classroom = create(:classroom)
-      membership = create(:classroom_membership, classroom: classroom, role: "student", status: "inactive")
+      student = create(:student, classroom: classroom, active: false)
 
       expect(classroom.destroy).to eq(false)
       expect(Classroom.exists?(classroom.id)).to eq(true)
-      expect(ClassroomMembership.exists?(membership.id)).to eq(true)
+      expect(Student.exists?(student.id)).to eq(true)
     end
 
   end

@@ -9,8 +9,7 @@ RSpec.describe 'Classroom lifecycle', type: :request do
                      annual_school: school,
                      annual_grade: 4)
     classroom = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
-    student_membership = create(:classroom_membership, classroom: classroom, role: :student,
-                                                       status: :active, student_number: 7)
+    student = create(:student, classroom: classroom, active: true, student_number: 7)
     sign_in admin
 
     patch deactivate_classroom_path(classroom)
@@ -18,7 +17,7 @@ RSpec.describe 'Classroom lifecycle', type: :request do
     expect(response).to redirect_to(classrooms_path)
     expect(classroom.reload).not_to be_active
     expect(classroom.teacher).to eq(teacher)
-    expect(student_membership.reload).to have_attributes(status: 'active', student_number: 7)
+    expect(student.reload).to have_attributes(active: true, student_number: 7)
   end
 
   it 'lets an own-school manager deactivate a classroom' do
