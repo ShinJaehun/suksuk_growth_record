@@ -23,7 +23,7 @@
 
 ## 3. global admin과 학교 manager
 
-기존 전역 `User#role`은 `admin`, `teacher`, `student`를 유지하며 `school_manager` 같은 전역 role을 추가하지 않는다.
+전역 `User#role`은 `admin`, `teacher`를 유지하며 `school_manager` 같은 전역 role을 추가하지 않는다. 학생은 별도 `Student` 모델이다.
 
 - global admin은 모든 학교를 관리한다.
 - 학교 manager는 전역 role이 `teacher`인 사용자에게 학교 소속 단위로 부여하는 권한이다.
@@ -42,9 +42,9 @@ manager의 canonical source는 active annual teacher의 `User.school_role == "ma
 - 새 선생님을 해당 학교의 일반 구성원으로 생성
 - 해당 학교 안에서 선생님의 단일 담당 교실 배정·해제
 
-`SchoolPolicy`와 scope는 일반 teacher와 manager에게 자신의 학교만 노출한다. 일반 teacher는 학교를 열람할 수 있지만 운영 기능과 선생님 관리를 할 수 없고, manager는 자신의 학교 운영 기능과 학교별 선생님 관리만 사용할 수 있다. global admin은 모든 학교를 조회하고 `/admin/teachers`에서 전체 학교 선생님의 소속과 담당 학급을 통합 관리하지만 학교별 선생님 endpoint는 사용하지 않는다. 학교 생성·이름 수정·삭제는 global admin 전용이다.
+`SchoolPolicy`와 scope는 일반 teacher와 manager에게 자신의 학교만 노출한다. 일반 teacher는 학교를 열람할 수 있지만 운영 기능과 선생님 관리를 할 수 없고, manager는 자신의 학교 운영 기능과 `/teachers`에서 active SchoolYear 선생님 관리만 사용할 수 있다. global admin은 모든 학교를 조회하고 `/teachers`에서 각 학교의 active SchoolYear 선생님 소속과 담당 학급을 통합 관리한다. 학교 생성·이름 수정·삭제는 global admin 전용이다.
 
-이 policy는 학교 운영 정보와 학교별 선생님 관리 route에 연결된다. member는 자신의 학교 현황을 읽고 global admin은 manager를 지정·해제할 수 있다. manager는 학급을 다른 학교로 이동할 수 없고, teacher를 다른 학교로 이동하거나 학교 소속을 해제하거나 manager 지정·해제를 할 수 없다. 학교 manager의 teacher 생성은 URL의 학교로 고정되며 항상 일반 구성원으로 생성된다.
+이 policy는 학교 운영 정보와 canonical `/teachers` 관리 route에 연결된다. member는 자신의 학교 현황을 읽고 global admin은 manager를 지정·해제할 수 있다. manager는 학급을 다른 학교로 이동할 수 없고, teacher를 다른 학교로 이동하거나 학교 소속을 해제하거나 manager 지정·해제를 할 수 없다. 학교 manager의 teacher 생성은 자신의 active SchoolYear 학교로 고정되며 항상 일반 구성원으로 생성된다.
 
 담당 teacher 배정·해제는 역할별 전용 경로에서 수행한다. teacher form은 학교, 학년, 단일 학급을 함께 관리하고 현재·과거 담당 관계는 `HomeroomAssignment`에 저장하며 `ended_on IS NULL`인 row가 현재 담당이다. classroom create/update는 담당 teacher를 동시에 지정하지 않는다. `/classrooms/:id/edit`에서 admin과 해당 학교 manager는 반·학년 등 구조 정보를 관리하고, 담당 teacher는 허용된 교실 운영 기능만 관리한다. manager가 담당 teacher가 아니라면 학생 관리와 운영 권한은 없다.
 

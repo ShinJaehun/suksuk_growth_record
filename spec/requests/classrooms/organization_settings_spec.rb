@@ -621,8 +621,8 @@ RSpec.describe 'Classroom organization settings', type: :request do
       'text-indigo-700'
     )
     expect(classroom_card.at_css(%(a[href="#{edit_classroom_path(classroom)}"])).text).to include('교실 설정')
-    expect(response.body).not_to include(new_admin_teacher_path)
-    expect(response.body).not_to include(edit_admin_teacher_path(homeroom))
+    expect(response.body).not_to include(new_teacher_path)
+    expect(response.body).not_to include(edit_teacher_path(homeroom))
     expect(response.body).not_to include(new_admin_school_path)
     expect(response.body).not_to include(edit_admin_school_path(school))
     expect(response.body).not_to include('선생님 목록')

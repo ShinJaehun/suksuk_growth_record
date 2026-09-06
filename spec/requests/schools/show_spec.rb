@@ -35,7 +35,7 @@ RSpec.describe 'School overview', type: :request do
     expect(settings_link['data-turbo-frame']).to be_nil
     expect(response.body).not_to include(classroom.class_label, teacher.name)
     expect(overview.at_css(%(a[href="#{new_classroom_path}"]))).to be_nil
-    expect(overview.at_css(%(a[href="#{new_school_teacher_path(school)}"]))).to be_nil
+    expect(overview.at_css(%(a[href="#{new_teacher_path}"]))).to be_nil
   end
 
   it 'hides school settings from the school manager while showing the manager name' do

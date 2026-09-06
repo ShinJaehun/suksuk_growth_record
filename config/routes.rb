@@ -89,12 +89,7 @@ Rails.application.routes.draw do
   put "/classrooms/:id",
     to: "classrooms/settings#update"
 
-  resources :schools, only: %i[index show edit update] do
-    resources :teachers, only: %i[index new create edit update], module: :schools do
-      patch :deactivate, on: :member
-      patch :reactivate, on: :member
-    end
-  end
+  resources :schools, only: %i[index show edit update]
 
   # Defines the root path route ("/")
   root "home#index"
@@ -102,10 +97,6 @@ Rails.application.routes.draw do
   namespace :admin do
     root to: redirect("/schools")
 
-    resources :teachers, only: [:index, :new, :create, :edit, :update] do
-      patch :deactivate, on: :member
-      patch :reactivate, on: :member
-    end
     resources :schools, only: %i[new create edit update] do
       patch :deactivate, on: :member
       patch :reactivate, on: :member

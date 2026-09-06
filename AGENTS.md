@@ -54,7 +54,7 @@
 ## 도메인 원칙
 
 - 서비스의 사용자 역할 개념은 `admin`, `teacher`, `student`를 기준으로 하되, 인증 모델은 admin/teacher `User`와 별도 `Student`로 구분한다.
-- 현재 runtime authority는 admin/teacher `User`와 Classroom에 직접 속한 `Student`로 분리된다. legacy student `User`와 student `ClassroomMembership`은 cleanup 전환 데이터로만 남으며 신규 등록·학생 관리·PIN 로그인 authority로 사용하지 않는다.
+- 현재 runtime authority는 admin/teacher `User`와 Classroom에 직접 속한 `Student`로 분리된다. 학생용 `User`와 student `ClassroomMembership`은 runtime/schema에 존재하지 않는다.
 - `Student`는 Devise User가 아니며 Rails session + PIN으로 인증한다. 이는 일반적인 인증 모델 확대가 아니라 승인된 Student cutover 예외이며 그 밖의 role을 성급히 별도 인증 모델로 분리하지 않는다.
 - 권한 판단은 controller/policy 중심으로 유지한다.
 - view에서 직접 복잡한 권한 조건을 늘리지 않는다.
@@ -62,9 +62,9 @@
 - Classroom의 학교와 학년도는 `Classroom.school_year.school`, `Classroom.school_year`를 기준으로 하고 반 식별자는 `Classroom.class_label`을 사용한다.
 - 교사의 현재 학교, 학교 역할과 학년은 각각 `User.school_year.school`, `User.school_role`, `User.grade`를 기준으로 한다.
 - teacher의 학교 소속과 권한에는 별도 membership model을 두지 않는다.
-- 현재 runtime의 학생 소속과 lifecycle source는 `Student.classroom_id`와 `Student.active`다. legacy student `ClassroomMembership`은 cleanup 전환 데이터일 뿐 runtime authority가 아니다.
+- 현재 runtime의 학생 소속과 lifecycle source는 `Student.classroom_id`와 `Student.active`다.
 - Teacher, Student, Classroom lifecycle은 각각의 canonical spec과 상태 source를 따른다.
-- current Student authority와 아직 제거하지 않은 legacy cleanup 데이터를 구분한다. Student에는 `StudentEnrollment`를 두지 않는다.
+- Student에는 `StudentEnrollment`를 두지 않는다.
 - 학생 관련 기능은 교실 사용 맥락을 먼저 고려한다.
 - 공유 태블릿 환경에서는 학생 세션, 로그아웃, PIN, 권한 노출에 특히 주의한다.
 - Turbo 응답과 HTML 응답은 둘 다 깨지지 않도록 주의한다.

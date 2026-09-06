@@ -59,20 +59,19 @@ Teacher 0..1 ↔ 0..1 Classroom
 - teacher는 담당 classroom이 없거나 하나다.
 - classroom은 담당 teacher가 없거나 한 명이다.
 - 신규 assignment 시 teacher와 classroom은 같은 SchoolYear와 grade를 가지며 teacher, classroom, SchoolYear, School이 active여야 한다.
-- 신규 teacher `ClassroomMembership`은 만들지 않는다.
-- 학생 classroom 소속은 `Student.classroom_id`가 canonical source다. legacy `ClassroomMembership`은 cleanup 전환 데이터로만 남는다.
+- 학생 classroom 소속은 `Student.classroom_id`가 canonical source다.
 - teacher 비활성화 시 current assignment를 종료하고 재활성화 때 자동 복원하지 않는다.
 - classroom 비활성화 시 current assignment와 Student row를 보존한 채 운영을 잠그며, 재활성화하면 보존된 관계를 다시 사용한다.
 - classroom grade 변경이 `User.grade`와 충돌하면 먼저 assignment를 해제해야 한다.
 
 ## Teacher 운영 영역
 
-- `/teachers`는 global admin과 manager의 canonical 개별 teacher 관리 영역이다.
-- global admin은 모든 학교, manager는 자기 학교 teacher만 관리한다.
+- `/teachers`는 global admin과 manager가 active SchoolYear teacher를 관리하는 canonical 개별 teacher 관리 영역이다.
+- global admin은 각 학교의 active SchoolYear teacher를, manager는 자기 active SchoolYear teacher만 관리한다.
 - 일반 teacher는 접근할 수 없다.
 - teacher form은 학교, 학년, 단일 학급 순서로 구성한다.
 - 학교와 학년이 유효할 때만 같은 SchoolYear·grade의 active 미배정 classroom을 후보로 조회한다.
-- teacher 생성 시 최초 password를 입력할 수 있지만 기존 teacher update에서는 manager가 password를 변경할 수 없다.
+- teacher 생성 시 temporary password를 자동 발급하며 기존 teacher update에서는 password를 변경하지 않는다.
 - teacher 목록은 annual school, `User.grade`, 단일 classroom과 lifecycle 상태를 표시한다.
 
 ## 학생 관리
@@ -84,7 +83,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 - 담당 teacher와 admin은 학생 명부, 학생 정보와 PIN을 관리할 수 있다.
 - 학생 자신은 별도 Student session에서 허용된 자기 정보와 PIN 중심 흐름만 사용한다.
 - 학생 avatar는 gender에 맞는 `avatar_key` pool과 fallback 정책을 유지한다.
-- legacy student User와 student ClassroomMembership은 cleanup 전환 데이터이며 현재 학생 runtime authority로 사용하지 않는다.
+- 학생용 `User`와 `ClassroomMembership`은 runtime/schema에 존재하지 않는다.
 
 ## 권한 원칙
 

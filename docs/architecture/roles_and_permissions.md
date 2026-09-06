@@ -6,13 +6,13 @@
 
 - 서버측 권한 판단의 중심은 Pundit policy와 `policy_scope`다.
 - 모든 비-`index` 액션은 `verify_authorized`, `index` 액션은 `verify_policy_scoped` 대상이다.
-- 전역 역할은 `User.role`의 `admin`, `teacher`, `student`를 유지한다.
+- `User.role`은 `admin`, `teacher`를 유지하며 학생은 별도 `Student` 모델이다.
 - teacher의 학교는 `User.school_year.school`, 학교별 권한은 `User.school_role`의 `member`, `manager`로 표현한다.
-- 학생의 교실 소속은 `ClassroomMembership`으로 표현한다.
-- canonical teacher assignment는 nullable `Classroom.teacher_id`이며 teacher와 classroom은 각각 상대를 최대 하나만 가진다.
+- 학생은 `Student.classroom_id`로 Classroom에 직접 속한다.
+- canonical teacher assignment는 current `HomeroomAssignment`이며 teacher와 classroom은 각각 current 상대를 최대 하나만 가진다.
 - UI 숨김은 편의 수단일 뿐이며 policy, scope와 controller/domain validation이 최종 권한 경계다.
 
-teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher membership을 만들지 않고 `ClassroomMembership`은 학생 소속에 사용한다.
+teacher assignment는 `HomeroomAssignment`를 사용하며 current assignment는 `ended_on IS NULL`이다.
 
 ## 역할 설명
 
@@ -35,7 +35,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 ### 일반 teacher
 
 - `/teachers`와 `/admin/*` school operations 영역에 접근할 수 없다.
-- `Classroom.teacher_id`로 자신에게 배정된 active classroom 하나에서 학생 운영 기능을 사용한다.
+- current `HomeroomAssignment`로 자신에게 배정된 active classroom 하나에서 학생 운영 기능을 사용한다.
 - 담당 classroom이 없으면 정상 안내 상태를 본다.
 - 같은 학교라는 이유만으로 미담당 classroom에 접근할 수 없다.
 
@@ -51,7 +51,7 @@ teacher assignment는 `Classroom.teacher_id`를 사용한다. 신규 teacher mem
 
 | 리소스/액션 | global admin | manager | 일반 teacher | student |
 |---|---|---|---|---|
-| `/teachers` | 모든 학교 | 자기 학교 | 불가 | 불가 |
+| `/teachers` | 각 학교의 active SchoolYear | 자기 active SchoolYear | 불가 | 불가 |
 | `/classrooms` 목록·상세 | 모든 학교 | 자기 학교 | 담당 active classroom | 자기 active Student classroom |
 | classroom 생성·구조 수정 | 가능 | 자기 학교 | 불가 | 불가 |
 | teacher profile 관리 | 가능 | 자기 학교 허용 범위 | 불가 | 불가 |
@@ -88,9 +88,9 @@ Teacher의 학교 소속과 권한은 annual User에만 저장하며 별도 memb
 ## 현재 assignment 구조
 
 ```text
-Classroom.teacher_id nullable
-foreign key: users
-unique index: teacher_id where teacher_id is not null
+HomeroomAssignment(classroom_id, teacher_id, started_on, ended_on)
+current: ended_on IS NULL
+partial unique: current classroom_id / current teacher_id
 ```
 
 ## 문서 유지 원칙
