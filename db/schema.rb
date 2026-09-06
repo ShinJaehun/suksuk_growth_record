@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_003000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,24 +40,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
-  end
-
-  create_table "classroom_memberships", force: :cascade do |t|
-    t.bigint "classroom_id", null: false
-    t.datetime "created_at", null: false
-    t.string "role", default: "student", null: false
-    t.string "status", default: "active", null: false
-    t.integer "student_number"
-    t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
-    t.index ["classroom_id", "student_number"], name: "idx_classroom_memberships_active_student_number", unique: true, where: "(((role)::text = 'student'::text) AND ((status)::text = 'active'::text) AND (student_number IS NOT NULL))"
-    t.index ["classroom_id", "user_id"], name: "index_classroom_memberships_on_classroom_id_and_user_id", unique: true
-    t.index ["classroom_id"], name: "index_classroom_memberships_on_classroom_id"
-    t.index ["user_id"], name: "index_classroom_memberships_on_one_active_student", unique: true, where: "(((role)::text = 'student'::text) AND ((status)::text = 'active'::text))"
-    t.index ["user_id"], name: "index_classroom_memberships_on_user_id"
-    t.check_constraint "role::text = ANY (ARRAY['teacher'::character varying::text, 'student'::character varying::text])", name: "chk_cm_role"
-    t.check_constraint "status::text = ANY (ARRAY['active'::character varying::text, 'inactive'::character varying::text])", name: "chk_classroom_memberships_status"
-    t.check_constraint "student_number IS NULL OR student_number > 0", name: "chk_classroom_memberships_student_number_positive"
   end
 
   create_table "classrooms", force: :cascade do |t|
@@ -98,7 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
     t.index ["school_id"], name: "index_school_years_on_school_id"
     t.index ["school_id"], name: "index_school_years_on_unique_active_school", unique: true, where: "((status)::text = 'active'::text)"
     t.index ["school_id"], name: "index_school_years_on_unique_planning_school", unique: true, where: "((status)::text = 'planning'::text)"
-    t.check_constraint "status::text = ANY (ARRAY['planning'::character varying, 'active'::character varying, 'archived'::character varying]::text[])", name: "chk_school_years_status"
+    t.check_constraint "status::text = ANY (ARRAY['planning'::character varying::text, 'active'::character varying::text, 'archived'::character varying::text])", name: "chk_school_years_status"
     t.check_constraint "year >= 1000 AND year <= 9999", name: "chk_school_years_year_range"
   end
 
@@ -123,7 +105,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
     t.datetime "updated_at", null: false
     t.index ["classroom_id", "student_number"], name: "index_students_on_active_classroom_number", unique: true, where: "(active AND (student_number IS NOT NULL))"
     t.index ["classroom_id"], name: "index_students_on_classroom_id"
-    t.check_constraint "gender IS NULL OR (gender::text = ANY (ARRAY['boy'::character varying, 'girl'::character varying]::text[]))", name: "chk_students_gender"
+    t.check_constraint "gender IS NULL OR (gender::text = ANY (ARRAY['boy'::character varying::text, 'girl'::character varying::text]))", name: "chk_students_gender"
     t.check_constraint "student_number IS NULL OR student_number > 0", name: "chk_students_student_number_positive"
   end
 
@@ -135,7 +117,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
     t.datetime "updated_at", null: false
     t.index ["actor_user_id"], name: "index_teacher_credential_events_on_actor_user_id"
     t.index ["teacher_user_id"], name: "index_teacher_credential_events_on_teacher_user_id"
-    t.check_constraint "action::text = ANY (ARRAY['temporary_password_issued'::character varying, 'temporary_password_reissued'::character varying]::text[])", name: "chk_teacher_credential_events_action"
+    t.check_constraint "action::text = ANY (ARRAY['temporary_password_issued'::character varying::text, 'temporary_password_reissued'::character varying::text])", name: "chk_teacher_credential_events_action"
   end
 
   create_table "users", force: :cascade do |t|
@@ -152,10 +134,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
-    t.string "role", default: "student", null: false
+    t.string "role", null: false
     t.string "school_role"
     t.bigint "school_year_id"
-    t.string "student_pin_digest"
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
@@ -166,13 +147,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_002000) do
     t.check_constraint "grade IS NULL OR grade >= 1 AND grade <= 6", name: "chk_users_grade_range"
     t.check_constraint "login_id IS NULL OR login_id::text <> ''::text AND login_id::text = btrim(login_id::text) AND login_id::text = lower(login_id::text)", name: "chk_users_login_id_canonical"
     t.check_constraint "role::text = 'teacher'::text AND school_year_id IS NOT NULL AND login_id IS NOT NULL AND school_role IS NOT NULL OR role::text <> 'teacher'::text AND school_year_id IS NULL AND login_id IS NULL AND school_role IS NULL AND grade IS NULL", name: "chk_users_annual_fields_by_role"
-    t.check_constraint "school_role IS NULL OR (school_role::text = ANY (ARRAY['member'::character varying, 'manager'::character varying]::text[]))", name: "chk_users_school_role"
+    t.check_constraint "role::text = ANY (ARRAY['teacher'::character varying::text, 'admin'::character varying::text])", name: "chk_users_role"
+    t.check_constraint "school_role IS NULL OR (school_role::text = ANY (ARRAY['member'::character varying::text, 'manager'::character varying::text]))", name: "chk_users_school_role"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "classroom_memberships", "classrooms", on_delete: :cascade
-  add_foreign_key "classroom_memberships", "users", on_delete: :cascade
   add_foreign_key "classrooms", "school_years"
   add_foreign_key "homeroom_assignments", "classrooms"
   add_foreign_key "homeroom_assignments", "users", column: "teacher_id"
