@@ -8,41 +8,22 @@
 
 ## P0
 
-### Teacher와 Classroom 단일 담당 전환
+### SchoolYear 운영 확장
 
-상태: Canonical migration pending
-
-- 기존 teacher `ClassroomMembership` 데이터의 1:1 호환 여부 감사
-- 다중 assignment 충돌의 명시적 데이터 정리
-- nullable `Classroom.teacher_id`, users foreign key와 non-null unique index 추가
-- controller, service, policy, scope와 UI를 단일 assignment로 변경
-- teacher 또는 classroom 비활성화 시 assignment 해제
-- 신규 teacher `ClassroomMembership` 생성 제거
-
-### School manager 단일화
-
-- 같은 school의 manager membership 0..1 invariant
-- 기존 복수 manager 데이터 감사
-- global admin 전용 manager 지정·교체·해제
+- planning SchoolYear 준비와 activation 운영 흐름
+- archived SchoolYear read-only 조회 경계
+- 명시적인 rollover와 실패·복구 절차
 
 ## P1
 
-### Teacher 운영 영역 정리
+### Future admin bulk management
 
-- `/teachers`를 canonical 개별 teacher 관리 endpoint로 유지
-- compatibility `/admin/teachers`와 nested school teacher endpoint 후속 정리
-- school, grade, 단일 classroom form과 server validation 정리
-- manager own-school scope와 lifecycle 권한 회귀 점검
-
-### Classroom lifecycle UI
-
-- manager와 global admin의 deactivate/reactivate 동작
-- inactive classroom의 관리 목록 표시
-- 일반 teacher scope와 직접 진입에서 inactive classroom 제외
+- `/admin/teachers` planning-year bulk bootstrap
+- `/admin/classrooms` planning-year bulk configuration
+- 현재 canonical credential과 SchoolYear operation 재사용
 
 ### Student 운영 안정성
 
-- student membership 이동 정책
 - roster bulk edit 경쟁 조건과 오류 안내
 - PIN/token 로그인 및 재발급 UX
 - role/gender별 avatar 일관성
@@ -65,8 +46,7 @@
 ## 범위 밖
 
 - 제거된 service-specific domain 재도입
-- Grade model 또는 `User.grade`
+- Grade model
 - teacher의 복수 classroom 담당
 - classroom의 복수 teacher 담당
 - school별 복수 manager
-- `/admin` bulk management 실제 구현

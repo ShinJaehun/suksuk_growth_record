@@ -42,7 +42,7 @@ manager의 canonical source는 active annual teacher의 `User.school_role == "ma
 - 새 선생님을 해당 학교의 일반 구성원으로 생성
 - 해당 학교 안에서 선생님의 단일 담당 교실 배정·해제
 
-`SchoolPolicy`와 scope는 일반 teacher와 manager에게 자신의 학교만 노출한다. 일반 teacher는 학교를 열람할 수 있지만 운영 기능과 선생님 관리를 할 수 없고, manager는 자신의 학교 운영 기능과 `/teachers`에서 active SchoolYear 선생님 관리만 사용할 수 있다. global admin은 모든 학교를 조회하고 `/teachers`에서 각 학교의 active SchoolYear 선생님 소속과 담당 학급을 통합 관리한다. 학교 생성·이름 수정·삭제는 global admin 전용이다.
+`SchoolPolicy`와 scope는 일반 teacher와 manager에게 자신의 학교만 노출한다. 일반 teacher는 학교를 열람할 수 있지만 운영 기능과 선생님 관리를 할 수 없고, manager는 자신의 학교 운영 기능과 `/teachers`에서 active SchoolYear 선생님 관리만 사용할 수 있다. global admin은 모든 학교를 조회하고 `/teachers`에서 각 학교의 active SchoolYear 선생님 소속과 담당 학급을 통합 관리한다. 학교 생성·이름 수정·비활성화·재활성화는 global admin 전용이다.
 
 이 policy는 학교 운영 정보와 canonical `/teachers` 관리 route에 연결된다. member는 자신의 학교 현황을 읽고 global admin은 manager를 지정·해제할 수 있다. manager는 학급을 다른 학교로 이동할 수 없고, teacher를 다른 학교로 이동하거나 학교 소속을 해제하거나 manager 지정·해제를 할 수 없다. 학교 manager의 teacher 생성은 자신의 active SchoolYear 학교로 고정되며 항상 일반 구성원으로 생성된다.
 

@@ -9,22 +9,17 @@ ko:
         success: "학교 관리자 권한을 해제했습니다."
     schools:
       new_title: "학교 등록"
-      edit_title: "학교 이름 수정"
       form:
         name_label: "학교 이름"
         operational_year_label: "운영 연도"
         create_submit: "학교 등록"
-        update_submit: "변경 저장"
         creating: "등록 중..."
-        updating: "저장 중..."
       actions:
         back_to_schools: "학교 관리로 돌아가기"
       errors:
         name_blank: "학교 이름을 입력해 주세요."
       create:
         success: "학교를 등록했습니다."
-      update:
-        success: "학교 이름을 수정했습니다."
     teachers:
       new_title: "선생님 추가"
       edit_title: "운영 설정"
