@@ -77,7 +77,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).to include(classroom.class_label, other_classroom.class_label)
     expect(response.body).to include(classroom_path(classroom), classroom_path(other_classroom))
     expect(response.body).not_to include(new_admin_school_path)
-    expect(response.body).not_to include(edit_admin_school_path(school))
 
     document = Nokogiri::HTML(response.body)
     classroom_card = document.at_xpath("//h2[contains(normalize-space(), '#{classroom.class_label}')]/ancestor::article[1]")
@@ -624,7 +623,6 @@ RSpec.describe 'Classroom organization settings', type: :request do
     expect(response.body).not_to include(new_teacher_path)
     expect(response.body).not_to include(edit_teacher_path(homeroom))
     expect(response.body).not_to include(new_admin_school_path)
-    expect(response.body).not_to include(edit_admin_school_path(school))
     expect(response.body).not_to include('선생님 목록')
     expect(response.body).not_to include('학교 운영 정보')
   end

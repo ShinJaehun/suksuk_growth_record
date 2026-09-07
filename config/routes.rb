@@ -98,7 +98,7 @@ Rails.application.routes.draw do
   namespace :admin do
     root to: redirect("/schools")
 
-    resources :schools, only: %i[new create edit update] do
+    resources :schools, only: %i[new create] do
       patch :deactivate, on: :member
       patch :reactivate, on: :member
       resources :school_managers, only: :create, path: :managers

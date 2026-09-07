@@ -1,7 +1,7 @@
 class Admin::SchoolsController < Admin::BaseController
   include SchoolWorkspacePrepareable
 
-  before_action :set_school, only: %i[edit update deactivate reactivate]
+  before_action :set_school, only: %i[deactivate reactivate]
   layout -> { turbo_frame_request? ? false : "application" }
 
   def new
@@ -20,23 +20,7 @@ class Admin::SchoolsController < Admin::BaseController
         notice: t("admin.schools.create.success"),
         status: :see_other
     else
-      render_school_form(:new)
-    end
-  end
-
-  def edit
-    authorize @school
-  end
-
-  def update
-    authorize @school
-
-    if @school.update(school_params)
-      redirect_to schools_path,
-        notice: t("admin.schools.update.success"),
-        status: :see_other
-    else
-      render_school_form(:edit)
+      render_school_form
     end
   end
 
@@ -85,26 +69,22 @@ class Admin::SchoolsController < Admin::BaseController
     end
   end
 
-  def render_school_form(template)
+  def render_school_form
     respond_to do |format|
       format.turbo_stream do
         render turbo_stream: turbo_stream.replace(
           "modal",
           partial: "admin/schools/modal",
-          locals: modal_locals(template)
+          locals: modal_locals
         ), status: :unprocessable_content
       end
       format.html do
-        render template, formats: :html, status: :unprocessable_content
+        render :new, formats: :html, status: :unprocessable_content
       end
     end
   end
 
-  def modal_locals(template)
-    if template == :new
-      { school: @school, title: t("admin.schools.new_title"), submit_label: t("admin.schools.form.create_submit") }
-    else
-      { school: @school, title: t("admin.schools.edit_title"), submit_label: t("admin.schools.form.update_submit") }
-    end
+  def modal_locals
+    { school: @school, title: t("admin.schools.new_title"), submit_label: t("admin.schools.form.create_submit") }
   end
 end

@@ -41,7 +41,6 @@ RSpec.describe 'Admin schools', type: :request do
     expect(response.body).to include(new_admin_school_path)
     expect(response.body).to include(school_path(school), '활성')
     expect(response.body).not_to include(
-      edit_admin_school_path(school),
       deactivate_admin_school_path(school),
       reactivate_admin_school_path(school)
     )
@@ -106,20 +105,6 @@ RSpec.describe 'Admin schools', type: :request do
     expect(response.body).not_to include('<!DOCTYPE html>')
     expect(response.body).to include('data-turbo-frame="_top"')
     expect(response.body).to include('data-turbo-submits-with="등록 중..."')
-    expect(response.body).not_to include('translation missing')
-  end
-
-  it 'renders the edit school form in one modal frame without the application layout' do
-    sign_in admin
-
-    get edit_admin_school_path(school), headers: { 'Turbo-Frame' => 'modal' }
-
-    expect(response).to have_http_status(:ok)
-    expect(response.body.scan('<turbo-frame id="modal"').size).to eq(1)
-    expect(response.body).to include('name="school[name]"')
-    expect(response.body).to include('data-turbo-frame="_top"')
-    expect(response.body).to include('data-turbo-submits-with="저장 중..."')
-    expect(response.body).not_to include('<!DOCTYPE html>')
     expect(response.body).not_to include('translation missing')
   end
 
@@ -219,47 +204,6 @@ RSpec.describe 'Admin schools', type: :request do
     expect(School.find_by(name: '원자성 학교')).to be_nil
   end
 
-  it 'redirects the top frame after a successful modal update' do
-    sign_in admin
-
-    patch admin_school_path(school),
-          params: { school: { name: '튼튼초등학교' } },
-          headers: { 'Accept' => Mime[:turbo_stream].to_s }
-
-    expect(response).to have_http_status(:see_other)
-    expect(response).to redirect_to(schools_path)
-    expect(response.body).not_to include('turbo-stream action="refresh"')
-    expect(school.reload.name).to eq('튼튼초등학교')
-  end
-
-  it 'keeps update validation errors in the modal frame' do
-    sign_in admin
-
-    patch admin_school_path(school),
-          params: { school: { name: '' } },
-          headers: { 'Accept' => Mime[:turbo_stream].to_s }
-
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(response.body).to include('turbo-stream action="replace" target="modal"')
-    expect(response.body.scan('<turbo-frame id="modal"').size).to eq(1)
-    expect(response.body).to include('name="school[name]"')
-    expect(response.body).to include('학교 이름을 입력해 주세요.')
-    expect(response.body).not_to include('<!DOCTYPE html>')
-    expect(school.reload.name).to eq('새싹초등학교')
-  end
-
-  it 'renders the same update validation error in the standalone fallback' do
-    sign_in admin
-
-    patch admin_school_path(school), params: { school: { name: '' } }
-
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(response.body).to include('<!DOCTYPE html>')
-    expect(response.body).to include('학교 이름을 입력해 주세요.')
-    expect(response.body).to include('학교 관리로 돌아가기')
-    expect(school.reload.name).to eq('새싹초등학교')
-  end
-
   it 'prevents a teacher from accessing or changing schools' do
     sign_in teacher
 
@@ -269,13 +213,6 @@ RSpec.describe 'Admin schools', type: :request do
     expect do
       post admin_schools_path, params: { school: { name: '조작 학교' } }
     end.not_to change(School, :count)
-
-    get edit_admin_school_path(school)
-    expect(response).to redirect_to(root_path)
-
-    patch admin_school_path(school), params: { school: { name: '조작된 이름' } }
-    expect(response).to redirect_to(root_path)
-    expect(school.reload.name).to eq('새싹초등학교')
 
     patch deactivate_admin_school_path(school)
     expect(response).to redirect_to(root_path)
@@ -298,7 +235,15 @@ RSpec.describe 'Admin schools', type: :request do
     expect(response).to redirect_to(new_user_session_path)
   end
 
-  it 'does not define a destroy route' do
+  it 'does not define edit, update, or destroy routes' do
+    expect do
+      Rails.application.routes.recognize_path("/admin/schools/#{school.id}/edit", method: :get)
+    end.to raise_error(ActionController::RoutingError)
+
+    expect do
+      Rails.application.routes.recognize_path("/admin/schools/#{school.id}", method: :patch)
+    end.to raise_error(ActionController::RoutingError)
+
     expect do
       Rails.application.routes.recognize_path("/admin/schools/#{school.id}", method: :delete)
     end.to raise_error(ActionController::RoutingError)
