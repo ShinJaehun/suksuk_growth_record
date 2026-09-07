@@ -1,7 +1,7 @@
 class TeachersController < ApplicationController
   before_action :authenticate_user!
   before_action :authorize_teacher_management!
-  before_action :set_teacher, only: %i[edit update deactivate reactivate]
+  before_action :set_teacher, only: %i[edit update deactivate reactivate reissue_temporary_password]
 
   def index
     prepare_index
@@ -41,6 +41,10 @@ class TeachersController < ApplicationController
 
   def edit
     authorize @teacher, :update_profile?, policy_class: TeacherManagementPolicy
+    @can_reissue_temporary_password = TeacherManagementPolicy.new(
+      current_user,
+      @teacher
+    ).reissue_temporary_password?
     prepare_form
   end
 
@@ -75,6 +79,25 @@ class TeachersController < ApplicationController
   def reactivate
     authorize @teacher, :reactivate_teacher?
     update_status(true)
+  end
+
+  def reissue_temporary_password
+    authorize @teacher, :reissue_temporary_password?, policy_class: TeacherManagementPolicy
+    result = AnnualTeacherUsers::TemporaryCredential.call(
+      teacher: @teacher,
+      actor: current_user,
+      action: :temporary_password_reissued
+    )
+
+    if result.success?
+      @temporary_password = result.temporary_password
+      response.headers['Cache-Control'] = 'no-store'
+      render :temporary_password
+    else
+      redirect_to edit_teacher_path(@teacher),
+                  alert: t('admin.teachers.temporary_password_reissue.failure'),
+                  status: :see_other
+    end
   end
 
   private

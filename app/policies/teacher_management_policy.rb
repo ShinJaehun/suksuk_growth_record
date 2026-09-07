@@ -25,6 +25,16 @@ class TeacherManagementPolicy < ApplicationPolicy
     school_manager? && record.school_year_id == user.school_year_id
   end
 
+  def reissue_temporary_password?
+    return false unless record.teacher?
+    return true if user&.admin?
+
+    school_manager? &&
+      record != user &&
+      record.school_member? &&
+      record.school_year_id == user.school_year_id
+  end
+
   private
 
   def school_manager?

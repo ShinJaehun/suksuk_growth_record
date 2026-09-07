@@ -49,6 +49,49 @@ RSpec.describe UserPasswordAttemptLimiter, type: :service do
     expect(other_school).not_to be_blocked
   end
 
+  it "separates teacher failures by credential generation" do
+    old_generation = described_class.new(
+      school_id: 1,
+      login_id: "teacher1",
+      credential_generation: "old-encrypted-password",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+    5.times { old_generation.record_failure }
+
+    new_generation = described_class.new(
+      school_id: 1,
+      login_id: "teacher1",
+      credential_generation: "new-encrypted-password",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+
+    expect(old_generation).to be_blocked
+    expect(new_generation).not_to be_blocked
+    5.times { new_generation.record_failure }
+    expect(new_generation).to be_blocked
+  end
+
+  it "uses a stable generation for unknown teacher login IDs" do
+    first = described_class.new(
+      school_id: 1,
+      login_id: "missing",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+    5.times { first.record_failure }
+
+    second = described_class.new(
+      school_id: 1,
+      login_id: "missing",
+      remote_ip: remote_ip,
+      cache: cache
+    )
+
+    expect(second).to be_blocked
+  end
+
   it "resets failure and block records" do
     5.times { limiter.record_failure }
 
@@ -76,5 +119,19 @@ RSpec.describe UserPasswordAttemptLimiter, type: :service do
     expect(limiter.block_key).not_to include(email)
     expect(limiter.block_key).not_to include(email.downcase)
     expect(limiter.block_key).not_to include(remote_ip)
+  end
+
+  it "does not include the raw teacher credential generation in cache keys" do
+    generation = "raw-encrypted-password"
+    teacher_limiter = described_class.new(
+      school_id: 1,
+      login_id: "teacher1",
+      credential_generation: generation,
+      remote_ip: remote_ip,
+      cache: cache
+    )
+
+    expect(teacher_limiter.cache_key).not_to include(generation)
+    expect(teacher_limiter.block_key).not_to include(generation)
   end
 end

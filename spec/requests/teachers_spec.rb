@@ -54,8 +54,11 @@ RSpec.describe 'Teacher operations', type: :request do
 
     get classroom_options_teachers_path,
         params: { school_id: other_school.id, membership_grade: 5 }
-    expect(response.body).to include(own_classroom.class_label)
-    expect(response.body).not_to include(other_classroom.class_label)
+    classroom_ids = Nokogiri::HTML.fragment(response.body)
+                                  .css('option')
+                                  .filter_map { |option| option['value'].presence&.to_i }
+    expect(classroom_ids).to include(own_classroom.id)
+    expect(classroom_ids).not_to include(other_classroom.id)
   end
 
   it 'limits admin listing and direct management to active SchoolYear teachers across schools' do
@@ -65,9 +68,9 @@ RSpec.describe 'Teacher operations', type: :request do
     planning_year = create(:school_year, school: school, year: 2027, status: :planning)
     archived_year = create(:school_year, :archived, school: school, year: 2025)
     planning_teacher = create(:user, :teacher, school_year: planning_year,
-                              school_role: 'member', login_id: 'planning-request-teacher')
+                                               school_role: 'member', login_id: 'planning-request-teacher')
     archived_teacher = create(:user, :teacher, school_year: archived_year,
-                              school_role: 'member', login_id: 'archived-request-teacher')
+                                               school_role: 'member', login_id: 'archived-request-teacher')
     sign_in admin
 
     get teachers_path
@@ -85,6 +88,9 @@ RSpec.describe 'Teacher operations', type: :request do
       expect(response).to have_http_status(:not_found)
 
       patch reactivate_teacher_path(teacher)
+      expect(response).to have_http_status(:not_found)
+
+      patch reissue_temporary_password_teacher_path(teacher)
       expect(response).to have_http_status(:not_found)
     end
   end
@@ -332,6 +338,83 @@ RSpec.describe 'Teacher operations', type: :request do
     expect(response).to redirect_to(teachers_path)
     expect(classroom.reload.teacher).to be_nil
     expect(teacher.reload.annual_school).to eq(school)
+  end
+
+  it 'reissues an inactive teacher temporary password once and records the actor and target' do
+    teacher = annual_teacher(school: school)
+    teacher.update!(active: false, password: 'old-password')
+    admin = create(:user, :admin)
+    sign_in admin
+
+    patch reissue_temporary_password_teacher_path(teacher)
+
+    expect(response).to have_http_status(:ok)
+    expect(teacher.reload).to be_inactive
+    expect(teacher).to be_password_change_required
+    expect(teacher.valid_password?('old-password')).to eq(false)
+    event = teacher.teacher_credential_events.temporary_password_reissued.last
+    expect(event).to have_attributes(actor_user: admin, teacher_user: teacher)
+
+    temporary_password = Nokogiri::HTML(response.body).at_css('[data-temporary-password]').text
+    expect(response.body).to include(teacher.name, teacher.login_id, temporary_password)
+    expect(teacher.valid_password?(temporary_password)).to eq(true)
+    expect(response.headers['Cache-Control']).to include('no-store')
+
+    get edit_teacher_path(teacher)
+    expect(response.body).not_to include(temporary_password)
+  end
+
+  it 'does not change credentials or events when a manager reissues own password' do
+    target_manager = manager
+    old_digest = target_manager.encrypted_password
+    sign_in manager
+
+    expect do
+      patch reissue_temporary_password_teacher_path(target_manager)
+    end.not_to change(TeacherCredentialEvent, :count)
+
+    expect(response).to redirect_to(root_path)
+    expect(target_manager.reload.encrypted_password).to eq(old_digest)
+  end
+
+  it 'shows the reissue action only when the policy allows it' do
+    member = annual_teacher(school: school)
+    sign_in manager
+
+    get edit_teacher_path(member)
+    document = Nokogiri::HTML(response.body)
+    reissue_form = document.at_xpath(
+      "//form[@action='#{reissue_temporary_password_teacher_path(member)}']"
+    )
+    expect(reissue_form).to be_present
+    expect(reissue_form['data-turbo']).to eq('false')
+
+    get edit_teacher_path(manager)
+    expect(response.body).not_to include(reissue_temporary_password_teacher_path(manager))
+  end
+
+  it 'removes normal authority from a teacher session after an admin reissue' do
+    teacher = annual_teacher(school: school)
+    teacher.update!(password: 'old-password', password_change_required: false)
+
+    post school_teacher_login_path(school), params: {
+      teacher: { login_id: teacher.login_id, password: 'old-password' }
+    }
+    expect(response).to redirect_to(classrooms_path)
+
+    credential = AnnualTeacherUsers::TemporaryCredential.call(
+      teacher: teacher,
+      actor: create(:user, :admin),
+      action: :temporary_password_reissued
+    )
+    temporary_password = credential.temporary_password
+    get classrooms_path
+    expect(response).to redirect_to(new_user_session_path)
+
+    post school_teacher_login_path(school), params: {
+      teacher: { login_id: teacher.login_id, password: temporary_password }
+    }
+    expect(response).to redirect_to(edit_forced_password_path)
   end
 
   it 'rejects direct assignment of a different-grade or occupied classroom' do

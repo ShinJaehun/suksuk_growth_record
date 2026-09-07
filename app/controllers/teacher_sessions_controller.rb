@@ -11,14 +11,15 @@ class TeacherSessionsController < ApplicationController
   def create
     @school = School.find(params[:school_id])
     login_id = params.dig(:teacher, :login_id).to_s.strip.downcase
+    teacher = active_school_year&.users&.teacher&.find_by(login_id: login_id) if login_id.present?
     limiter = UserPasswordAttemptLimiter.new(
       school_id: @school.id,
       login_id:,
+      credential_generation: teacher&.encrypted_password,
       remote_ip: request.remote_ip
     )
     return render_throttled if limiter.blocked?
 
-    teacher = active_school_year&.users&.teacher&.find_by(login_id: login_id) if login_id.present?
     if teacher&.active? && teacher.valid_password?(params.dig(:teacher, :password).to_s)
       limiter.reset
       sign_in(:user, teacher)

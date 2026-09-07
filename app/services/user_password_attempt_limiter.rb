@@ -5,9 +5,17 @@ class UserPasswordAttemptLimiter
   WINDOW = 10.minutes
   KEY_PREFIX = "user_password_attempts:v1".freeze
 
-  def initialize(email: nil, school_id: nil, login_id: nil, remote_ip:, cache: Rails.cache)
+  UNKNOWN_CREDENTIAL_GENERATION = "unknown".freeze
+
+  def initialize(email: nil, school_id: nil, login_id: nil, credential_generation: nil,
+                 remote_ip:, cache: Rails.cache)
     @identity = if school_id
-                  ["teacher", school_id.to_s, login_id.to_s.strip.downcase]
+                  [
+                    "teacher",
+                    school_id.to_s,
+                    login_id.to_s.strip.downcase,
+                    credential_generation.presence || UNKNOWN_CREDENTIAL_GENERATION
+                  ]
                 else
                   ["admin", email.to_s.strip.downcase]
                 end

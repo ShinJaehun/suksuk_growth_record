@@ -3,6 +3,21 @@
     <h1 class="text-3xl font-extrabold"><%= t("admin.teachers.edit_title") %></h1>
   </header>
   <%= render "form" %>
+  <% if @can_reissue_temporary_password %>
+    <section class="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5">
+      <h2 class="font-bold text-amber-950"><%= t("admin.teachers.temporary_password_reissue.title") %></h2>
+      <p class="text-sm text-amber-900"><%= t("admin.teachers.temporary_password_reissue.description") %></p>
+      <%= button_to t("admin.teachers.temporary_password_reissue.submit"),
+            reissue_temporary_password_teacher_path(@teacher),
+            method: :patch,
+            form: { data: { turbo: false } },
+            data: {
+              turbo_confirm: t("admin.teachers.temporary_password_reissue.confirm"),
+              turbo_submits_with: t("admin.teachers.temporary_password_reissue.submitting")
+            },
+            class: "rounded-lg border border-amber-400 bg-white px-4 py-2 font-semibold text-amber-900 hover:bg-amber-100" %>
+    </section>
+  <% end %>
   <% if @teacher.active? && policy(@teacher).deactivate_teacher? %>
     <%= button_to t("teacher_status.deactivate"), deactivate_teacher_path(@teacher),
           method: :patch,

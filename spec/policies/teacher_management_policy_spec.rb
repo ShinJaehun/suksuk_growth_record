@@ -28,6 +28,23 @@ RSpec.describe TeacherManagementPolicy do
     expect(described_class::Scope.new(manager, User).resolve).to contain_exactly(manager, member)
   end
 
+  it 'authorizes temporary password reissue by role and SchoolYear' do
+    admin = create(:user, :admin)
+    other_manager = create(:user, :teacher, :active_annual_teacher,
+                           annual_school: create(:school), annual_school_role: 'manager')
+    planning_year = create(:school_year, school: school, year: 2027, status: :planning)
+    other_year_member = create(:user, :teacher, school_year: planning_year,
+                                                school_role: 'member', login_id: 'next-year-member')
+
+    expect(described_class.new(admin, member).reissue_temporary_password?).to eq(true)
+    expect(described_class.new(admin, manager).reissue_temporary_password?).to eq(true)
+    expect(described_class.new(manager, member).reissue_temporary_password?).to eq(true)
+    expect(described_class.new(manager, manager).reissue_temporary_password?).to eq(false)
+    expect(described_class.new(manager, other_manager).reissue_temporary_password?).to eq(false)
+    expect(described_class.new(manager, other_year_member).reissue_temporary_password?).to eq(false)
+    expect(described_class.new(manager, outside_teacher).reissue_temporary_password?).to eq(false)
+  end
+
   it "limits the admin scope to teachers in each school's active SchoolYear" do
     admin = create(:user, :admin)
     active_teacher = member

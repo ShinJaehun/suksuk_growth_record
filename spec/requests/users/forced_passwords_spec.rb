@@ -36,6 +36,9 @@ RSpec.describe "Forced teacher password change", type: :request do
     }
 
     expect(response).to redirect_to(classrooms_path)
+    follow_redirect!
+    expect(response).to have_http_status(:ok)
+    expect(controller.current_user).to eq(teacher)
     expect(teacher.reload).not_to be_password_change_required
     expect(teacher.valid_password?("new-password123")).to be(true)
 

@@ -110,6 +110,51 @@ RSpec.describe "Teacher sessions", type: :request do
     expect(controller.current_user).to eq(teacher)
   end
 
+  it "allows a reissued temporary credential to recover from the previous credential block" do
+    school = create(:school)
+    year = create(:school_year, :active, school:)
+    teacher = annual_teacher(school:, school_year: year, password: "old-password")
+
+    5.times { login(school, password: "wrong") }
+    login(school, password: "old-password")
+    expect(response).to have_http_status(:too_many_requests)
+
+    credential = AnnualTeacherUsers::TemporaryCredential.call(
+      teacher:,
+      actor: create(:user, :admin),
+      action: :temporary_password_reissued
+    )
+    login(school, password: credential.temporary_password)
+    expect(response).to redirect_to(edit_forced_password_path)
+
+    delete destroy_user_session_path
+    5.times { login(school, password: "wrong") }
+    login(school, password: credential.temporary_password)
+    expect(response).to have_http_status(:too_many_requests)
+  end
+
+  it "allows a normally changed credential to recover from the previous credential block" do
+    school = create(:school)
+    year = create(:school_year, :active, school:)
+    teacher = annual_teacher(school:, school_year: year, password: "old-password")
+
+    5.times { login(school, password: "wrong") }
+    teacher.update!(password: "new-password")
+    login(school, password: "new-password")
+
+    expect(controller.current_user).to eq(teacher)
+  end
+
+  it "continues to throttle unknown login IDs" do
+    school = create(:school)
+    create(:school_year, :active, school:)
+
+    5.times { login(school, login_id: "missing", password: "wrong") }
+    login(school, login_id: "missing", password: "wrong")
+
+    expect(response).to have_http_status(:too_many_requests)
+  end
+
   it "redirects temporary-password accounts to forced change" do
     school = create(:school)
     year = create(:school_year, :active, school:)

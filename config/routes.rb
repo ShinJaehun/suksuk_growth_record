@@ -33,6 +33,7 @@ Rails.application.routes.draw do
     get :classroom_options, on: :collection
     patch :deactivate, on: :member
     patch :reactivate, on: :member
+    patch :reissue_temporary_password, on: :member
   end
 
   resources :classrooms, except: [:edit, :update] do

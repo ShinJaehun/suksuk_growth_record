@@ -14,7 +14,7 @@ class Users::ForcedPasswordsController < ApplicationController
     if current_user.errors.empty? && current_user.update(attributes.merge(password_change_required: false))
       teacher = current_user
       reset_session
-      sign_in(:user, teacher)
+      sign_in(:user, teacher, force: true)
       redirect_to after_sign_in_path_for(teacher), notice: t("users.forced_passwords.updated")
     else
       render :edit, status: :unprocessable_content

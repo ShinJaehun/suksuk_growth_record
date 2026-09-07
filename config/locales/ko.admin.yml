@@ -95,6 +95,19 @@ ko:
         temporary_password: "임시 비밀번호: %{password}"
       update:
         success: "학교와 담당 학급을 저장했습니다."
+      temporary_password_reissue:
+        title: "임시 비밀번호 재발급"
+        description: "기존 비밀번호는 사용할 수 없게 됩니다. 새 임시 비밀번호는 지금 한 번만 확인할 수 있으며, 선생님은 로그인 후 비밀번호를 변경해야 합니다."
+        submit: "새 임시 비밀번호 발급"
+        confirm: "기존 비밀번호를 사용할 수 없게 하고 새 임시 비밀번호를 발급할까요?"
+        submitting: "발급 중..."
+        failure: "임시 비밀번호를 발급하지 못했습니다."
+        result_title: "새 임시 비밀번호"
+        one_time_notice: "이 화면을 벗어나면 새 임시 비밀번호를 다시 확인할 수 없습니다."
+        teacher_name: "선생님 이름"
+        login_id: "로그인 아이디"
+        temporary_password: "임시 비밀번호"
+        back_to_teacher: "선생님 운영 설정으로 돌아가기"
       account_status:
         title: "계정 상태"
         deactivate: "비활성화"
