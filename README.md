@@ -1,6 +1,10 @@
-# suksuk_school_starter
+# 쑥쑥성장기록장 / Daily Growth Log
 
-학교 기반 Rails 서비스를 시작하기 위한 bootstrap repository입니다. 새 서비스는 이 저장소를 복제한 뒤 공통 학교 운영 기반 위에 service-specific domain을 추가합니다.
+`suksuk_growth_record`는 학생의 일일 자기평가와 성찰을 기록하는 서비스입니다.
+
+이 저장소는 `ShinJaehun/suksuk_school_starter`의
+`starter-current-year-baseline-2026-09` tag, commit `47bed6e`에서 분기했습니다.
+아래 공통 학교 운영 runtime foundation은 그대로 상속합니다.
 
 ## 제공하는 기반
 

@@ -2,25 +2,15 @@
 
 ## 문서 사용 원칙
 
-- 현재 starter의 공통 학교·교실·사용자·학생 운영 범위만 기록한다.
+- 쑥쑥성장기록장 prototype 이후의 active product work만 기록한다.
 - 확정 정책은 canonical spec과 architecture 문서로 이동한다.
-- 제거된 service-specific 도메인은 신규 backlog로 유지하지 않는다.
+- starter에서 상속한 foundation의 향후 roadmap은 성장기록장 우선순위로 간주하지 않는다.
 
 ## P0
 
-### SchoolYear 운영 확장
-
-- planning SchoolYear 준비와 activation 운영 흐름
-- archived SchoolYear read-only 조회 경계
-- 명시적인 rollover와 실패·복구 절차
+- Daily Growth Log MVP는 [`daily_growth_log_mvp.md`](../specs/daily_growth_log_mvp.md)를 따른다.
 
 ## P1
-
-### Future admin bulk management
-
-- `/admin/teachers` planning-year bulk bootstrap
-- `/admin/classrooms` planning-year bulk configuration
-- 현재 canonical credential과 SchoolYear operation 재사용
 
 ### Student 운영 안정성
 
@@ -45,8 +35,16 @@
 
 ## 범위 밖
 
-- 제거된 service-specific domain 재도입
 - Grade model
 - teacher의 복수 classroom 담당
 - classroom의 복수 teacher 담당
 - school별 복수 manager
+
+## Upstream starter future work
+
+아래 항목은 `suksuk_school_starter`의 향후 과제이며 현재 성장기록장 prototype 범위 밖이다.
+
+- planning/archived SchoolYear full operation
+- rollover와 실패·복구 절차
+- `/admin/teachers` planning-year bulk bootstrap
+- `/admin/classrooms` planning-year bulk configuration
