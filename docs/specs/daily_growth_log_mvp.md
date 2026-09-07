@@ -95,16 +95,18 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 
 종합은 source score에서 계산 가능한 derived metric으로 우선 취급하며 total score column 저장을 미리 확정하지 않는다. 덕목 구성이 다른 날짜도 척도는 같지만 측정 구성에는 차이가 있다. prototype에서는 별도 시각적 change marker를 구현하지 않는다.
 
+주간 chart에서 `종합`을 표시할 때만 이 평균을 `종합 평균 / 5 × 100`으로 환산한다. 예를 들어 평균 4.0은 80%다. 이 percentage는 저장 컬럼이 아닌 display-derived metric이며 canonical 종합 성장점수의 1.0~5.0 정의를 변경하지 않는다.
+
 ## 학생 성장 추이
 
-- 학생은 자신의 기록을 line chart로 확인할 수 있다.
-- 첫 prototype은 쑥쑥칭찬통장에서 사용했던 line chart 패턴의 재사용을 우선 고려한다.
-- metric navigation은 `[종합]`과 현재 active 덕목을 기본으로 구성하며, 과거 score가 존재하는 사용 종료 덕목의 추이도 조회할 수 있어야 한다.
-- 구체적인 navigation 표현은 구현 단계에서 정하며 기본 metric은 `종합`이다.
-- 종합과 개별 덕목의 Y축은 모두 1~5다.
-- 덕목 생성 전 날짜나 해당 덕목 score가 없는 날짜는 0점이 아니라 데이터 없음이다.
-- 새 덕목 line은 실제 평가가 시작된 시점부터 나타난다.
-- 최대 5개 덕목과 종합 navigation은 모바일에서 horizontal scroll 가능한 UI를 고려한다. 구체 Tailwind 구현은 이 spec에서 정하지 않는다.
+- 학생용 공통 navigation의 `성장` 항목은 학생 자신의 주간 성장 추이 화면으로 연결한다. `오늘` 입력 화면과 후속 `월간` 화면의 역할은 변경하지 않는다.
+- 한 주는 월요일부터 일요일까지 7일이다. 기본 화면은 application 기준 오늘이 포함된 현재 주이며 이전 주와 다음 주로 이동할 수 있다. 현재 주에서는 미래 주로 이동하는 다음 주 navigation을 제공하지 않거나 비활성화한다.
+- metric navigation은 `[종합] [독서] [봉사] [감사] ...` 형태로 전환하며 기본 metric은 `종합`이다. 현재 active 덕목을 기본으로 노출하고, 사용 종료된 덕목도 조회 주간에 실제 score가 존재하면 조회할 수 있어야 한다. 구체적인 Tailwind 표현은 구현 단계에서 정한다.
+- `종합` chart는 해당 날짜의 canonical 종합 평균을 percentage로 환산하여 표시하고 Y축은 0~100%로 둔다. 의미 있는 tick은 0/20/40/60/80/100%를 기본으로 한다.
+- 개별 덕목 chart의 Y축은 0~5다. 실제 score는 1..5만 존재하며 Y축의 0은 시각적 baseline일 뿐 score 0을 의미하지 않는다.
+- 기록이 없는 날짜와 record는 있지만 선택한 덕목 score가 없는 날짜는 모두 0점이 아닌 데이터 없음으로 취급한다. 새 덕목은 실제 score가 처음 생긴 날짜부터 나타나며, 데이터 없음과 실제 낮은 점수를 시각적으로 혼동시키지 않는다.
+- 첫 prototype은 `suksuk_praise` 학생 주간 dashboard의 SVG line chart 패턴을 재사용한다. 둥근 line/path, point marker, grid, 날짜/요일 배치와 이전/다음 주 navigation 패턴을 우선 재사용하되 praise/coupon 전용 marker나 count 개념은 가져오지 않으며 새 chart library 도입을 요구하지 않는다.
+- 월간 visualization, 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다.
 
 ## Monthly visualization 후속 방향
 
