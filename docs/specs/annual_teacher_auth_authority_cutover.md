@@ -247,10 +247,10 @@ Archived authentication은 explicit School과 SchoolYear context를 가진 별�
 가능하다.
 
 Phase 2C는 active login에서 archived User를 검색/fallback하지 않고 archived account에
-active school-operation mutation을 부여하지 않는 경계를 마련한다. Architecture에 정의된
-credential reissue authorization도 유지한다. Archived authentication에는 향후 explicit
-School과 SchoolYear context가 필요하지만 controller, route와 UI 구현은 다음을 포함해 후속
-historical phase로 남긴다.
+active school-operation mutation을 부여하지 않는 경계를 마련한다. Canonical `/teachers`
+credential reissue에서도 archived User를 제외한다. Archived authentication과 credential
+management에는 향후 explicit School과 SchoolYear context가 필요하지만 controller, route와
+UI 구현은 다음을 포함해 후속 historical phase로 남긴다.
 
 - Historical navigation과 전체 read-only UI
 - HomeroomAssignment를 이용한 ordinary teacher의 당시 classroom scope
@@ -311,17 +311,49 @@ Authorization은 다음과 같다.
 
 ### Global admin
 
-모든 School의 active, planning 및 archived annual teacher User에 발급/재발급할 수 있다.
+Canonical `/teachers` scope에 포함되는 각 School의 active SchoolYear teacher에게 재발급할
+수 있다. Ordinary member뿐 아니라 manager teacher도 대상이 될 수 있다. Planning 또는
+archived SchoolYear teacher는 `/teachers` scope와 직접 요청 모두에서 제외한다.
 
 ### Current active-year manager
 
 자신이 active User이고, active SchoolYear에서 `school_role == "manager"`이며 School이
-active인 경우에만 자기 School의 active, planning 및 archived teacher User credential을
-발급/재발급할 수 있다. 다른 School의 account에는 접근할 수 없다.
+active인 경우에만 자신과 같은 `school_year_id`의 ordinary member teacher credential을
+재발급할 수 있다. 자기 자신, 다른 manager, 다른 School 또는 다른 SchoolYear teacher는
+대상이 될 수 없다.
 
 Manager가 credential을 관리할 수 있다는 사실은 manager role 지정 권한을 주지 않는다.
-Archived credential reissue는 historical data 접근을 다시 가능하게 하는 민감 action이므로
-동일한 own-School scope와 audit를 반드시 적용한다.
+Global admin은 active SchoolYear의 manager teacher도 재발급할 수 있다.
+
+Target `User.active`는 annual SchoolYear management boundary와 별개다. `/teachers` scope에
+포함되는 inactive teacher도 재발급할 수 있지만 재발급은 `User.active`를 변경하지 않는다.
+Inactive teacher는 재활성화되기 전까지 normal teacher login eligibility를 얻지 않는다.
+
+### Canonical UI와 server boundary
+
+개별 재발급 action은 canonical `/teachers/:id/edit`에서 권한이 있는 actor에게만 노출한다.
+별도 admin surface, bulk action 또는 목록 일괄 재발급은 만들지 않는다. 성공 뒤 같은 teacher
+edit 화면 또는 현재 UX와 일관된 화면으로 돌아가며 새 평문 temporary password를 성공 직후
+한 번만 명확히 표시한다. Reload나 이후 조회로 평문을 복원하거나 다시 표시할 수 없다.
+
+UI 노출은 편의 경계일 뿐이다. Server는 `TeacherManagementPolicy::Scope`의 active
+SchoolYear 경계와 action authorization을 모두 적용하며 직접 요청으로 이를 우회할 수 없다.
+정확한 route helper, flash key와 버튼 문구는 implementation detail이다.
+
+### Reissue operation과 실패 원칙
+
+재발급은 기존 `AnnualTeacherUsers::TemporaryCredential`의 random credential generation과
+transaction을 재사용하고 action으로 `temporary_password_reissued`를 기록한다. 새 password
+generator, credential table 또는 service 계층을 추가하지 않는다.
+
+성공하면 기존 password는 즉시 신규 인증에 사용할 수 없고 새 temporary password와
+`password_change_required = true`가 저장된다. 같은 transaction에서
+`TeacherCredentialEvent`에 actor, target과 `temporary_password_reissued` action을 기록한다.
+평문 password는 DB, event 또는 log에 저장하지 않는다.
+
+Authorization 실패는 credential이나 event를 변경하지 않고 평문을 노출하지 않는다.
+Credential 또는 event 저장 실패는 transaction 전체를 rollback하여 기존 password와
+`password_change_required` 상태를 보존하고 event, 성공 메시지와 평문을 남기지 않는다.
 
 ## Credential audit
 
@@ -346,14 +378,40 @@ Credential mutation과 audit insert는 하나의 transaction이어야 한다. Au
 
 ## Credential reissue와 existing session
 
-새 password는 이전 password credential을 즉시 무효화해야 한다. 재발급 전에 존재한
-authenticated/remembered teacher session도 정상 application authority를 계속 유지할 수
-없어야 한다.
+새 password는 이전 password credential을 즉시 무효화하여 이전 credential로 신규 인증할 수
+없어야 한다. 재발급 전에 만들어진 authenticated/remembered teacher session도 정상
+application authority를 계속 유지할 수 없어야 한다. Session을 물리적으로 destroy하는지는
+implementation detail이며, 현재 `password_change_required`와 request-time eligibility 검사가
+이 outcome을 만족한다면 기존 구조를 재사용한다.
 
-이는 결과 invariant이며 특정 schema mechanism을 미리 요구하지 않는다. 구현에서는 먼저
-기존 Devise password/session semantics가 이를 만족하는지 targeted verification한다. 기본
-동작만으로 충족되지 않아 persistent revocation state가 필요하다는 사실이 확인되면 임의로
-새 schema를 추가하지 않고 canonical spec과 human approval로 돌아온다.
+기존 session을 별도로 폐기하기 위한 session version, token blacklist 또는 custom session
+store 같은 새 persistent revocation mechanism을 이번 spec에서 요구하지 않는다. 현재
+인증/session architecture가 위 outcome을 만족하지 못한다고 확인되면 새 mechanism을 임의로
+구현하지 않고 human approval로 돌아간다.
+
+## Current `/teachers` individual reissue acceptance criteria
+
+1. Global admin은 active SchoolYear ordinary member teacher에게 재발급할 수 있다.
+2. Global admin은 active SchoolYear manager teacher에게도 재발급할 수 있다.
+3. Manager는 자신과 같은 SchoolYear의 ordinary member teacher에게 재발급할 수 있다.
+4. Manager는 자기 자신에게 재발급할 수 없다.
+5. Manager는 다른 manager에게 재발급할 수 없다.
+6. Manager는 다른 School 또는 다른 SchoolYear teacher에게 재발급할 수 없다.
+7. Planning과 archived teacher는 `/teachers` 재발급 대상이 아니며 직접 요청도 거부한다.
+8. Inactive teacher도 재발급할 수 있지만 `User.active` 상태는 변경하지 않는다.
+9. 성공하면 이전 password는 신규 인증에 사용할 수 없고 새 temporary password와
+   `password_change_required = true`가 저장되며 기존 authenticated/remembered session은
+   정상 application authority를 계속 유지할 수 없다.
+10. 성공하면 `temporary_password_reissued` event에 actor와 target을 기록한다.
+11. 평문 temporary password는 성공 직후 한 번만 표시하고 저장·복원·재표시하지 않는다.
+12. Authorization 또는 저장 실패 시 password, `password_change_required`와 event에 partial
+    change가 없고 평문이나 성공 메시지를 노출하지 않는다.
+13. UI 미노출과 별개로 direct request를 scope와 server-side authorization으로 차단한다.
+
+이 기능은 bulk reissue, planning/bootstrap 또는 archived UI, rollover, teacher copy·자동
+진급, SMS/email 전송, password history, 별도 credential table, temporary password 만료시간,
+manager 권한 구조 변경, `/admin/teachers` 복원이나 새 session revocation 체계를 포함하지
+않는다.
 
 ## Rate limiting
 
@@ -366,8 +424,20 @@ Active teacher: school_id + normalized login_id + remote_ip
 ```
 
 Teacher limiter는 School-scoped lookup과 같은 normalization을 사용한다. 같은 login ID를
-다른 School에서 사용하는 account의 실패 횟수를 섞지 않는다. Admin limiter는 기존
-email semantics를 유지한다. 성공 시 해당 credential context의 key만 reset한다.
+다른 School에서 사용하는 account의 실패 횟수를 섞지 않는다. 실패와 차단 상태는 이 context뿐
+아니라 현재 credential generation에 귀속된다. Temporary password 재발급 또는 정상 password
+변경으로 credential이 바뀌면 이전 credential의 실패·차단 상태가 새 credential에 영향을 주지
+않아야 하며, 정확한 새 password로 제한 시간 종료나 manual unlock을 기다리지 않고 즉시 로그인할
+수 있어야 한다. 새 credential에서 발생한 실패는 독립적으로 다시 누적되고 기존과 같은 limiter
+정책을 적용한다.
+
+존재하지 않는 login ID도 throttle하여 account enumeration을 방지한다. Plaintext password,
+encrypted password 원문 또는 credential identifier 원문을 cache key, log나 audit에 노출하지
+않는다. Encrypted-password fingerprint나 cache key 형식 같은 구현 수단은 고정하지 않고 관찰
+가능한 credential-generation recovery outcome만 요구한다. Manual unlock UI, CAPTCHA 또는
+persistent account-lock 구조는 추가하지 않는다.
+
+Admin limiter는 기존 email semantics를 유지한다. 성공 시 해당 credential context의 key만 reset한다.
 향후 archived authentication limiter는 explicit SchoolYear context를 포함해야 하지만,
 그 구현은 full archived authentication flow와 함께 후속 phase에서 정한다.
 
@@ -525,12 +595,13 @@ SchoolMembership은 compatibility residue일 뿐 teacher runtime source나 fallb
     `password_change_required = true`와 issuance audit로 생성된다.
 12. Temporary credential 인증 뒤 forced password change와 sign-out 외 일반 access를
     금지하고, 변경 성공 뒤 state를 해제하며 session을 rotate한다.
-13. Reissue 후 이전 password와 기존 authenticated/remembered session은 정상 application
-    authority를 유지하지 못한다.
+13. Reissue 후 이전 password는 신규 인증에 사용할 수 없고 기존 authenticated/remembered
+    session은 정상 application authority를 유지하지 못한다. 이를 위한 물리적 session 종료나
+    새 persistent revocation mechanism은 미리 요구하지 않는다.
 14. Plaintext/digest credential은 DB, audit 또는 application log에 노출되지 않고 credential
     event는 actor, target, action과 timestamp를 남긴다.
-15. Current manager는 own-School current active year의 ordinary member만 생성할 수 있고
-    credential/teacher operation도 own-School로 제한된다.
+15. Current manager는 own-School current active year의 ordinary member만 생성·관리하고,
+    credential 재발급은 같은 SchoolYear ordinary member target으로 제한된다.
 16. Cross-School URL/parameter 조작은 거부되고 manager는 `/admin/*`, manager designation과
     global admin operation에 접근할 수 없다.
 17. Persisted teacher SchoolYear는 일반 runtime operation에서 변경할 수 없다.
@@ -541,6 +612,9 @@ SchoolMembership은 compatibility residue일 뿐 teacher runtime source나 fallb
 20. Admin/student annual field absence와 teacher annual field completeness를 role-dependent
     model/DB invariant가 보호한다.
 21. Rate limiter는 admin email context와 active teacher School/login ID context를 분리한다.
+    Teacher 실패·차단은 credential generation에도 귀속되어 재발급이나 정상 password 변경 뒤
+    새 credential은 이전 제한을 상속하지 않고, 새 실패는 독립적으로 누적된다. Unknown login
+    throttle과 account-enumeration 방지는 유지한다.
 22. Global admin의 신규 운영 School 등록은 명시적으로 제출된 운영 연도로 정확히 하나의
     active SchoolYear를 School과 같은 transaction에서 생성한다.
 23. 운영 연도 form 기본값은 3월부터 12월까지 현재 calendar year, 1월부터 2월까지 직전
@@ -566,7 +640,10 @@ SchoolMembership은 compatibility residue일 뿐 teacher runtime source나 fallb
 - 신규 active teacher temporary issuance와 forced-change 검증
 - Inactive User/SchoolYear/School로 바뀐 existing session의 fail-closed 검증
 - Admin email flow가 teacher email을 lookup하지 않는 검증
-- Reissue 뒤 old credential과 authenticated/remembered session authority 차단 검증
+- Reissue 뒤 old credential 신규 인증 차단과 기존 authenticated/remembered session의 정상
+  application authority 차단 검증
+- 재발급·정상 password 변경 뒤 새 credential의 즉시 로그인, 새 실패의 독립 누적, unknown
+  login throttle과 credential 원문 비노출 검증
 - Policy/navigation/service의 SchoolMembership residue search
 - Full RSpec
 - Browser에서 active login, forced change, admin login과 manager boundary 확인
@@ -598,12 +675,17 @@ SchoolMembership은 compatibility residue일 뿐 teacher runtime source나 fallb
    `password_change_required = false`로 시작한다.
 3. Credential audit은 actor/target/action/created_at의 최소 `TeacherCredentialEvent`로 둔다.
 4. Persisted annual teacher User의 SchoolYear는 일반 operation에서 변경하지 않는다.
-5. Credential reissue 뒤 old credential과 existing session이 정상 authority를 유지하지
-   못하는 것은 outcome invariant다. Persistent revocation schema는 미리 확정하지 않는다.
+5. Credential reissue 뒤 old credential은 신규 인증에 사용할 수 없고 existing session도
+   정상 application authority를 유지하지 못한다. 물리적 session 종료 방식이나 persistent
+   revocation schema는 미리 확정하지 않는다.
+6. Teacher login 실패·차단은 credential generation에 귀속된다. 재발급이나 정상 password
+   변경 뒤 새 credential은 이전 제한을 상속하지 않으며 구체적인 generation 식별 방식은
+   고정하지 않는다.
 
 ## Open Questions
 
 현재 Phase 2C product-policy 수준의 미해결 질문은 없다. Password random format/length,
 limiter 수치와 cache key 이름, 정확한 Rails route helper/controller 이름은 승인된 contract
-안에서 implementation spec이 정할 세부사항이다. Devise 기본 semantics가 session revocation
-outcome을 충족하지 못하면 persistent state 설계 전에 human approval로 돌아온다.
+안에서 implementation spec이 정할 세부사항이다. 현재 session architecture가 승인된 session
+authority 차단 outcome을 충족하지 못하면 별도 revocation mechanism 구현 전에 human
+approval로 돌아온다.
