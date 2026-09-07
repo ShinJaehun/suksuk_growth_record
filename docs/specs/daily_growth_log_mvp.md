@@ -50,7 +50,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 이미 저장된 학생의 일일 기록은 이후 Classroom의 active 덕목 변경 때문에 자동으로 추가·삭제되지 않는다.
 - 아직 기록하지 않은 학생은 기록을 처음 저장할 때의 active 덕목을 기준으로 자기평가한다.
 - 같은 날짜라도 덕목 변경 전후에 저장한 학생의 평가 항목 수가 다를 수 있으며, 이를 이유로 기존 제출을 무효화하거나 미제출 학생의 기록을 강제 생성하지 않는다.
- 
+
 ## 학생 일일 기록
 
 - 학생은 starter의 Classroom token/QR, 학생 선택, PIN 인증 흐름을 재사용한다.
@@ -165,7 +165,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - school manager 또는 global admin이라는 운영 역할만으로 학생의 성장 점수와 성찰 기록 조회 권한을 자동으로 부여하지 않는다.
 - 성장기록 domain의 교사 권한은 current HomeroomAssignment를 기준으로 한다.
 - 관리자용 성장기록 조회나 지원 기능은 필요할 경우 별도 spec에서 결정한다.
- 
+
 ## 데이터와 history invariants
 
 - `student + recorded_on`당 daily record는 최대 하나다.
@@ -206,7 +206,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 현재 prototype 구현을 막는 미결 정책은 없다.
 
 구현 과정에서 이 spec과 충돌하거나 새로운 제품 정책 결정이 필요하면 임의로 우회 구현하지 않고 spec을 먼저 다시 검토한다.
- 
+
 ## Prototype acceptance criteria
 
 1. 기존 current Classroom과 새 Classroom에 기본 덕목 `독서`, `봉사`, `감사`가 중복 없이 제공된다.
