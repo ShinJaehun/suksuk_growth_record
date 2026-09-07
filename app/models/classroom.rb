@@ -8,6 +8,10 @@ class Classroom < ApplicationRecord
   has_one :teacher, through: :current_homeroom_assignment
 
   has_many :students, dependent: :restrict_with_error
+  has_many :virtues, -> { order(:position, :id) }, dependent: :destroy
+  has_many :daily_growth_records, dependent: :restrict_with_error
+
+  after_create :bootstrap_default_virtues
 
   before_destroy :prevent_destroy_with_students, prepend: true
   before_destroy :prevent_destroy_with_homeroom_history, prepend: true
@@ -68,6 +72,10 @@ class Classroom < ApplicationRecord
 
     errors.add(:base, :homeroom_history_present)
     throw :abort
+  end
+
+  def bootstrap_default_virtues
+    Virtues::BootstrapDefaults.call(classroom: self)
   end
 
 end

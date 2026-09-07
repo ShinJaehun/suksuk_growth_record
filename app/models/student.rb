@@ -9,6 +9,7 @@ class Student < ApplicationRecord
   AVATAR_KEYS = (BOY_AVATAR_KEYS + GIRL_AVATAR_KEYS).freeze
 
   belongs_to :classroom
+  has_many :daily_growth_records, dependent: :restrict_with_error
 
   has_secure_password :student_pin, validations: false
 

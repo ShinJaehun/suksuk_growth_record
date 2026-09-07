@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_003000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_10_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -54,6 +54,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_003000) do
     t.index ["school_year_id"], name: "index_classrooms_on_school_year_id"
     t.index ["student_login_token"], name: "index_classrooms_on_student_login_token", unique: true
     t.check_constraint "class_label::text <> ''::text AND length(class_label::text) <= 50 AND class_label::text = btrim(class_label::text) AND \"right\"(class_label::text, 1) <> '반'::text", name: "chk_classrooms_class_label_canonical"
+  end
+
+  create_table "daily_growth_records", force: :cascade do |t|
+    t.bigint "classroom_id", null: false
+    t.datetime "created_at", null: false
+    t.date "recorded_on", null: false
+    t.text "reflection"
+    t.bigint "student_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["classroom_id"], name: "index_daily_growth_records_on_classroom_id"
+    t.index ["student_id", "recorded_on"], name: "index_daily_growth_records_on_student_and_date", unique: true
+    t.index ["student_id"], name: "index_daily_growth_records_on_student_id"
+  end
+
+  create_table "daily_growth_scores", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "daily_growth_record_id", null: false
+    t.integer "score", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "virtue_id", null: false
+    t.index ["daily_growth_record_id", "virtue_id"], name: "index_daily_growth_scores_on_record_and_virtue", unique: true
+    t.index ["daily_growth_record_id"], name: "index_daily_growth_scores_on_daily_growth_record_id"
+    t.index ["virtue_id"], name: "index_daily_growth_scores_on_virtue_id"
+    t.check_constraint "score >= 1 AND score <= 5", name: "chk_daily_growth_scores_range"
   end
 
   create_table "homeroom_assignments", force: :cascade do |t|
@@ -151,9 +175,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_003000) do
     t.check_constraint "school_role IS NULL OR (school_role::text = ANY (ARRAY['member'::character varying::text, 'manager'::character varying::text]))", name: "chk_users_school_role"
   end
 
+  create_table "virtues", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.bigint "classroom_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["classroom_id"], name: "index_virtues_on_classroom_id"
+    t.check_constraint "\"position\" > 0", name: "chk_virtues_position_positive"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "classrooms", "school_years"
+  add_foreign_key "daily_growth_records", "classrooms"
+  add_foreign_key "daily_growth_records", "students"
+  add_foreign_key "daily_growth_scores", "daily_growth_records"
+  add_foreign_key "daily_growth_scores", "virtues"
   add_foreign_key "homeroom_assignments", "classrooms"
   add_foreign_key "homeroom_assignments", "users", column: "teacher_id"
   add_foreign_key "school_years", "schools"
@@ -161,4 +200,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_003000) do
   add_foreign_key "teacher_credential_events", "users", column: "actor_user_id"
   add_foreign_key "teacher_credential_events", "users", column: "teacher_user_id"
   add_foreign_key "users", "school_years"
+  add_foreign_key "virtues", "classrooms"
 end
