@@ -25,8 +25,9 @@ class TeachersController < ApplicationController
     end
 
     if result&.success?
-      expose_temporary_password(result)
-      redirect_to teachers_path, notice: t('admin.teachers.create.success'), status: :see_other
+      @temporary_password = result.temporary_password
+      response.headers['Cache-Control'] = 'no-store'
+      render :temporary_password
     else
       prepare_form
       flash.now[:alert] = t('admin.teachers.create.failure')
@@ -315,14 +316,5 @@ class TeachersController < ApplicationController
       role: teacher.school_role,
       classroom: teacher.assigned_classroom
     }
-  end
-
-  def expose_temporary_password(result)
-    return if result.temporary_password.blank?
-
-    flash[:temporary_password] = t(
-      "admin.teachers.create.temporary_password",
-      password: result.temporary_password
-    )
   end
 end

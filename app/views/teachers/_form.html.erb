@@ -5,6 +5,7 @@
       url: @teacher.persisted? ? teacher_path(@teacher) : teachers_path,
       class: "space-y-6",
       data: {
+        turbo: (@teacher.persisted? ? nil : false),
         controller: "teacher-avatar-preview teacher-classroom-picker",
         teacher_classroom_picker_url_value: classroom_options_teachers_path,
         teacher_classroom_picker_selected_id_value: @selected_classroom_id,

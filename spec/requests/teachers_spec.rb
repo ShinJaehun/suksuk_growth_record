@@ -132,6 +132,9 @@ RSpec.describe 'Teacher operations', type: :request do
     get new_teacher_path, params: { membership_grade: 5 }
 
     document = Nokogiri::HTML(response.body)
+    teacher_form = document.at_css("form[action='#{teachers_path}']")
+    expect(teacher_form).to be_present
+    expect(teacher_form['data-turbo']).to eq('false')
     expect(document.css('select[name="membership_grade"]').size).to eq(1)
     expect(document.css('select[name="classroom_id"]').size).to eq(1)
     expect(document.css('input[type="checkbox"]')).to be_empty
@@ -186,6 +189,15 @@ RSpec.describe 'Teacher operations', type: :request do
     expect(teacher.annual_school).to eq(school)
     expect(teacher.teacher_credential_events.where(action: 'temporary_password_issued')).to exist
     expect(teacher.assigned_classroom).to be_nil
+
+    expect(response).to have_http_status(:ok)
+    temporary_password = Nokogiri::HTML(response.body).at_css('[data-temporary-password]').text
+    expect(response.body).to include(teacher.name, teacher.login_id, temporary_password)
+    expect(teacher.valid_password?(temporary_password)).to eq(true)
+    expect(response.headers['Cache-Control']).to include('no-store')
+
+    get teachers_path
+    expect(response.body).not_to include(temporary_password)
   end
 
   it "creates an admin-selected school's teacher in its active SchoolYear" do
@@ -240,6 +252,9 @@ RSpec.describe 'Teacher operations', type: :request do
     expect(classroom.reload.teacher).to eq(teacher)
     get edit_teacher_path(teacher)
     document = Nokogiri::HTML(response.body)
+    teacher_form = document.at_css("form[action='#{teacher_path(teacher)}']")
+    expect(teacher_form).to be_present
+    expect(teacher_form['data-turbo']).to be_nil
     expect(document.at_css('select[name="membership_grade"] option[value="5"][selected]')).to be_present
     expect(document.at_css(%(select[name="classroom_id"] option[value="#{classroom.id}"][selected]))).to be_present
   end
