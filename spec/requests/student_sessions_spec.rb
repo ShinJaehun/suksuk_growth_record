@@ -171,7 +171,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
       }
     end
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
     expect(logs).to include('/c/[FILTERED]/login')
     expect(logs).not_to include(token)
     expect(logs).not_to include('1234')
@@ -234,7 +234,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
     expect(session[:student_id]).to eq(student.id)
   end
 
@@ -244,7 +244,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
     expect(session[:student_id]).to eq(student.id)
     expect(session[:student_login_classroom_id]).to eq(classroom.id)
   end
@@ -433,7 +433,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
       post_student_pin(pin: '1234')
     end
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
   end
 
   it 'resets failed attempts after a successful PIN login before throttling' do
@@ -454,7 +454,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     post_student_pin(pin: '5678', target_student: other_student)
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
   end
 
   it 'does not throttle a different classroom on the same IP' do
@@ -464,7 +464,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     post_student_pin(pin: '5678', target_student: other_student, target_classroom: other_classroom)
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
   end
 
   it 'does not throttle the same student from a different IP' do
@@ -472,7 +472,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     post_student_pin(pin: '1234', ip: '203.0.113.11')
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
   end
 
   it 'keeps invalid token handling outside PIN throttling' do
@@ -555,6 +555,6 @@ RSpec.describe 'Student PIN sessions', type: :request do
     post_student_pin(pin: '1234')
     expect(response).to have_http_status(:unprocessable_content)
     post_student_pin(pin: '4321')
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
   end
 end

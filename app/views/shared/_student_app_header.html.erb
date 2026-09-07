@@ -1,0 +1,56 @@
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="flex items-center gap-4 px-4 py-4 sm:px-5">
+    <%= student_avatar_image(
+          current_student,
+          class: "h-24 w-24 shrink-0 rounded-2xl border border-slate-200 bg-slate-100 object-contain",
+          alt: "#{current_student.name} avatar"
+        ) %>
+
+    <div class="min-w-0">
+      <p class="truncate text-lg font-extrabold tracking-tight text-slate-900">
+        <%= current_student.name %>
+      </p>
+      <p class="mt-0.5 truncate text-sm font-medium text-slate-600">
+        <%= current_student.classroom.school_year.school.name %>
+      </p>
+      <p class="mt-0.5 truncate text-sm text-slate-500">
+        <%= classroom_display_name(current_student.classroom) %>
+        <span class="mx-1 text-slate-300">·</span>
+        <%= if current_student.student_number.present?
+              t("students.edit.self_pin.student_number_value", number: current_student.student_number)
+            else
+              t("students.edit.self_pin.unassigned_student_number")
+            end %>
+      </p>
+    </div>
+  </div>
+
+  <nav class="grid grid-cols-3 border-t border-slate-200"
+       aria-label="<%= t("student_app.navigation.label") %>"
+       data-student-app-nav>
+    <%= link_to student_growth_record_path,
+          class: class_names(
+            "flex min-h-16 flex-col items-center justify-center gap-1 px-2 py-2 text-center transition",
+            "bg-blue-50 text-blue-700" => active == :today,
+            "text-slate-600 hover:bg-slate-50" => active != :today
+          ),
+          aria: { current: active == :today ? "page" : nil } do %>
+      <span class="text-lg" aria-hidden="true">📝</span>
+      <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.today") %></span>
+    <% end %>
+
+    <span class="flex min-h-16 cursor-default flex-col items-center justify-center gap-1 bg-slate-50/50 px-2 py-2 text-center text-slate-400"
+          aria-disabled="true"
+          title="<%= t("student_app.navigation.coming_soon") %>">
+      <span class="text-lg" aria-hidden="true">📈</span>
+      <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.growth") %></span>
+    </span>
+
+    <span class="flex min-h-16 cursor-default flex-col items-center justify-center gap-1 bg-slate-50/50 px-2 py-2 text-center text-slate-400"
+          aria-disabled="true"
+          title="<%= t("student_app.navigation.coming_soon") %>">
+      <span class="text-lg" aria-hidden="true">📅</span>
+      <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.monthly") %></span>
+    </span>
+  </nav>
+</section>

@@ -32,7 +32,7 @@ class StudentSessionsController < ApplicationController
       session[:student_id] = student.id
       session[:student_login_classroom_id] = classroom_id
       session[:student_last_seen_at] = Time.current.to_i
-      redirect_to student_profile_path, notice: t('student_sessions.signed_in')
+      redirect_to student_growth_record_path, notice: t('student_sessions.signed_in')
     else
       throttled = attempt_limiter&.record_failure
       flash.now[:alert] = throttled ? t('student_sessions.throttled') : t('student_sessions.invalid')

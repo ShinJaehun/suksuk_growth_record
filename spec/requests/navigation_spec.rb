@@ -34,7 +34,7 @@ RSpec.describe 'Navigation', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
 
     get student_profile_path
 

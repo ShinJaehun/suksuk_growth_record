@@ -28,6 +28,14 @@ RSpec.describe "Student self service", type: :request do
     expect(response.body).not_to include(other_student.name)
   end
 
+  it "links to today's growth record" do
+    sign_in_student
+
+    get student_profile_path
+
+    expect(response.body).to include(student_growth_record_path, "오늘")
+  end
+
   it "shows self-service PIN fields without teacher management fields" do
     sign_in_student
 

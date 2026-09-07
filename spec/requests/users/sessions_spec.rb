@@ -190,7 +190,7 @@ RSpec.describe 'Users::Sessions', type: :request do
       student_pin: '1234'
     }
 
-    expect(response).to redirect_to(student_profile_path)
+    expect(response).to redirect_to(student_growth_record_path)
     expect(session[:student_id]).to eq(student.id)
     expect(session[:student_login_classroom_id]).to eq(classroom.id)
     expect(controller.current_user).to be_nil

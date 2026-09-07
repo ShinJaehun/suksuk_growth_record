@@ -1,0 +1,32 @@
+ko:
+  student_app:
+    navigation:
+      label: "학생 메뉴"
+      today: "오늘"
+      growth: "성장"
+      monthly: "월간"
+      profile: "나"
+      coming_soon: "준비 중"
+    profile:
+      title: "내 정보"
+
+  daily_growth_records:
+    title: "오늘의 성장 기록"
+    actions:
+      create: "오늘 기록 저장"
+      update: "오늘 기록 수정"
+    reflection:
+      label: "오늘의 생각"
+      optional: "(선택)"
+      placeholder: "오늘 실천하며 느낀 점을 적어 보세요."
+    score_labels:
+      "1": "거의 실천하지 못했어요"
+      "2": "조금 실천했어요"
+      "3": "보통이에요"
+      "4": "잘 실천했어요"
+      "5": "아주 잘 실천했어요"
+    notices:
+      created: "오늘의 성장 기록을 저장했습니다."
+      updated: "오늘의 성장 기록을 수정했습니다."
+    errors:
+      invalid: "모든 덕목의 점수를 확인해 주세요."
