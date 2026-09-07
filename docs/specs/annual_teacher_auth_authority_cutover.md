@@ -287,7 +287,8 @@ Cutover 뒤 active-year 개별 teacher 생성은 email과 operator가 고른 ini
 - Target active SchoolYear와 canonical login ID를 명시한다.
 - System이 충분히 random한 temporary password를 생성한다.
 - `password_change_required = true`로 저장한다.
-- 평문 temporary password는 성공 시 한 번만 표시한다.
+- 평문 temporary password는 생성 request의 request-local 값으로만 전달하고 성공 직후
+  one-time 결과 본문에서 한 번만 표시한다. DB, session 또는 flash에는 저장하지 않는다.
 - Initial issuance도 `TeacherCredentialEvent` 감사 대상이다.
 - Email은 optional contact/profile field다.
 
@@ -296,13 +297,27 @@ teacher만 생성할 수 있으며 manager role을 지정할 수 없다. Manager
 admin만 수행한다. 이를 위한 기존 individual teacher form/auth field 변경은 2C의 필수 auth
 migration이지만 planning bulk bootstrap과 unrelated UI redesign은 후속 범위다.
 
+생성 성공 결과 본문은 teacher name, `login_id`, temporary password, 화면을 벗어나면 다시
+확인할 수 없다는 안내와 적절한 `/teachers` 복귀 동선을 표시한다. HTTP/browser cache와 Turbo
+snapshot cache가 이 결과를 저장하거나 복원하지 못하게 한다. Modal은 사용하지 않는다.
+
+Initial issuance와 individual reissue는 모두
+`AnnualTeacherUsers::TemporaryCredential`을 canonical credential operation으로 공유하며
+credential mutation과 audit event를 함께 처리한다. 향후 `/admin/teachers` bulk bootstrap도
+별도 generator를 만들지 않고 이를 재사용한다. Bulk UI, CSV와 password 복사 방식은 이번
+범위에서 설계하거나 구현하지 않으며 planning/archived teacher bootstrap, rollover와
+`/admin/teachers` 구현도 계속 보류한다.
+
 ## Temporary password 발급과 재발급
 
 - 평문 temporary password를 DB나 audit record에 저장하지 않는다.
+- 평문 temporary password를 session이나 flash에 저장하지 않는다.
 - 기존/current password나 digest를 조회·표시하지 않는다.
 - 충분히 예측하기 어려운 random password를 생성한다.
-- 생성된 평문은 성공 응답에서 한 번만 표시하고 이후 다시 볼 수 없다.
+- 생성된 평문은 성공 request의 request-local 값으로만 전달하고 one-time 결과 본문에서 한 번만
+  표시하며 이후 다시 볼 수 없다.
 - 새 credential 저장이 성공한 뒤에만 평문을 표시한다.
+- HTTP/browser cache와 Turbo snapshot cache로 결과 본문을 복원할 수 없게 한다.
 - 재발급 즉시 이전 password credential을 무효화한다.
 - 발급/재발급 뒤 `password_change_required = true`다.
 - 실패한 transaction은 새 평문을 성공 결과처럼 노출하지 않는다.
@@ -338,7 +353,21 @@ edit 화면 또는 현재 UX와 일관된 화면으로 돌아가며 새 평문 t
 
 UI 노출은 편의 경계일 뿐이다. Server는 `TeacherManagementPolicy::Scope`의 active
 SchoolYear 경계와 action authorization을 모두 적용하며 직접 요청으로 이를 우회할 수 없다.
-정확한 route helper, flash key와 버튼 문구는 implementation detail이다.
+정확한 route helper와 버튼 문구는 implementation detail이다.
+
+## Current `/teachers` initial issuance acceptance criteria
+
+1. 신규 teacher 생성은 `AnnualTeacherUsers::TemporaryCredential`로 credential과
+   `temporary_password_issued` audit event를 생성한다.
+2. 성공한 생성 request는 평문 temporary password를 request-local 값으로만 결과 본문에
+   전달하며 DB, session 또는 flash에 저장하지 않는다.
+3. 결과 본문은 teacher name, `login_id`, temporary password, one-time 안내와 적절한
+   `/teachers` 복귀 동선을 표시한다.
+4. 결과 본문은 HTTP/browser cache와 Turbo snapshot cache에서 복원되지 않는다.
+5. 결과 화면에 modal을 도입하지 않는다.
+6. Individual reissue와 같은 canonical credential operation을 공유한다.
+7. Bulk UI, CSV, 복사 방식, planning/archived bootstrap, rollover와 `/admin/teachers` 구현은
+   이 범위에 포함하지 않는다.
 
 ### Reissue operation과 실패 원칙
 
@@ -403,7 +432,8 @@ store 같은 새 persistent revocation mechanism을 이번 spec에서 요구하�
    `password_change_required = true`가 저장되며 기존 authenticated/remembered session은
    정상 application authority를 계속 유지할 수 없다.
 10. 성공하면 `temporary_password_reissued` event에 actor와 target을 기록한다.
-11. 평문 temporary password는 성공 직후 한 번만 표시하고 저장·복원·재표시하지 않는다.
+11. 평문 temporary password는 성공 request의 request-local 값으로만 결과 본문에 한 번
+    표시하고 DB, session, flash 또는 cache에서 저장·복원·재표시하지 않는다.
 12. Authorization 또는 저장 실패 시 password, `password_change_required`와 event에 partial
     change가 없고 평문이나 성공 메시지를 노출하지 않는다.
 13. UI 미노출과 별개로 direct request를 scope와 server-side authorization으로 차단한다.
