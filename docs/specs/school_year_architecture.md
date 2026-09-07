@@ -2,7 +2,7 @@
 
 ## 목적
 
-이 문서는 학교 기반 서비스를 여러 학년도에 걸쳐 운영하고 과거 자료를 보존하기 위한 장기 canonical architecture를 정의한다. 특정 서비스 도메인은 포함하지 않으며, 현재 starter의 `School`, `User`, `SchoolMembership`, `Classroom`, `ClassroomMembership`을 안전하게 발전시키는 기준으로 사용한다.
+이 문서는 학교 기반 서비스를 여러 학년도에 걸쳐 운영하고 과거 자료를 보존하기 위한 장기 canonical architecture를 정의한다. 특정 서비스 도메인은 포함하지 않으며, migration 시작 당시 starter 구조에서 장기 target으로 안전하게 발전시키는 기준으로 사용한다. 현재 runtime은 [`current_system.md`](../architecture/current_system.md)와 [`roles_and_permissions.md`](../architecture/roles_and_permissions.md)를 따른다.
 
 이 문서는 목표 구조를 정의한다. migration, route, controller, view와 데이터 이전 절차는 각 구현 단계의 별도 승인 대상이다.
 
@@ -19,9 +19,9 @@
 - 현재 학년도 화면에는 학년도를 반복 표시하지 않고 context가 바뀌거나 여러 연도를 구별할 때만 표시한다.
 - 다음 학년도 구성은 planning 단계에서 명시적으로 준비하며 자동 복사·진급하지 않는다.
 
-## 현재 구조와 전환 방향
+## Historical pre-cutover baseline과 전환 방향
 
-현재 구조는 다음과 같다.
+Migration 시작 당시의 legacy 구조는 다음과 같다.
 
 ```text
 School
@@ -31,7 +31,7 @@ School
     └── ClassroomMembership ── student User
 ```
 
-현재 제약은 teacher당 `SchoolMembership` 하나, `Classroom.teacher_id` 기반 현재 담임 1:1, student User당 active `ClassroomMembership` 하나다. 이는 단일 현재 학년도 운영에는 맞지만 연도별 이력과 학년도 중 담임 교체를 충분히 표현하지 못한다.
+당시 제약은 teacher당 `SchoolMembership` 하나, `Classroom.teacher_id` 기반 현재 담임 1:1, student User당 active `ClassroomMembership` 하나였다. 이는 단일 현재 학년도 운영에는 맞지만 연도별 이력과 학년도 중 담임 교체를 충분히 표현하지 못했다.
 
 목표 구조는 다음과 같다.
 
@@ -48,7 +48,7 @@ School
         └── Student
 ```
 
-현재 student `ClassroomMembership`은 전환 기간의 source이며 장기 canonical은 아니다. 이전 뒤 학생 소속과 lifecycle 책임은 Classroom에 직접 속한 Student가 가진다.
+Student `ClassroomMembership`은 전환 기간의 historical source였으며 현재 runtime source가 아니다. 현재 학생 소속과 lifecycle 책임은 Classroom에 직접 속한 Student가 가진다.
 
 ## SchoolYear lifecycle
 
@@ -126,7 +126,7 @@ active: boolean
 
 ## Teacher User와 인증 context
 
-현재 구현은 teacher와 global admin을 하나의 Devise `User`에서 email/password로 인증한다. 이는 현행 상태이며 장기 target은 다음 세 인증 경계를 분리한다.
+Migration 시작 당시 구현은 teacher와 global admin을 하나의 Devise `User`에서 email/password로 인증했다. 장기 target은 다음 세 인증 경계를 분리하며, 현재까지 구현된 인증 경계는 current runtime 문서를 따른다.
 
 ```text
 Global admin User → SchoolYear 비종속 시스템 계정
@@ -165,7 +165,7 @@ UNIQUE (school_year_id, login_id)
 
 같은 사람이 다음 학년도에도 근무하면 다음 학년도용 teacher User를 새로 발급한다. 이름, `login_id`, avatar나 profile 일치로 연도간 동일인을 자동 추론하거나 연결하지 않는다. 영구 Teacher identity와 annual account의 2계층은 starter target에 두지 않으며, 장기 동일인 연결은 이를 필요로 하는 downstream 서비스의 별도 확장이다.
 
-현재 `SchoolMembership`의 school, role과 grade 책임은 migration 기간에 compatibility structure로 남을 수 있지만 장기 target에서는 annual teacher User와 SchoolYear relation으로 흡수한다. Teacher User와 사실상 1:1인 annual membership model을 중복 유지하지 않는다.
+Pre-cutover `SchoolMembership`의 school, role과 grade 책임은 migration 기간에 compatibility structure로 남을 수 있었지만 장기 target에서는 annual teacher User와 SchoolYear relation으로 흡수한다. Teacher User와 사실상 1:1인 annual membership model을 중복 유지하지 않는다.
 
 따라서 authentication code가 `find_by(login_id: "tara0411")`처럼 SchoolYear context 없는 global lookup을 해서는 안 된다. Teacher login entry point가 School context를 식별하고, active login에서는 그 School의 active SchoolYear를 자동으로 resolve한다.
 

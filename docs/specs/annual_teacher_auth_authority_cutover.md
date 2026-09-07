@@ -1,5 +1,12 @@
 # Annual Teacher Authentication and Authority Cutover
 
+**Status: completed**
+
+이 문서는 완료된 Phase 2C cutover의 canonical historical record다. 아래 `BEFORE`,
+pre-cutover 및 전환 당시의 `현재` 설명은 historical baseline이며 현재 runtime source는
+[`current_system.md`](../architecture/current_system.md)와
+[`roles_and_permissions.md`](../architecture/roles_and_permissions.md)를 따른다.
+
 ## 목적
 
 이 문서는 [Annual Teacher User Migration](annual_teacher_user_migration.md)의 Phase 2C

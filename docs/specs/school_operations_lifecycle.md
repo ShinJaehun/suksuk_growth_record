@@ -4,7 +4,7 @@
 
 학교 공통 starter에서 teacher와 classroom의 운영 lifecycle, 역할별 접근·관리 권한, 일반 운영 영역과 향후 global admin bulk management 영역의 경계를 정의한다. teacher와 classroom의 단일 담당 관계를 명확히 하고 활성 상태를 일상적인 운영 lifecycle로 사용한다.
 
-이 문서의 teacher/School/Classroom 정책은 현재 runtime을 설명한다. 문서 안의 student `ClassroomMembership` 설명은 Student cutover 이전 baseline이며, 현재 학생 runtime authority는 Classroom 직속 `Student`다. 학생 관련 현재 정책은 [`student_model_migration.md`](student_model_migration.md), [`student_membership_lifecycle.md`](student_membership_lifecycle.md), [`student_roster.md`](student_roster.md)가 우선한다.
+이 문서의 teacher/School/Classroom 정책은 현재 runtime을 설명한다. Student cutover는 완료됐으며, 문서 안의 student User, `ClassroomMembership.status`와 student membership 설명 전체는 historical pre-cutover baseline이지 현재 runtime source가 아니다. 현재 학생 lifecycle과 소속은 `Student.active`와 `Student.classroom_id`가 canonical source다. 현재 runtime은 [`current_system.md`](../architecture/current_system.md), [`roles_and_permissions.md`](../architecture/roles_and_permissions.md)와 학생 관련 [`student_model_migration.md`](student_model_migration.md), [`student_membership_lifecycle.md`](student_membership_lifecycle.md), [`student_roster.md`](student_roster.md)가 우선한다.
 
 ## 용어와 현재 구조
 
@@ -127,6 +127,10 @@ Teacher lifecycle은 기존 `User.active`를 사용한다.
 학교 대표 선생님은 자기 학교의 member teacher만 비활성화·재활성화할 수 있다. manager 계정 lifecycle과 manager role 변경은 global admin만 수행한다.
 
 ## Student lifecycle
+
+이 절의 `ClassroomMembership`과 student User 설명은 Student cutover 이전 historical
+baseline이다. 현재 동작으로 해석하지 않으며 현재 학생 동작은 위에 지정한 current/student
+문서의 `Student.active`와 `Student.classroom_id` 계약을 따른다.
 
 학교 운영의 세 lifecycle source는 서로 구분한다.
 
@@ -341,7 +345,9 @@ valid school과 학년이 선택되면 해당 school, 해당 grade와 active 상
 - 일반 teacher의 담당 active classroom 진입과 manager/admin lifecycle 관리 UI가 역할별 policy를 따른다.
 - Classroom delete protection은 student membership과 서비스 기록을 보존한다.
 
-### Teacher/Student lifecycle 구현 감사 (2026-09-05)
+### Pre-Student-cutover Teacher/Student lifecycle 구현 감사 (2026-09-05)
+
+이 감사의 student 항목은 당시 구현 기록이며 현재 Student runtime 설명이 아니다.
 
 #### A. Already consistent
 
