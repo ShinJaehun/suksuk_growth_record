@@ -43,13 +43,22 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - Classroom은 성장 기록을 위해 최소 1개의 active 덕목을 유지해야 하며 마지막 active 덕목은 사용 종료할 수 없다.
 - 5개 제한은 active 덕목 수에 대한 domain/application invariant이며 DB를 5개 점수 column으로 고정하지 않는다.
 - 과거 기록이 있는 덕목은 hard delete하지 않는다. 사용 종료 후에도 과거 기록에서 의미를 보존한다.
-- 단순 오타나 표현 수정은 rename할 수 있으며 과거 기록에도 현재 이름을 표시하는 방향을 기본으로 한다.
+- rename은 단순 오타나 표현 수정 용도이며 이미 존재하는 DailyGrowthScore의 이름 snapshot은 변경하지 않는다.
 - 의미가 다른 덕목으로 교체할 때는 rename보다 기존 덕목 사용 종료 후 신규 덕목 추가를 기본 원칙으로 한다.
-- 덕목과 일일 점수는 별도 row 관계를 가져 입력 당시 덕목 구성을 보존할 수 있어야 한다. 구체 model과 schema 이름은 구현 단계에서 정한다.
+- DailyGrowthRecord는 최초 저장 시점의 active Virtue 구성을 score 구성으로 확정한다. 각 DailyGrowthScore는 Virtue reference를 유지하며 score가 처음 생성될 당시의 Virtue 표시 이름을 snapshot으로 보존한다. 정확한 저장 column 이름은 구현 단계에서 정한다.
 - 담임은 당일에도 active 덕목을 추가하거나 사용 종료할 수 있다.
-- 이미 저장된 학생의 일일 기록은 이후 Classroom의 active 덕목 변경 때문에 자동으로 추가·삭제되지 않는다. 덕목 관리는 기존 DailyGrowthRecord 구성을 bulk rewrite하거나 score row를 자동 생성·삭제하지 않는다.
-- 아직 기록하지 않은 학생은 기록을 처음 저장할 때의 active 덕목을 기준으로 자기평가한다.
-- 같은 날짜라도 덕목 변경 전후에 저장한 학생의 평가 항목 수가 다를 수 있으며, 이를 이유로 기존 제출을 무효화하거나 미제출 학생의 기록을 강제 생성하지 않는다.
+- 이미 저장된 학생의 일일 기록은 이후 덕목 추가·사용 종료·rename의 영향을 받지 않는다. 구체적인 보존 범위는 아래 데이터와 history invariants를 따른다.
+- 아직 해당 날짜의 record가 없는 학생만 최초 저장 시점의 active Virtue 구성과 각 Virtue의 현재 이름을 사용한다.
+- 같은 날짜라도 학생별 최초 저장 시점에 따라 평가 항목 수와 이름 snapshot이 다를 수 있으며, 이를 이유로 기존 제출을 무효화하거나 미제출 학생의 기록을 강제 생성하지 않는다.
+
+예: 9/8 09:00에 `배려`를 추가하고 `독서`를 `책 읽기`로 rename한 경우:
+
+| record 최초 저장 시점 | 덕목 구성과 이름 snapshot |
+|---|---|
+| 9/7 | 기존 구성과 `독서` 유지 |
+| 학생 A: 9/8 08:30 | `배려` 없이 기존 구성과 `독서` 유지; 같은 날 다시 수정해도 동일 |
+| 학생 B: 9/8 14:00 | `배려`를 포함한 active 구성과 `책 읽기` 사용 |
+| 9/9 신규 record | 이후 설정 변경이 없다면 `배려`를 포함한 active 구성과 `책 읽기` 사용 |
 
 아래 관리 화면과 색상 정책은 구현을 위한 승인된 contract이며 구현 완료를 뜻하지 않는다.
 
@@ -65,9 +74,9 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 
 - 각 Virtue는 application이 관리하는 제한된 palette에서 정확히 하나의 유효한 표시 색상을 가진다. 흰 배경의 SVG line/point에서 식별 가능한 충분히 진하고 구별 가능한 색상을 최소 8개 정도 제공하는 방향을 기본으로 한다. 정확한 Tailwind class/hex 값은 implementation concern이다.
 - Virtue에 palette 색상을 안정적으로 식별하는 값을 DB에 저장하고 명시적으로 변경할 때까지 유지한다. exact schema name은 구현 단계에서 결정한다. 매 request나 metric 선택마다 임시 random 값을 만들거나 virtue id modulo 방식으로 색상을 계산하지 않는다.
-- 새 덕목 추가 시 교사가 색상을 선택할 수 있고, 미선택 시 palette에서 자동 배정한다. 자동 배정은 같은 Classroom의 현재 active 덕목이 사용하지 않는 색상을 우선하여 기본 UX에서 active 덕목끼리 겹치지 않도록 한다. 정확한 random 알고리즘은 canonical contract가 아니며 저장 후에는 고정된 color identity다.
+- 같은 Classroom의 active Virtue는 서로 다른 색상을 사용해야 한다. 수동 선택·수정과 direct request도 다른 active Virtue가 사용하는 색상을 선택할 수 없다. 사용 종료된 Virtue는 기존 color identity를 유지하며 inactive 상태에서는 색상 중복을 허용한다. 새 덕목에서 색상을 선택하지 않으면 현재 active 덕목이 사용하지 않는 palette 색상을 자동 배정한다. 정확한 random 알고리즘은 canonical contract가 아니며 저장 후에는 고정된 color identity다.
 - 기본 덕목 `독서`, `봉사`, `감사`도 각각 유효한 색상을 가진다. 도입 전 존재하는 모든 Virtue는 안전하고 재현 가능한 migration/backfill로 하나의 유효한 색상을 갖게 하며, 이후 새 Classroom bootstrap도 기본 덕목의 색상을 함께 배정한다. backfill의 정확한 색 선택은 business contract가 아니다.
-- 담임이 active 덕목의 색상을 변경하면 과거·현재 chart 모두 Virtue의 현재 색상을 사용한다. 색상은 score/history snapshot에 저장하지 않으며 score 값은 바뀌지 않는다. 이는 rename과 같은 history 표시 정책이며, 사용 종료된 덕목도 기존 color identity를 유지한다.
+- 색상은 Virtue의 현재 presentation identity이며 score/history content snapshot 대상이 아니다. 담임이 active 덕목의 색상을 변경하면 과거·현재 chart 모두 현재 색상을 사용하되 score 값과 historical virtue name snapshot은 바뀌지 않는다. 이름 snapshot을 보존하는 rename과는 별도 정책이며, 사용 종료된 덕목도 기존 color identity를 유지한다.
 - 저장된 색상은 학생 chart의 덕목별 시각적 identity이며 이후 교사 통계·월간 visualization에서도 재사용할 수 있는 기준이다.
 
 ### 덕목 관리 feature의 제외 범위
@@ -96,12 +105,12 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 | 5 | 아주 잘 실천했어요 |
 
 - 오늘 기록은 저장 후 같은 날 다시 수정할 수 있다.
-- 같은 날 다시 수정할 때는 처음 저장된 기록의 덕목 구성을 유지한다. 그 사이 새로 추가되거나 사용 종료된 학급 덕목을 기존 기록에 자동 반영하지 않는다.
+- 같은 날 다시 수정할 때는 최초 저장 때 확정된 score 구성과 virtue name snapshot을 유지하고, 허용 범위 안에서 score 값과 reflection만 수정한다. 그 사이 담임이 덕목을 추가·사용 종료·rename해도 기존 오늘 record에는 반영하지 않는다.
 - 날짜가 지나면 학생은 과거 기록을 수정할 수 없으며 read-only로 조회한다.
 - 학생은 기록 날짜를 직접 선택하지 않는다. create/update 대상은 application 기준 `오늘`의 자기 기록이다.
 - 학생이 parameter를 조작해 과거 또는 미래 날짜의 기록을 생성·수정할 수 없어야 한다.
 - 과거 기록은 숫자 표보다 입력 당시 UI와 유사한 read-only 자기평가 화면으로 보여준다.
-- 과거 화면은 해당 날짜에 실제 평가한 덕목만 보여준다. 현재 active 덕목으로 과거 기록을 재구성하지 않는다.
+- 과거 read-only 화면은 해당 날짜에 실제 평가한 덕목을 DailyGrowthScore 생성 당시 보존된 이름으로 보여준다. 현재 Virtue 이름으로 바꾸거나 현재 active 덕목 목록으로 과거 기록을 재구성하지 않는다.
 - 이전/다음은 기록이 존재하는 날짜 사이를 이동하고, 오늘로 돌아오면 현재 editable 상태와 자연스럽게 연결되는 방향을 기본으로 한다.
 - prototype은 기존 application `Time.zone`을 날짜 기준으로 사용하며 별도의 학교별 timezone은 추가하지 않는다.
 - prototype에서는 주말·휴일 여부만으로 오늘 기록 입력을 별도 차단하지 않는다.
@@ -128,9 +137,10 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 기본 주와 이전/다음 주 이동은 월요일부터 일요일까지의 calendar week를 기준으로 한다. 기본 화면은 application 기준 오늘이 포함된 현재 주이며 이전 주와 다음 주로 이동할 수 있다. 현재 주에서는 미래 주로 이동하는 다음 주 navigation을 제공하지 않거나 비활성화한다.
 - 주간 chart와 weekly presentation의 표시 범위는 월요일부터 금요일까지 5일이다. 토요일과 일요일은 X축과 주간 표시 범위에서 제외하며, 주말 기록이 존재해도 chart에 표시하지 않는다. 이는 visualization 정책으로, `DailyGrowthRecord` domain의 주말·휴일 입력 허용 정책은 변경하지 않는다.
 - metric navigation은 `[종합] [독서] [봉사] [감사] ...` 형태로 전환하며 기본 metric은 `종합`이다. 현재 active 덕목을 기본으로 노출하고, 사용 종료된 덕목도 주간 chart 표시 범위인 월요일부터 금요일 사이에 실제 score가 존재하면 조회할 수 있어야 한다. 구체적인 Tailwind 표현은 구현 단계에서 정한다.
+- weekly metric의 Virtue identity와 색상 정책은 유지한다. metric navigation처럼 Virtue 자체를 선택하는 UI는 현재 Virtue 이름을 사용할 수 있지만, historical DailyGrowthRecord의 내용을 표시할 때는 score의 이름 snapshot이 canonical source다. 현재 이름을 사용하는 선택 UI가 기존 snapshot을 변경하지는 않는다.
 - `종합` chart는 해당 날짜의 canonical 종합 평균을 percentage로 환산하여 표시하고 Y축은 0~100%로 둔다. 의미 있는 tick은 0/20/40/60/80/100%를 기본으로 한다.
 - 개별 덕목 chart의 Y축은 0~5다. 실제 score는 1..5만 존재하며 Y축의 0은 시각적 baseline일 뿐 score 0을 의미하지 않는다.
-- 색상 기능의 승인 contract에 따라 `종합` graph는 product의 고정 기본색을, 개별 덕목 graph의 line과 point marker는 위 Virtue 색상 정책의 저장된 현재 색상을 사용한다. metric navigation의 작은 color indicator/swatch는 선택 사항이며 구체 UI는 구현 단계에서 결정한다.
+- 색상 기능의 승인 contract에 따라 `종합` graph는 Virtue palette와 시각적으로 구분되는 product 고정색을, 개별 덕목 graph의 line과 point marker는 위 Virtue 색상 정책의 저장된 현재 색상을 사용한다. metric navigation의 작은 color indicator/swatch는 선택 사항이며 구체 UI는 구현 단계에서 결정한다.
 - 기록이 없는 날짜와 record는 있지만 선택한 덕목 score가 없는 날짜는 모두 0점이 아닌 데이터 없음으로 취급한다. 새 덕목은 실제 score가 처음 생긴 날짜부터 나타나며, 데이터 없음과 실제 낮은 점수를 시각적으로 혼동시키지 않는다.
 - 첫 prototype은 `suksuk_praise` 학생 주간 dashboard의 SVG graph visual을 최대한 그대로 재사용한다. 월~금 5개 point 위치, viewBox/spacing/grid, 두꺼운 둥근 line/path, 원형 point marker, 날짜/요일 배치와 이전/다음 주 navigation 패턴을 재사용하되 praise/coupon 전용 icon·marker·count와 summary card는 가져오지 않으며 새 chart library를 추가하지 않는다.
 - 월간 visualization, 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다.
@@ -202,17 +212,17 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - `daily record + virtue`당 score는 최대 하나다.
 - score는 1..5다.
 - daily record에는 최소 하나 이상의 score가 존재한다.
-- 저장된 daily record에는 그 기록을 처음 저장할 때 평가한 덕목 score가 존재한다.
+- 저장된 daily record의 score 구성은 최초 저장 시점에 확정한다. DailyGrowthScore의 Virtue identity 관계와 score 생성 당시의 virtue name snapshot은 historical record로 보존하며 teacher rename으로 snapshot을 수정하지 않는다.
 - 덕목 활성 상태가 바뀌어도 과거 score가 가리키는 덕목 의미는 사라지지 않는다.
 - 새 덕목 생성 이전 날짜에 score 0을 자동 보충하지 않는다.
-- Classroom의 active 덕목 변경은 이미 저장된 daily record의 덕목 구성을 소급 변경하지 않는다.
+- teacher virtue configuration change는 기존 DailyGrowthRecord / DailyGrowthScore를 rewrite하지 않는다. score 자동 추가·삭제, 다른 Virtue로 교체, 기존 score 값·reflection 변경을 하지 않는다. 해당 날짜의 record가 없는 학생만 이후 덕목 구성·이름 설정 변경의 영향을 받는다.
 - 날짜가 지난 기록은 Student가 update할 수 없다.
 - Student가 임의의 `recorded_on`을 지정하여 과거·미래 기록을 생성하거나 수정할 수 없다.
 - total/average는 해당 날짜에 실제 존재하는 score만 사용한다.
 - daily record의 당시 Classroom 귀속은 이후 Student의 현재 Classroom이 바뀌더라도 보존되어야 한다.
 - realtime 상태와 DB canonical state를 분리한다.
 
-정확한 DB index, check constraint, model과 migration 설계는 implementation 단계에서 정한다.
+기존 DailyGrowthScore row도 유효한 이름 snapshot으로 안전하게 채워야 한다. 정확한 snapshot column 이름, backfill 방법, DB index, check constraint, model과 migration 설계는 implementation 단계에서 정한다.
 
 ## Prototype non-goals
 
