@@ -31,6 +31,12 @@ ko:
     errors:
       invalid: "모든 덕목의 점수를 확인해 주세요."
 
+  teacher_growth_records:
+    completed: "오늘 입력완료"
+    not_completed: "오늘 아직 입력하지 않았음"
+    student_number: "%{number}번"
+    unassigned_student_number: "번호 미지정"
+
   activerecord:
     attributes:
       daily_growth_record:

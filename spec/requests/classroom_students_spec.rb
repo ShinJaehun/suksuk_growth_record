@@ -1031,16 +1031,64 @@ RSpec.describe 'Classroom students', type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it 'rejects an unassigned school manager' do
+    it 'allows a manager in the Classroom SchoolYear without granting Student management' do
       manager = create(:user, :teacher, :active_annual_teacher,
-                       annual_school: past_classroom.school_year.school,
+                       annual_school: classroom.school_year.school,
                        annual_school_role: 'manager')
       sign_out teacher
       sign_in manager
 
-      get classroom_student_path(past_classroom, past_student)
+      get classroom_student_path(classroom, student)
+
+      expect(response).to have_http_status(:ok)
+      expect(StudentPolicy.new(manager, student).manage?).to eq(false)
+      expect(response.body).not_to include(edit_classroom_student_path(classroom, student))
+    end
+
+    it 'rejects a manager outside the Classroom SchoolYear' do
+      manager = create(:user, :teacher, :active_annual_teacher,
+                       annual_school: create(:school), annual_school_role: 'manager')
+      sign_out teacher
+      sign_in manager
+
+      get classroom_student_path(classroom, student)
 
       expect(response).to redirect_to(root_path)
+    end
+
+    it 'does not find a Student from another Classroom through URL manipulation' do
+      other_student = create(:student)
+
+      get classroom_student_path(classroom, other_student)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "shows today's missing state without an editable form" do
+      get classroom_student_path(classroom, student)
+
+      expect(response.body).to include(I18n.t('teacher_growth_records.not_completed'))
+      expect(Nokogiri::HTML(response.body).css('form, input, textarea, button')).to be_empty
+    end
+
+    it "shows today's frozen labels, stored scores, and reflection read-only" do
+      record = create(:daily_growth_record, :with_score,
+                      student: student, recorded_on: Time.zone.today, reflection: '오늘의 성찰')
+      frozen_item = record.daily_virtue_configuration.items.first
+      frozen_name = frozen_item.name
+      current_name = '현재 덕목 이름'
+      frozen_item.virtue.update!(name: current_name)
+
+      get classroom_student_path(classroom, student)
+
+      expect(response.body).to include(
+        I18n.t('teacher_growth_records.completed'),
+        frozen_name,
+        record.daily_growth_scores.first.score.to_s,
+        '오늘의 성찰'
+      )
+      expect(response.body).not_to include(current_name)
+      expect(Nokogiri::HTML(response.body).css('form, input, textarea, button')).to be_empty
     end
   end
 

@@ -41,8 +41,13 @@ class ClassroomStudentsController < ApplicationController
   end
 
   def show
-    authorize @student, :show?
+    authorize @classroom, :manage_growth?
     @can_manage_student = policy(@student).manage?
+    @record = @student.daily_growth_records
+      .where(classroom: @classroom)
+      .includes(:daily_growth_scores, daily_virtue_configuration: :items)
+      .find_by(recorded_on: Time.zone.today)
+    @score_rows = score_rows(@record)
   end
 
   def edit
@@ -108,6 +113,16 @@ class ClassroomStudentsController < ApplicationController
   def set_classroom = @classroom = Classroom.find(params[:classroom_id])
   def set_student = @student = @classroom.students.find(params[:id])
   def authorize_manage! = authorize(@classroom, :manage_members?)
+
+  def score_rows(record)
+    return [] unless record
+
+    scores_by_virtue_id = record.daily_growth_scores.index_by(&:virtue_id)
+    record.daily_virtue_configuration.items.filter_map do |item|
+      score = scores_by_virtue_id[item.virtue_id]
+      { name: item.name, value: score.score } if score
+    end
+  end
 
   def student_params
     params.require(:student).permit(:name, :student_number, :student_pin, :gender, :avatar_key)

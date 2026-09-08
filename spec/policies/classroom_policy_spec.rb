@@ -8,43 +8,56 @@ RSpec.describe ClassroomPolicy do
       annual_grade: grade)
   end
 
-  describe "#manage_growth_virtues?" do
+  describe "growth operational authority" do
     let(:classroom) { create(:classroom) }
     let(:teacher) { annual_teacher(school: classroom.school_year.school, grade: classroom.grade) }
 
-    it "requires an active current homeroom teacher" do
+    it "allows the active current homeroom teacher" do
       assignment = create(:homeroom_assignment, classroom:, teacher:)
+      policy = described_class.new(teacher, classroom)
+
+      expect(policy.manage_growth?).to eq(true)
       expect(described_class.new(teacher, classroom).manage_growth_virtues?).to eq(true)
 
       teacher.update!(active: false)
-      expect(described_class.new(teacher, classroom).manage_growth_virtues?).to eq(false)
+      expect(described_class.new(teacher, classroom).manage_growth?).to eq(false)
       teacher.update!(active: true)
       assignment.update!(ended_on: Date.current)
-      expect(described_class.new(teacher, classroom.reload).manage_growth_virtues?).to eq(false)
+      expect(described_class.new(teacher, classroom.reload).manage_growth?).to eq(false)
     end
 
-    it "requires an active classroom" do
-      create(:homeroom_assignment, classroom:, teacher:)
-      classroom.update!(active: false)
-
-      expect(described_class.new(teacher, classroom).manage_growth_virtues?).to eq(false)
+    it "rejects a regular teacher outside the classroom" do
+      expect(described_class.new(teacher, classroom).manage_growth?).to eq(false)
     end
 
-    it "does not grant authority through admin, manager, or Student roles" do
+    it "allows a manager only in their annual SchoolYear" do
       manager = annual_teacher(school: classroom.school_year.school, school_role: "manager")
-      actors = [create(:user, :admin), manager, teacher, create(:student, classroom:)]
+      other_classroom = create(:classroom)
 
-      actors.each do |actor|
-        expect(described_class.new(actor, classroom).manage_growth_virtues?).to eq(false)
-      end
+      expect(described_class.new(manager, classroom).manage_growth?).to eq(true)
+      expect(described_class.new(manager, other_classroom).manage_growth?).to eq(false)
     end
 
-    it "allows a manager who is also the current homeroom teacher" do
-      manager = annual_teacher(school: classroom.school_year.school,
-        school_role: "manager", grade: classroom.grade)
-      create(:homeroom_assignment, classroom:, teacher: manager)
+    it "allows a global admin" do
+      expect(described_class.new(create(:user, :admin), classroom).manage_growth?).to eq(true)
+    end
 
-      expect(described_class.new(manager, classroom).manage_growth_virtues?).to eq(true)
+    it "rejects a Student" do
+      expect(described_class.new(create(:student, classroom:), classroom).manage_growth?).to eq(false)
+    end
+
+    it "preserves active lifecycle boundaries" do
+      admin = create(:user, :admin)
+      classroom.update!(active: false)
+      expect(described_class.new(admin, classroom).manage_growth?).to eq(false)
+
+      classroom.update!(active: true)
+      classroom.school_year.update!(status: :archived)
+      expect(described_class.new(admin, classroom).manage_growth?).to eq(false)
+
+      classroom.school_year.update!(status: :active)
+      classroom.school_year.school.update!(active: false)
+      expect(described_class.new(admin, classroom).manage_growth?).to eq(false)
     end
   end
 

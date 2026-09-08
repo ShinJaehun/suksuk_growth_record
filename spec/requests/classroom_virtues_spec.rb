@@ -52,34 +52,66 @@ RSpec.describe 'Classroom virtue management', type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
-  it 'does not grant a school manager management access or a classroom entry point' do
+  it 'allows the same-SchoolYear manager to use every virtue management action and entry point' do
     manager = create(:user, :teacher, :active_annual_teacher,
                      annual_school: classroom.school_year.school, annual_school_role: 'manager')
     sign_out teacher
     sign_in manager
 
     get classroom_path(classroom)
-    expect(document.at_css(%(a[href="#{classroom_virtues_path(classroom)}"]))).to be_nil
+    expect(document.at_css(%(a[href="#{classroom_virtues_path(classroom)}"]))).to be_present
     get classroom_virtues_path(classroom)
-    expect(response).to redirect_to(root_path)
+    expect(response).to have_http_status(:ok)
 
-    patch classroom_virtue_path(classroom, virtue), params: { virtue: { name: '변경 시도' } }
-    expect(response).to redirect_to(root_path)
-    expect(virtue.reload.name).to eq('독서')
+    post classroom_virtues_path(classroom), params: { virtue: { name: '배려' } }
+    created = classroom.virtues.find_by!(name: '배려')
+    expect(response).to redirect_to(classroom_virtues_path(classroom))
+
+    patch classroom_virtue_path(classroom, created), params: { virtue: { name: '서로 배려' } }
+    expect(response).to redirect_to(classroom_virtues_path(classroom))
+    expect(created.reload.name).to eq('서로 배려')
+
+    patch deactivate_classroom_virtue_path(classroom, created)
+    expect(response).to redirect_to(classroom_virtues_path(classroom))
+    expect(created.reload).not_to be_active
   end
 
-  it 'does not grant a global admin management access or a classroom entry point' do
+  it 'allows a global admin to use every virtue management action and entry point' do
     sign_out teacher
     sign_in create(:user, :admin)
 
     get classroom_path(classroom)
-    expect(document.at_css(%(a[href="#{classroom_virtues_path(classroom)}"]))).to be_nil
+    expect(document.at_css(%(a[href="#{classroom_virtues_path(classroom)}"]))).to be_present
     get classroom_virtues_path(classroom)
-    expect(response).to redirect_to(root_path)
+    expect(response).to have_http_status(:ok)
 
-    patch deactivate_classroom_virtue_path(classroom, virtue)
-    expect(response).to redirect_to(root_path)
-    expect(virtue.reload).to be_active
+    post classroom_virtues_path(classroom), params: { virtue: { name: '배려' } }
+    created = classroom.virtues.find_by!(name: '배려')
+    expect(response).to redirect_to(classroom_virtues_path(classroom))
+
+    patch classroom_virtue_path(classroom, created), params: { virtue: { name: '서로 배려' } }
+    expect(response).to redirect_to(classroom_virtues_path(classroom))
+    expect(created.reload.name).to eq('서로 배려')
+
+    patch deactivate_classroom_virtue_path(classroom, created)
+    expect(response).to redirect_to(classroom_virtues_path(classroom))
+    expect(created.reload).not_to be_active
+  end
+
+  it 'blocks a school manager outside the Classroom SchoolYear' do
+    manager = create(:user, :teacher, :active_annual_teacher,
+                     annual_school: create(:school), annual_school_role: 'manager')
+    sign_out teacher
+    sign_in manager
+
+    get classroom_virtues_path(classroom)
+    expect(response).to have_http_status(:not_found)
+
+    sign_in manager
+    expect do
+      post classroom_virtues_path(classroom), params: { virtue: { name: '배려' } }
+    end.not_to change(Virtue, :count)
+    expect(response).to have_http_status(:not_found)
   end
 
   it 'blocks a Student session' do
