@@ -38,7 +38,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 덕목은 Classroom 단위다.
 - 새/current Classroom에는 기본 덕목 `독서`, `봉사`, `감사`가 제공된다.
 - 성장기록 기능 도입 시 기존 current Classroom에도 기본 덕목 3개를 정확히 한 번 bootstrap한다. 이후 새 Classroom도 같은 기본 덕목으로 시작하며 중복 생성하지 않는다.
-- 담임교사는 자기 current Classroom의 덕목을 추가, 편집, 사용 종료할 수 있다.
+- 담임교사는 자기 current active Classroom의 덕목을 추가, 편집, 사용 종료할 수 있다. 권한 기준은 아래 Authorization을 따른다.
 - 학생 입력 화면에 노출되는 active 덕목은 최대 5개다. 기본 3개에 최대 2개를 추가하는 UX를 기본으로 한다.
 - Classroom은 성장 기록을 위해 최소 1개의 active 덕목을 유지해야 하며 마지막 active 덕목은 사용 종료할 수 없다.
 - 5개 제한은 active 덕목 수에 대한 domain/application invariant이며 DB를 5개 점수 column으로 고정하지 않는다.
@@ -46,10 +46,35 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 단순 오타나 표현 수정은 rename할 수 있으며 과거 기록에도 현재 이름을 표시하는 방향을 기본으로 한다.
 - 의미가 다른 덕목으로 교체할 때는 rename보다 기존 덕목 사용 종료 후 신규 덕목 추가를 기본 원칙으로 한다.
 - 덕목과 일일 점수는 별도 row 관계를 가져 입력 당시 덕목 구성을 보존할 수 있어야 한다. 구체 model과 schema 이름은 구현 단계에서 정한다.
-- 담임은 필요할 때 active 덕목을 추가하거나 사용 종료할 수 있다.
-- 이미 저장된 학생의 일일 기록은 이후 Classroom의 active 덕목 변경 때문에 자동으로 추가·삭제되지 않는다.
+- 담임은 당일에도 active 덕목을 추가하거나 사용 종료할 수 있다.
+- 이미 저장된 학생의 일일 기록은 이후 Classroom의 active 덕목 변경 때문에 자동으로 추가·삭제되지 않는다. 덕목 관리는 기존 DailyGrowthRecord 구성을 bulk rewrite하거나 score row를 자동 생성·삭제하지 않는다.
 - 아직 기록하지 않은 학생은 기록을 처음 저장할 때의 active 덕목을 기준으로 자기평가한다.
 - 같은 날짜라도 덕목 변경 전후에 저장한 학생의 평가 항목 수가 다를 수 있으며, 이를 이유로 기존 제출을 무효화하거나 미제출 학생의 기록을 강제 생성하지 않는다.
+
+아래 관리 화면과 색상 정책은 구현을 위한 승인된 contract이며 구현 완료를 뜻하지 않는다.
+
+### 교사 덕목 관리 화면
+
+- Classroom 상세 화면에 권한 있는 담임을 위한 `덕목 관리` 진입점을 둔다. 관리 화면은 active 덕목과 사용 종료된 덕목을 구분하며 기존 position/display order를 사용한다.
+- active 덕목의 이름·색상 수정과 사용 종료, 새 덕목 추가를 지원한다. 사용 종료된 덕목은 history 보존을 위해 목록에서 확인한다.
+- 복잡한 admin table보다 하나의 일반 page 안에 읽기 쉬운 form을 두는 작은 학급 운영 화면을 우선한다. 제목 `덕목 관리`, active 개수(예: `3 / 5`), active 목록(color swatch·이름·수정·사용 종료), 추가 form(이름·palette 선택·미선택 시 자동 배정), 사용 종료 목록으로 구성한다. modal은 필수가 아니며 business logic은 view에 두지 않는다.
+- active가 5개면 추가할 수 없고 1개면 마지막 덕목을 사용 종료할 수 없다. UI는 기존 domain invariant를 반영하며 parameter 조작이나 direct request로도 우회할 수 없어야 한다.
+- 빈 이름, 최대 개수 초과, 마지막 active 종료, invalid palette color 등 validation 실패는 같은 관리 화면에 이해할 수 있는 오류로 표시한다. 실패한 변경은 partial state를 남기지 않으며 성공 후 목록은 DB canonical state를 반영한다.
+
+### Virtue 색상
+
+- 각 Virtue는 application이 관리하는 제한된 palette에서 정확히 하나의 유효한 표시 색상을 가진다. 흰 배경의 SVG line/point에서 식별 가능한 충분히 진하고 구별 가능한 색상을 최소 8개 정도 제공하는 방향을 기본으로 한다. 정확한 Tailwind class/hex 값은 implementation concern이다.
+- Virtue에 palette 색상을 안정적으로 식별하는 값을 DB에 저장하고 명시적으로 변경할 때까지 유지한다. exact schema name은 구현 단계에서 결정한다. 매 request나 metric 선택마다 임시 random 값을 만들거나 virtue id modulo 방식으로 색상을 계산하지 않는다.
+- 새 덕목 추가 시 교사가 색상을 선택할 수 있고, 미선택 시 palette에서 자동 배정한다. 자동 배정은 같은 Classroom의 현재 active 덕목이 사용하지 않는 색상을 우선하여 기본 UX에서 active 덕목끼리 겹치지 않도록 한다. 정확한 random 알고리즘은 canonical contract가 아니며 저장 후에는 고정된 color identity다.
+- 기본 덕목 `독서`, `봉사`, `감사`도 각각 유효한 색상을 가진다. 도입 전 존재하는 모든 Virtue는 안전하고 재현 가능한 migration/backfill로 하나의 유효한 색상을 갖게 하며, 이후 새 Classroom bootstrap도 기본 덕목의 색상을 함께 배정한다. backfill의 정확한 색 선택은 business contract가 아니다.
+- 담임이 active 덕목의 색상을 변경하면 과거·현재 chart 모두 Virtue의 현재 색상을 사용한다. 색상은 score/history snapshot에 저장하지 않으며 score 값은 바뀌지 않는다. 이는 rename과 같은 history 표시 정책이며, 사용 종료된 덕목도 기존 color identity를 유지한다.
+- 저장된 색상은 학생 chart의 덕목별 시각적 identity이며 이후 교사 통계·월간 visualization에서도 재사용할 수 있는 기준이다.
+
+### 덕목 관리 feature의 제외 범위
+
+- drag-and-drop/reorder, 사용 종료 덕목 reactivation, hard delete, arbitrary free-form hex/color picker는 제공하지 않는다.
+- 학생별 덕목 설정, 학교 공통/global virtue library, virtue template, score scale 변경, 기존 DailyGrowthRecord 구성 rewrite는 포함하지 않는다.
+- 월간 visualization, 교사 학급 통계, realtime/Action Cable/Turbo broadcast 추가, 학생 graph에 여러 덕목 line 동시 표시, admin support surface는 포함하지 않는다.
 
 ## 학생 일일 기록
 
@@ -105,6 +130,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - metric navigation은 `[종합] [독서] [봉사] [감사] ...` 형태로 전환하며 기본 metric은 `종합`이다. 현재 active 덕목을 기본으로 노출하고, 사용 종료된 덕목도 주간 chart 표시 범위인 월요일부터 금요일 사이에 실제 score가 존재하면 조회할 수 있어야 한다. 구체적인 Tailwind 표현은 구현 단계에서 정한다.
 - `종합` chart는 해당 날짜의 canonical 종합 평균을 percentage로 환산하여 표시하고 Y축은 0~100%로 둔다. 의미 있는 tick은 0/20/40/60/80/100%를 기본으로 한다.
 - 개별 덕목 chart의 Y축은 0~5다. 실제 score는 1..5만 존재하며 Y축의 0은 시각적 baseline일 뿐 score 0을 의미하지 않는다.
+- 색상 기능의 승인 contract에 따라 `종합` graph는 product의 고정 기본색을, 개별 덕목 graph의 line과 point marker는 위 Virtue 색상 정책의 저장된 현재 색상을 사용한다. metric navigation의 작은 color indicator/swatch는 선택 사항이며 구체 UI는 구현 단계에서 결정한다.
 - 기록이 없는 날짜와 record는 있지만 선택한 덕목 score가 없는 날짜는 모두 0점이 아닌 데이터 없음으로 취급한다. 새 덕목은 실제 score가 처음 생긴 날짜부터 나타나며, 데이터 없음과 실제 낮은 점수를 시각적으로 혼동시키지 않는다.
 - 첫 prototype은 `suksuk_praise` 학생 주간 dashboard의 SVG graph visual을 최대한 그대로 재사용한다. 월~금 5개 point 위치, viewBox/spacing/grid, 두꺼운 둥근 line/path, 원형 point marker, 날짜/요일 배치와 이전/다음 주 navigation 패턴을 재사용하되 praise/coupon 전용 icon·marker·count와 summary card는 가져오지 않으며 새 chart library를 추가하지 않는다.
 - 월간 visualization, 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다.
@@ -167,6 +193,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 다른 Student 또는 다른 Classroom의 직접 URL과 parameter 조작으로 scope를 넓힐 수 없다.
 - school manager 또는 global admin이라는 운영 역할만으로 학생의 성장 점수와 성찰 기록 조회 권한을 자동으로 부여하지 않는다.
 - 성장기록 domain의 교사 권한은 current HomeroomAssignment를 기준으로 한다.
+- 덕목 관리 화면 접근과 변경도 이 담임 권한으로 제한한다. 담당하지 않는 Classroom의 직접 URL/parameter 요청과 Student 접근은 차단한다. school manager 또는 global admin role만으로는 덕목 관리 권한이 생기지 않으며, 기존 ClassroomPolicy의 broader admin/manager 권한을 성장 덕목 관리의 근거로 확대하지 않는다.
 - 관리자용 성장기록 조회나 지원 기능은 필요할 경우 별도 spec에서 결정한다.
 
 ## 데이터와 history invariants
