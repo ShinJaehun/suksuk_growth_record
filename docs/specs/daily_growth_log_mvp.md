@@ -204,17 +204,23 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 오늘 기록이 없으면 미입력 상태를 표시한다. 오늘 기록이 있으면 각 Virtue score를 최대값이 항상 5인 1~5 고정척도 가로 막대와 `score / 5`로 표시하고, 기존 학생 입력 화면의 점수별 행동 의미 문구를 재사용한다. percentage로 의미를 바꾸지 않는다.
 - 오늘 score의 덕목 이름은 frozen configuration item의 이름을, 막대 색상은 Virtue의 저장된 current presentation color를 사용한다. score가 없으면 0으로 보충하지 않으며 reflection은 별도 read-only 영역에 표시한다.
 - 교사용 Student show의 주간 chart는 위 학생 성장 추이와 같은 월~금 범위, 이전 주 이동, 미래 주 이동 제한, `종합`과 Virtue별 metric, missing 처리, 사용 종료 Virtue 노출과 색상 identity 계약을 사용한다. 학생용과 교사용 surface에 서로 다른 계산 규칙이나 chart 의미를 두지 않는다.
-- Student identity/profile card는 오늘과 성장 화면 선택에 따라 크기나 폭이 바뀌지 않는 안정된 header surface로 유지한다. `오늘`, `성장`, `월간` navigation은 profile card 아래의 별도 compact navigation surface로 둔다.
+- 학생 `/student/growth`와 교사용 Student show는 Student identity를 같은 visual contract로 표시한다. 왼쪽에는 Student avatar/thumbnail을 두고, 오른쪽 text는 학교 이름(중간 크기), 학년·반·번호(작은 크기), Student 이름(가장 큰 크기) 순서와 hierarchy를 사용한다.
+- Student identity/profile card는 오늘과 성장 tab 전환에 따라 폭, typography와 정보 순서가 바뀌지 않는 안정된 header surface로 유지한다. 학생용과 교사용에서 identity/body markup과 typography를 중복 구현하지 않고 공통 presentation partial을 재사용한다. exact partial/helper 이름과 Tailwind class는 implementation concern이다.
+- 공통화 대상은 Student identity presentation으로 제한한다. 교사용 Student show의 기존 `교실로 돌아가기`, 권한 있는 사용자의 `학생 정보·PIN 수정` 등 teacher-facing action과 authorization 책임은 기존 teacher-facing view에 유지하고 학생용 surface에 노출하지 않는다. 공통 partial에는 permission이나 business logic을 넣지 않는다.
+- `오늘`, `성장`, `월간` navigation은 profile card 아래의 별도 compact navigation surface로 둔다.
 - 학생의 canonical growth GET surface는 `/student/growth` 하나다. `tab`이 없거나 `tab=today`이면 오늘 화면을, `tab=growth`이면 주간 성장 화면을 표시한다.
+- GET `/student`는 별도 profile/dashboard presentation을 유지하지 않고 `/student/growth?tab=today`로 redirect한다. 학생 navbar의 현재 `내 정보` entry도 별도 `/student` presentation을 전제로 하지 않고 canonical today surface로 연결하며 exact navbar label 변경은 이번 범위가 아니다.
+- `/student/pin/edit`, `/student/pin`과 Student self-service PIN 관리 권한은 그대로 유지한다.
 - 학생 오늘 화면에서 오늘 DailyGrowthRecord가 없으면 입력 form을 바로 표시한다. 기록이 있으면 frozen Virtue 이름, current presentation color, 1~5 막대, `score / 5`, 행동 의미 문구와 reflection을 결과 형태로 표시한다.
 - 오늘 기록이 이미 있는 학생은 결과 화면의 수정 동작을 통해 같은 `/student/growth?tab=today` surface에서 edit mode로 전환할 수 있다. 정확한 edit-mode query parameter는 implementation concern이다.
+- canonical today dashboard의 일반 GET 진입은 조회만 수행하며 DailyVirtueConfiguration, DailyGrowthRecord 또는 다른 DB row를 생성하지 않는다.
 - StudentGrowthRecordsController는 계속 current_student의 오늘 기록 생성·수정 write를 담당한다. 저장 또는 수정 성공 후에는 학생 canonical growth GET의 오늘 결과 surface로 redirect하여 저장된 결과를 보여준다.
 - 기존 `/student/growth_record` GET은 별도 today presentation을 유지하지 않고 canonical `/student/growth?tab=today`로 redirect한다. UI navigation은 canonical `/student/growth` surface를 사용한다.
 - 교사용 Student show의 canonical route는 계속 `/classrooms/:classroom_id/students/:id`다. `tab`이 없거나 `tab=today`이면 오늘 저장 결과와 reflection만, `tab=growth`이면 주간 성장 chart만 표시한다.
 - 학생용과 교사용 `tab=growth`는 같은 월~금 범위, metric 계산, missing 처리, Virtue identity/color 및 week navigation 계약을 사용한다. `metric`과 `week_offset`은 growth surface에서 사용하고 navigation link는 `tab=growth`를 명시한다.
 - 잘못되거나 지원하지 않는 `tab` 값은 기본 `today` surface로 처리한다.
 - `월간` navigation은 학생용과 교사용 모두 표시하되 이번 feature에서는 비활성/준비 중 상태로 둔다.
-- 학생 `/student/growth`와 교사용 Student show는 동일한 content max-width를 사용한다. 정확한 Tailwind `max-w-*` 값은 implementation concern이다.
+- 학생 `/student/growth`와 교사용 Student show는 동일한 content max-width contract를 사용한다. 별도 `/student` max-width surface는 두지 않으며 정확한 Tailwind `max-w-*` 값은 implementation concern이다.
 - 교사, school manager, global admin은 Student show에서 Student 대신 score나 reflection을 입력하거나 수정할 수 없다. 학생의 today edit capability는 current_student에게만 존재한다.
 - Student의 이름, 번호, 아바타, PIN, 활성 상태 등 계정·구성원 관리 책임은 기존 edit 및 구성원 관리 흐름에 유지한다. 성장기록 read 권한을 가진 school manager에게 이러한 Student 관리 권한까지 자동으로 부여하지 않는다.
 - 향후 오늘 입력 현황에서 Student를 선택하는 링크는 `/classrooms/:classroom_id/students/:id`를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
@@ -264,6 +270,10 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 교사용 Student show의 과거 일일 기록 목록·탐색
 - 현재 성장 화면에 월간 chart를 함께 배치하는 것과 월간 전용 surface 구현
 - 새로운 generic chart framework, arbitrary date range와 yearly chart
+- today/growth 계산과 score 저장 방식 변경
+- growth 또는 Student 관리 권한 확대
+- teacher-facing action, Student self-service PIN 관리와 navbar 전체 IA 재설계
+- 새 DB schema
 
 - starter의 planning/archived SchoolYear 완성
 - rollover
@@ -322,3 +332,9 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 32. 학생용과 교사용 Student surface는 profile/header 아래에 `오늘`, `성장`, `월간` navigation을 별도 presentation으로 표시하며 월간은 이번 feature에서 준비 중이다.
 33. 교사용 Student show는 담임, 같은 current annual SchoolYear의 school manager와 global admin에게 active lifecycle 범위 안에서만 허용되며 일반 타반 teacher와 범위 밖 manager를 차단한다.
 34. growth read 권한은 Student 관리 권한을 확대하지 않는다.
+35. 학생과 교사의 Student identity card는 avatar 왼쪽, 학교 이름·학년/반/번호·Student 이름 순서의 동일한 정보 및 visual hierarchy를 사용한다.
+36. Student identity presentation은 공통 partial로 재사용하며 teacher-facing action과 permission logic은 공통 partial에 넣지 않는다.
+37. 교사용 Student show의 기존 `교실로 돌아가기`와 권한별 `학생 정보·PIN 수정` action은 유지되고 학생용 surface에는 노출되지 않는다.
+38. GET `/student`는 `/student/growth?tab=today`로 redirect하며 `/student/pin/edit`과 `/student/pin` 계약은 유지한다.
+39. canonical today에서 미입력 Student는 입력 form을, 입력완료 Student는 결과 막대·행동 문구·reflection을 보고, 일반 GET 진입만으로 DB row가 생성되지 않는다.
+40. 학생 canonical dashboard와 교사용 Student show는 동일한 content max-width contract를 사용하며 별도 `/student` presentation은 유지하지 않는다.
