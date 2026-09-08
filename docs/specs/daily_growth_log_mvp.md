@@ -147,20 +147,15 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 색상 기능의 승인 contract에 따라 `종합` graph는 Virtue palette와 시각적으로 구분되는 product 고정색을, 개별 덕목 graph의 line과 point marker는 위 Virtue 색상 정책의 저장된 현재 색상을 사용한다. metric navigation의 작은 color indicator/swatch는 선택 사항이며 구체 UI는 구현 단계에서 결정한다.
 - 기록이 없는 날짜와 record는 있지만 선택한 덕목 score가 없는 날짜는 모두 0점이 아닌 데이터 없음으로 취급한다. 새 덕목은 실제 score가 처음 생긴 날짜부터 나타나며, 데이터 없음과 실제 낮은 점수를 시각적으로 혼동시키지 않는다.
 - 첫 prototype은 `suksuk_praise` 학생 주간 dashboard의 SVG graph visual을 최대한 그대로 재사용한다. 월~금 5개 point 위치, viewBox/spacing/grid, 두꺼운 둥근 line/path, 원형 point marker, 날짜/요일 배치와 이전/다음 주 navigation 패턴을 재사용하되 praise/coupon 전용 icon·marker·count와 summary card는 가져오지 않으며 새 chart library를 추가하지 않는다.
-- 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다.
+- 월간 visualization, 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다.
 
-## 월간 성장 추이
+## 월간 visualization 후속 방향
 
-Student 성장 dashboard의 월간 chart는 하루 단위 점을 약 20개 나열하는 달력보다 해당 월의 calendar week별 평균 추세를 기본으로 한다.
-
-- 월간 집계는 기존 주간 chart와 같은 월요일~금요일 단위로 묶는다. 각 주에는 조회 대상 월에 실제로 포함되는 날짜만 사용하며 월 경계 밖 날짜와 토·일요일은 집계하지 않는다. X축에는 해당 월에 실제 월~금 날짜가 존재하는 주차만 표시한다. 정확한 달력 UI와 SVG 좌표는 implementation concern이다.
-- 기본 metric은 `종합`이며 개별 Virtue metric을 선택할 수 있다.
-- `종합`은 기존 주간 chart와 같은 의미를 사용한다. 각 DailyGrowthRecord의 `average_score`를 5점 만점 대비 백분율로 변환한 뒤, 해당 주에 실제 저장된 record의 값만 평균한다. 따라서 주간과 월간의 `종합`은 모두 0~100% scale을 사용한다.
-- 개별 Virtue metric은 해당 주에 실제 저장된 그 Virtue의 score만 평균한다.
-- 미입력일과 선택한 Virtue score가 없는 날은 0점으로 계산하지 않는다. 해당 주에 값이 하나도 없으면 데이터 없음으로 표시한다.
-- 이전 달로 이동할 수 있고 미래 달로는 이동할 수 없다. 현재 월과 과거 월만 조회한다.
-- ranking이나 다른 Student와의 비교, arbitrary date range와 yearly chart는 제공하지 않는다.
-- 주간과 월간 계산 및 chart presentation은 학생용과 교사용 surface에서 가능한 범위까지 재사용한다. 정확한 helper/service 이름은 canonical contract가 아니다.
+- 월간 visualization은 이번 Student 성장 dashboard feature 범위에 포함하지 않는다.
+- `/student/growth`와 교사용 Student show에는 주간 chart만 표시하며 월간 chart를 그 아래에 연속 배치하지 않는다.
+- 월간은 향후 학생 앱의 별도 `월간` navigation/surface에서 달력 형식으로 제공하는 방향으로 둔다. exact route와 달력 interaction은 후속 spec에서 확정한다.
+- 기존 DailyGrowthRecord / DailyGrowthScore/date 구조를 canonical source로 사용하며 월간 기능을 위해 별도 저장 모델을 미리 추가하지 않는다.
+- 기록이 없는 날짜와 없는 Virtue score를 0으로 해석하지 않는 기존 원칙은 유지한다.
 
 ## 교사 Classroom workflow와 realtime
 
@@ -209,10 +204,10 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 오늘 기록이 없으면 미입력 상태를 표시한다. 오늘 기록이 있으면 각 Virtue score를 최대값이 항상 5인 1~5 고정척도 가로 막대와 `score / 5`로 표시하고, 기존 학생 입력 화면의 점수별 행동 의미 문구를 재사용한다. percentage로 의미를 바꾸지 않는다.
 - 오늘 score의 덕목 이름은 frozen configuration item의 이름을, 막대 색상은 Virtue의 저장된 current presentation color를 사용한다. score가 없으면 0으로 보충하지 않으며 reflection은 별도 read-only 영역에 표시한다.
 - 교사용 Student show의 주간 chart는 위 학생 성장 추이와 같은 월~금 범위, 이전 주 이동, 미래 주 이동 제한, `종합`과 Virtue별 metric, missing 처리, 사용 종료 Virtue 노출과 색상 identity 계약을 사용한다. 학생용과 교사용 surface에 서로 다른 계산 규칙이나 chart 의미를 두지 않는다.
-- 교사용 Student show의 월간 chart는 위 월간 성장 추이의 calendar week별 평균과 navigation 계약을 사용한다.
-- 교사용 Student show는 위에서부터 Student profile/header, 오늘 성장기록, 오늘 reflection, 주간 성장 chart, 월간 성장 chart 순서를 기본으로 한다. 정확한 카드 레이아웃은 implementation concern이다.
+- 교사용 Student show는 위에서부터 Student profile/header, 오늘 성장기록, 오늘 reflection, 주간 성장 chart 순서를 기본으로 한다. 정확한 카드 레이아웃은 implementation concern이다.
+- 학생용 `/student/growth`와 교사용 Student show의 성장 contents는 동일한 content max-width를 사용한다. 정확한 Tailwind `max-w-*` 값은 implementation concern이다.
 - 교사, school manager, global admin은 이 Student show에서 Student 대신 score나 reflection을 입력하거나 수정할 수 없다.
-- 학생 자신의 `/student/growth_record`는 자기 Student session을 사용하는 입력·수정 entry point로, `/student/growth`는 자기 성장 추이 route로 유지한다. 교사용 Student show와 계산·chart presentation을 재사용할 수 있지만, actor 분기를 하나의 controller에 섞지 않고 학생용 write 동작은 계속 current_student를 대상으로 하는 StudentGrowthRecordsController가 담당한다.
+- 학생 자신의 `/student/growth_record`는 자기 Student session을 사용하는 입력·수정 entry point로, `/student/growth`는 자기 주간 성장 추이 route로 유지한다. 교사용 Student show와 계산·chart presentation을 재사용할 수 있지만, actor 분기를 하나의 controller에 섞지 않고 학생용 write 동작은 계속 current_student를 대상으로 하는 StudentGrowthRecordsController가 담당한다.
 - Student의 이름, 번호, 아바타, PIN, 활성 상태 등 계정·구성원 관리 책임은 기존 edit 및 구성원 관리 흐름에 유지한다. 성장기록 read 권한을 가진 school manager에게 이러한 Student 관리 권한까지 자동으로 부여하지 않는다.
 - 향후 오늘 입력 현황에서 Student를 선택하는 링크는 `/classrooms/:classroom_id/students/:id`를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
 
@@ -259,6 +254,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - realtime, Turbo broadcast, Action Cable과 polling
 - 학급 평균·학급 통계, Student 간 비교와 ranking
 - 교사용 Student show의 과거 일일 기록 목록·탐색
+- 현재 성장 화면에 월간 chart를 함께 배치하는 것과 월간 전용 surface 구현
 - 새로운 generic chart framework, arbitrary date range와 yearly chart
 
 - starter의 planning/archived SchoolYear 완성
@@ -309,7 +305,6 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 23. 교사용 Student show는 오늘 reflection을 read-only로 보존하며 score 또는 reflection 입력·수정 form이나 teacher-facing write action을 제공하지 않는다.
 24. 학생용과 교사용 주간 chart는 같은 월~금 범위, 종합·Virtue metric 계산, missing 처리와 Virtue color identity를 사용한다.
 25. 교사용 주간 chart는 이전 주로 이동할 수 있고 미래 주로 이동할 수 없다.
-26. 월간 chart는 종합과 Virtue별 calendar week 평균을 지원하며 미입력일 또는 없는 score를 0점으로 계산하지 않는다.
-27. 월간 chart는 이전 달로 이동할 수 있고 미래 달로 이동할 수 없다.
-28. 교사용 Student show는 담임, 같은 current annual SchoolYear의 school manager와 global admin에게 active lifecycle 범위 안에서만 허용되며 일반 타반 teacher와 범위 밖 manager를 차단한다.
-29. growth read 권한은 Student 관리 권한을 확대하지 않고, 학생 자신의 `/student/growth_record`와 `/student/growth` 계약을 변경하지 않는다.
+26. `/student/growth`와 교사용 Student show의 성장 contents는 동일한 content max-width를 사용하고, 이번 feature에서는 주간 chart만 표시한다.
+27. 교사용 Student show는 담임, 같은 current annual SchoolYear의 school manager와 global admin에게 active lifecycle 범위 안에서만 허용되며 일반 타반 teacher와 범위 밖 manager를 차단한다.
+28. growth read 권한은 Student 관리 권한을 확대하지 않고, 학생 자신의 `/student/growth_record`와 `/student/growth` 계약을 변경하지 않는다.
