@@ -8,6 +8,46 @@ RSpec.describe ClassroomPolicy do
       annual_grade: grade)
   end
 
+  describe "#manage_growth_virtues?" do
+    let(:classroom) { create(:classroom) }
+    let(:teacher) { annual_teacher(school: classroom.school_year.school, grade: classroom.grade) }
+
+    it "requires an active current homeroom teacher" do
+      assignment = create(:homeroom_assignment, classroom:, teacher:)
+      expect(described_class.new(teacher, classroom).manage_growth_virtues?).to eq(true)
+
+      teacher.update!(active: false)
+      expect(described_class.new(teacher, classroom).manage_growth_virtues?).to eq(false)
+      teacher.update!(active: true)
+      assignment.update!(ended_on: Date.current)
+      expect(described_class.new(teacher, classroom.reload).manage_growth_virtues?).to eq(false)
+    end
+
+    it "requires an active classroom" do
+      create(:homeroom_assignment, classroom:, teacher:)
+      classroom.update!(active: false)
+
+      expect(described_class.new(teacher, classroom).manage_growth_virtues?).to eq(false)
+    end
+
+    it "does not grant authority through admin, manager, or Student roles" do
+      manager = annual_teacher(school: classroom.school_year.school, school_role: "manager")
+      actors = [create(:user, :admin), manager, teacher, create(:student, classroom:)]
+
+      actors.each do |actor|
+        expect(described_class.new(actor, classroom).manage_growth_virtues?).to eq(false)
+      end
+    end
+
+    it "allows a manager who is also the current homeroom teacher" do
+      manager = annual_teacher(school: classroom.school_year.school,
+        school_role: "manager", grade: classroom.grade)
+      create(:homeroom_assignment, classroom:, teacher: manager)
+
+      expect(described_class.new(manager, classroom).manage_growth_virtues?).to eq(true)
+    end
+  end
+
   describe "Scope" do
     let(:school) { create(:school) }
     let(:other_school) { create(:school) }

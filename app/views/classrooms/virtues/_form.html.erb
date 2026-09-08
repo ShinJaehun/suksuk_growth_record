@@ -1,0 +1,17 @@
+<%= form_with model: [@classroom, virtue], namespace: dom_id(virtue), class: "space-y-3" do |form| %>
+  <div class="grid gap-3 sm:grid-cols-2">
+    <div>
+      <%= form.label :name, t("virtues.name"), class: "block text-sm font-semibold text-slate-700" %>
+      <%= form.text_field :name, required: true,
+            class: "mt-1 block w-full rounded-lg border-slate-300 text-sm" %>
+    </div>
+    <div>
+      <%= form.label :color_key, t("virtues.color"), class: "block text-sm font-semibold text-slate-700" %>
+      <%= form.select :color_key, virtue_color_options(virtue, active_virtues: @active_virtues),
+            { include_blank: virtue.new_record? ? t("virtues.automatic_color") : false },
+            class: "mt-1 block w-full rounded-lg border-slate-300 text-sm" %>
+    </div>
+  </div>
+  <%= form.submit t(virtue.new_record? ? "virtues.add" : "virtues.update"),
+        class: "rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700" %>
+<% end %>

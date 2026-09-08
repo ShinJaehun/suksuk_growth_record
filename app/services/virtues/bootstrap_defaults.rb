@@ -7,7 +7,9 @@ module Virtues
         return if classroom.virtues.exists?
 
         DEFAULT_NAMES.each_with_index do |name, index|
-          classroom.virtues.create!(name: name, active: true, position: index + 1)
+          classroom.virtues.create!(
+            name: name, active: true, position: index + 1, color_key: Virtue::COLORS.keys.fetch(index)
+          )
         end
       end
     end

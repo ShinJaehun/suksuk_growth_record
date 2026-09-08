@@ -59,6 +59,7 @@ class ClassroomsController < ApplicationController
     authorize @classroom
     @can_manage_classroom = policy(@classroom).update?
     @can_manage_classroom_members = policy(@classroom).manage_members?
+    @can_manage_growth_virtues = policy(@classroom).manage_growth_virtues?
     context = Classrooms::ShowContext.new(classroom: @classroom)
     @students = context.students
     @homeroom_teacher = context.homeroom_teacher

@@ -30,3 +30,28 @@ ko:
       updated: "오늘의 성장 기록을 수정했습니다."
     errors:
       invalid: "모든 덕목의 점수를 확인해 주세요."
+
+  activerecord:
+    attributes:
+      daily_growth_record:
+        daily_virtue_configuration: "날짜별 덕목 설정"
+      daily_virtue_configuration:
+        classroom: "학급"
+        recorded_on: "날짜"
+        items: "덕목 구성"
+      daily_virtue_configuration_item:
+        daily_virtue_configuration_id: "날짜별 덕목 설정"
+        virtue_id: "덕목"
+        name: "당시 덕목 이름"
+        position: "표시 순서"
+    errors:
+      models:
+        daily_growth_record:
+          mismatch: "이 기록의 학급 및 날짜와 일치하지 않습니다."
+          immutable: "은 변경할 수 없습니다."
+          incomplete: "이 날짜별 덕목 설정과 일치하지 않습니다."
+        daily_virtue_configuration:
+          immutable: "은 변경할 수 없습니다."
+        daily_virtue_configuration_item:
+          immutable: "확정된 날짜의 덕목 구성과 이름은 변경할 수 없습니다."
+          classroom_mismatch: "이 설정의 학급과 일치하지 않습니다."

@@ -68,6 +68,10 @@ class ClassroomPolicy < ApplicationPolicy
     active_school? && active_classroom? && !!(admin? || teacher_of?(record))
   end
 
+  def manage_growth_virtues?
+    active_school? && active_classroom? && teacher_of?(record)
+  end
+
   def deactivate?
     active_school? && active_classroom? && !!(admin? || school_manager_of?(record))
   end

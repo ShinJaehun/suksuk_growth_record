@@ -1,4 +1,10 @@
 module StudentGrowthHelper
+  OVERALL_GROWTH_COLOR = "#475569".freeze
+
+  def student_growth_color(virtue = nil)
+    virtue ? virtue.color_hex : OVERALL_GROWTH_COLOR
+  end
+
   def student_growth_chart(weekly_data, overall:)
     maximum = overall ? 100 : 5
     points = weekly_data.each_with_index.map do |day, index|
@@ -18,10 +24,12 @@ module StudentGrowthHelper
     { points: points, ticks: ticks, paths: student_growth_paths(points) }
   end
 
-  def student_growth_metric_link(metric, label)
-    link_to label, student_growth_path(week_offset: @week_offset, metric: metric),
+  def student_growth_metric_link(metric, label, color: OVERALL_GROWTH_COLOR)
+    swatch = tag.span class: "h-3 w-3 shrink-0 rounded-full ring-1 ring-white",
+      style: "background-color: #{color}", aria: { hidden: true }, data: { metric_swatch: true }
+    link_to safe_join([swatch, label]), student_growth_path(week_offset: @week_offset, metric: metric),
       class: class_names(
-        "shrink-0 rounded-full px-4 py-2 text-sm font-bold transition",
+        "inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition",
         "bg-blue-600 text-white" => @metric == metric,
         "bg-slate-100 text-slate-600 hover:bg-slate-200" => @metric != metric
       ),

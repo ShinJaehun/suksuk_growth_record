@@ -1,0 +1,43 @@
+ko:
+  virtues:
+    title: "덕목 관리"
+    active_count: "사용 중인 덕목 %{count} / %{maximum}"
+    active_title: "사용 중인 덕목"
+    inactive_title: "사용 종료된 덕목"
+    no_inactive: "사용 종료된 덕목이 없습니다."
+    name: "이름"
+    color: "색상"
+    automatic_color: "자동 배정"
+    add: "새 덕목 추가"
+    update: "수정"
+    deactivate: "사용 종료"
+    last_active: "마지막 덕목은 사용 종료할 수 없습니다."
+    maximum_active: "덕목은 최대 5개까지 사용할 수 있습니다. 새 덕목을 추가하려면 기존 덕목을 사용 종료해 주세요."
+    saved: "덕목 변경을 저장했습니다."
+    colors:
+      blue: "파랑"
+      green: "초록"
+      violet: "보라"
+      rose: "진분홍"
+      orange: "주황"
+      teal: "청록"
+      magenta: "자주"
+      brown: "갈색"
+  activerecord:
+    attributes:
+      virtue:
+        name: "이름"
+        color_key: "색상"
+        active: "사용 상태"
+    errors:
+      models:
+        virtue:
+          attributes:
+            name:
+              blank: "이름을 입력해 주세요."
+            color_key:
+              inclusion: "은 제공된 목록에서 선택해 주세요."
+              taken: "은 다른 사용 중인 덕목에서 이미 사용하고 있습니다."
+            active:
+              too_many: "는 최대 5개의 덕목까지 허용됩니다."
+              last_active: "를 변경할 수 없습니다. 마지막 덕목은 유지해야 합니다."

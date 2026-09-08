@@ -47,24 +47,30 @@ class StudentGrowthRecordsController < ApplicationController
 
   def load_today_record
     @record = current_student.daily_growth_records
-      .includes(daily_growth_scores: :virtue)
+      .includes(:daily_growth_scores, daily_virtue_configuration: :items)
       .find_by(recorded_on: Time.zone.today)
   end
 
   def load_today_record!
     @record = current_student.daily_growth_records
-      .includes(daily_growth_scores: :virtue)
+      .includes(:daily_growth_scores, daily_virtue_configuration: :items)
       .find_by!(recorded_on: Time.zone.today)
   end
 
   def prepare_form(submitted_scores: nil, reflection: nil)
+    configuration = @record&.daily_virtue_configuration ||
+      current_student.classroom.daily_virtue_configurations.includes(:items).find_by(recorded_on: Time.zone.today)
+    @virtue_fields = if configuration
+      configuration.items.map { |item| { id: item.virtue_id, name: item.name } }
+    else
+      current_student.classroom.virtues.active.in_display_order.map { |virtue| { id: virtue.id, name: virtue.name } }
+    end
+
     if @record
-      @virtues = @record.daily_growth_scores.map(&:virtue).sort_by { |virtue| [virtue.position, virtue.id] }
       stored_scores = @record.daily_growth_scores.index_by(&:virtue_id).transform_values(&:score)
       @selected_scores = submitted_scores || stored_scores.transform_keys(&:to_s)
       @reflection = reflection.nil? ? @record.reflection : reflection
     else
-      @virtues = current_student.classroom.virtues.active.in_display_order.to_a
       @selected_scores = submitted_scores || {}
       @reflection = reflection
     end

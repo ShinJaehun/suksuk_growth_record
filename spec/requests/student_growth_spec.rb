@@ -20,7 +20,16 @@ RSpec.describe "Student weekly growth", type: :request do
   end
 
   def create_record(date:, scores:, owner: student)
-    record = owner.daily_growth_records.build(classroom: owner.classroom, recorded_on: date)
+    configuration = owner.classroom.daily_virtue_configurations.find_by(recorded_on: date)
+    unless configuration
+      configuration = owner.classroom.daily_virtue_configurations.build(recorded_on: date)
+      scores.each_key do |virtue|
+        configuration.items.build(virtue: virtue, name: virtue.name, position: virtue.position)
+      end
+    end
+    record = owner.daily_growth_records.build(
+      classroom: owner.classroom, recorded_on: date, daily_virtue_configuration: configuration
+    )
     scores.each { |virtue, value| record.daily_growth_scores.build(virtue:, score: value) }
     record.save!
     record
@@ -291,6 +300,52 @@ RSpec.describe "Student weekly growth", type: :request do
     get student_growth_path, params: { metric: "unknown" }
 
     expect(graph_metric).to eq("overall")
+  end
+
+  it "uses a fixed product color outside the Virtue palette for the overall line, points, and swatch" do
+    create_record(date: monday, scores: { virtues[0] => 3 })
+    create_record(date: monday + 1, scores: { virtues[0] => 4 })
+    sign_in_student
+
+    get student_growth_path
+
+    overall_color = StudentGrowthHelper::OVERALL_GROWTH_COLOR
+    expect(Virtue::COLORS.values).not_to include(overall_color)
+    expect(document.at_css("svg path")["stroke"]).to eq(overall_color)
+    expect(document.css("svg circle").map { |point| point["fill"] }).to eq([overall_color] * 2)
+    expect(document.at_css('[data-metric="overall"] [data-metric-swatch]')["style"])
+      .to eq("background-color: #{overall_color}")
+  end
+
+  it "uses the selected virtue's stored color for its line, points, and metric swatch" do
+    virtue = virtues[0]
+    virtue.update!(color_key: "rose")
+    create_record(date: monday, scores: { virtue => 3 })
+    create_record(date: monday + 1, scores: { virtue => 4 })
+    sign_in_student
+
+    get student_growth_path, params: { metric: virtue.id }
+
+    expect(document.at_css("svg path")["stroke"]).to eq(virtue.color_hex)
+    expect(document.css("svg circle").map { |point| point["fill"] }).to eq([virtue.color_hex] * 2)
+    expect(document.at_css(%([data-metric="#{virtue.id}"] [data-metric-swatch]))["style"])
+      .to eq("background-color: #{virtue.color_hex}")
+  end
+
+  it "uses the current stored color for historical scores after the virtue is retired" do
+    virtue = virtues[0]
+    create_record(date: monday - 4, scores: { virtue => 3 })
+    create_record(date: monday - 3, scores: { virtue => 4 })
+    virtue.update!(color_key: "teal")
+    virtue.update!(active: false)
+    sign_in_student
+
+    get student_growth_path, params: { week_offset: -1, metric: virtue.id }
+
+    expect(document.at_css("svg path")["stroke"]).to eq(virtue.color_hex)
+    expect(document.css("svg circle").map { |point| point["fill"] }).to eq([virtue.color_hex] * 2)
+    expect(document.at_css(%([data-metric="#{virtue.id}"] [data-metric-swatch]))["style"])
+      .to eq("background-color: #{virtue.color_hex}")
   end
 
   it "links the shared growth navigation and marks only the current screen active" do

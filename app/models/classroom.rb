@@ -10,6 +10,7 @@ class Classroom < ApplicationRecord
   has_many :students, dependent: :restrict_with_error
   has_many :virtues, -> { order(:position, :id) }, dependent: :destroy
   has_many :daily_growth_records, dependent: :restrict_with_error
+  has_many :daily_virtue_configurations, dependent: :restrict_with_error
 
   after_create :bootstrap_default_virtues
 

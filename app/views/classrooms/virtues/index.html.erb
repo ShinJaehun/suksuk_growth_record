@@ -1,0 +1,65 @@
+<section class="mx-auto w-full max-w-3xl space-y-5 py-4">
+  <header class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <%= link_to classroom_display_name(@classroom), classroom_path(@classroom),
+          class: "text-sm font-semibold text-blue-700 hover:underline" %>
+    <h1 class="mt-2 text-2xl font-extrabold text-slate-900"><%= t("virtues.title") %></h1>
+    <p class="mt-2 text-sm text-slate-600">
+      <%= t("virtues.active_count", count: @active_count, maximum: Virtue::MAX_ACTIVE_PER_CLASSROOM) %>
+    </p>
+  </header>
+
+  <% if @virtue&.errors&.any? %>
+    <div role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <ul class="list-inside list-disc">
+        <% @virtue.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <section class="space-y-3">
+    <h2 class="text-lg font-bold text-slate-900"><%= t("virtues.active_title") %></h2>
+    <% @active_virtues.each do |virtue| %>
+      <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-2">
+          <%= virtue_color_swatch(virtue) %>
+          <h3 class="font-bold text-slate-900"><%= virtue.name %></h3>
+        </div>
+        <%= render "form", virtue: virtue %>
+        <% if @can_deactivate_virtue %>
+          <%= button_to t("virtues.deactivate"), deactivate_classroom_virtue_path(@classroom, virtue),
+                method: :patch,
+                class: "rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50" %>
+        <% else %>
+          <p class="text-sm text-slate-500"><%= t("virtues.last_active") %></p>
+        <% end %>
+      </article>
+    <% end %>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <h2 class="mb-3 text-lg font-bold text-slate-900"><%= t("virtues.add") %></h2>
+    <% if @can_add_virtue %>
+      <%= render "form", virtue: @new_virtue %>
+    <% else %>
+      <p class="text-sm text-slate-500"><%= t("virtues.maximum_active") %></p>
+    <% end %>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" data-inactive-virtues>
+    <h2 class="mb-3 text-lg font-bold text-slate-900"><%= t("virtues.inactive_title") %></h2>
+    <% if @inactive_virtues.empty? %>
+      <p class="text-sm text-slate-500"><%= t("virtues.no_inactive") %></p>
+    <% else %>
+      <ul class="space-y-3">
+        <% @inactive_virtues.each do |virtue| %>
+          <li class="flex items-center gap-2 text-slate-600">
+            <%= virtue_color_swatch(virtue) %>
+            <%= virtue.name %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+</section>

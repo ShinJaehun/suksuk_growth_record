@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_10_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -59,11 +59,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_10_000000) do
   create_table "daily_growth_records", force: :cascade do |t|
     t.bigint "classroom_id", null: false
     t.datetime "created_at", null: false
+    t.bigint "daily_virtue_configuration_id", null: false
     t.date "recorded_on", null: false
     t.text "reflection"
     t.bigint "student_id", null: false
     t.datetime "updated_at", null: false
     t.index ["classroom_id"], name: "index_daily_growth_records_on_classroom_id"
+    t.index ["daily_virtue_configuration_id"], name: "index_daily_growth_records_on_configuration"
     t.index ["student_id", "recorded_on"], name: "index_daily_growth_records_on_student_and_date", unique: true
     t.index ["student_id"], name: "index_daily_growth_records_on_student_id"
   end
@@ -78,6 +80,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_10_000000) do
     t.index ["daily_growth_record_id"], name: "index_daily_growth_scores_on_daily_growth_record_id"
     t.index ["virtue_id"], name: "index_daily_growth_scores_on_virtue_id"
     t.check_constraint "score >= 1 AND score <= 5", name: "chk_daily_growth_scores_range"
+  end
+
+  create_table "daily_virtue_configuration_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "daily_virtue_configuration_id", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "virtue_id", null: false
+    t.index ["daily_virtue_configuration_id", "virtue_id"], name: "index_daily_configuration_items_on_configuration_and_virtue", unique: true
+    t.index ["daily_virtue_configuration_id"], name: "index_daily_configuration_items_on_configuration"
+    t.index ["virtue_id"], name: "index_daily_virtue_configuration_items_on_virtue_id"
+    t.check_constraint "\"position\" > 0", name: "chk_daily_configuration_items_position_positive"
+  end
+
+  create_table "daily_virtue_configurations", force: :cascade do |t|
+    t.bigint "classroom_id", null: false
+    t.datetime "created_at", null: false
+    t.date "recorded_on", null: false
+    t.datetime "updated_at", null: false
+    t.index ["classroom_id", "recorded_on"], name: "index_daily_configurations_on_classroom_and_date", unique: true
+    t.index ["classroom_id"], name: "index_daily_virtue_configurations_on_classroom_id"
+    t.index ["id", "classroom_id", "recorded_on"], name: "index_daily_configurations_on_record_identity", unique: true
   end
 
   create_table "homeroom_assignments", force: :cascade do |t|
@@ -178,6 +203,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_10_000000) do
   create_table "virtues", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.bigint "classroom_id", null: false
+    t.string "color_key", null: false
     t.datetime "created_at", null: false
     t.string "name", null: false
     t.integer "position", null: false
@@ -190,9 +216,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_10_000000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "classrooms", "school_years"
   add_foreign_key "daily_growth_records", "classrooms"
+  add_foreign_key "daily_growth_records", "daily_virtue_configurations", column: ["daily_virtue_configuration_id", "classroom_id", "recorded_on"], primary_key: ["id", "classroom_id", "recorded_on"], name: "fk_growth_record_configuration_identity"
   add_foreign_key "daily_growth_records", "students"
   add_foreign_key "daily_growth_scores", "daily_growth_records"
   add_foreign_key "daily_growth_scores", "virtues"
+  add_foreign_key "daily_virtue_configuration_items", "daily_virtue_configurations"
+  add_foreign_key "daily_virtue_configuration_items", "virtues"
+  add_foreign_key "daily_virtue_configurations", "classrooms"
   add_foreign_key "homeroom_assignments", "classrooms"
   add_foreign_key "homeroom_assignments", "users", column: "teacher_id"
   add_foreign_key "school_years", "schools"

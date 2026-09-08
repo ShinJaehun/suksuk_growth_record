@@ -21,17 +21,31 @@ module DailyGrowthRecords
 
     def create_record
       @student.classroom.with_lock do
+        today = Time.zone.today
+        configuration = @student.classroom.daily_virtue_configurations.includes(items: :virtue)
+          .find_by(recorded_on: today) || capture_configuration(today)
         record = @student.daily_growth_records.build(
           classroom: @student.classroom,
-          recorded_on: Time.zone.today,
+          recorded_on: today,
+          daily_virtue_configuration: configuration,
           reflection: @reflection
         )
-        virtues = @student.classroom.virtues.active.in_display_order.to_a
-        require_exact_scores!(record, virtues.map(&:id))
-        virtues.each { |virtue| record.daily_growth_scores.build(virtue:, score: @scores.fetch(virtue.id)) }
+        require_exact_scores!(record, configuration.items.map(&:virtue_id))
+        configuration.items.each do |item|
+          record.daily_growth_scores.build(virtue: item.virtue, score: @scores.fetch(item.virtue_id))
+        end
         record.save!
         record
       end
+    end
+
+    def capture_configuration(today)
+      configuration = @student.classroom.daily_virtue_configurations.build(recorded_on: today)
+      @student.classroom.virtues.active.in_display_order.each do |virtue|
+        configuration.items.build(virtue: virtue, name: virtue.name, position: virtue.position)
+      end
+      configuration.save!
+      configuration
     end
 
     def update_record

@@ -71,6 +71,10 @@ Rails.application.routes.draw do
         to: "classrooms/student_logins#regenerate_student_login_token"
     end
 
+    resources :virtues, only: %i[index create update], module: :classrooms do
+      patch :deactivate, on: :member
+    end
+
     resources :students, controller: "classroom_students", only: [:new, :create, :show, :edit, :update, :destroy] do
       collection do
         get :bulk_new,
