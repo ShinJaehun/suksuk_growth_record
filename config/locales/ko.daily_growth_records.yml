@@ -19,6 +19,7 @@ ko:
       label: "오늘의 생각"
       optional: "(선택)"
       placeholder: "오늘 실천하며 느낀 점을 적어 보세요."
+    score_value: "%{score} / 5"
     score_labels:
       "1": "거의 실천하지 못했어요"
       "2": "조금 실천했어요"

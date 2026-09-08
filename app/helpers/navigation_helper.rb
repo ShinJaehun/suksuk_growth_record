@@ -2,7 +2,7 @@ module NavigationHelper
   def primary_navigation_items(context)
     if context[:student]
       return [
-        navigation_item('navigation.my_page', student_profile_path)
+        navigation_item('navigation.my_page', student_growth_path(tab: "today"))
       ]
     end
 

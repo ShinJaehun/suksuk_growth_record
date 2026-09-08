@@ -17,23 +17,12 @@ RSpec.describe "Student self service", type: :request do
     expect(response).to redirect_to(new_student_session_path)
   end
 
-  it "shows only the current Student profile data" do
-    other_student = create(:student, classroom: classroom, name: "다른 학생", student_pin: "5678")
+  it "redirects the Student profile route to the canonical today dashboard" do
     sign_in_student
 
     get student_profile_path
 
-    expect(response).to have_http_status(:ok)
-    expect(response.body).to include(student.name, "7번", classroom.class_label)
-    expect(response.body).not_to include(other_student.name)
-  end
-
-  it "links to today's growth record" do
-    sign_in_student
-
-    get student_profile_path
-
-    expect(response.body).to include(student_growth_record_path, "오늘")
+    expect(response).to redirect_to(student_growth_path(tab: "today"))
   end
 
   it "shows self-service PIN fields without teacher management fields" do
@@ -46,16 +35,6 @@ RSpec.describe "Student self service", type: :request do
     expect(response.body).to include('name="student[student_pin_confirmation]"')
     expect(response.body).not_to include('name="student[name]"')
     expect(response.body).not_to include('name="student[avatar_key]"')
-    expect(response.body).not_to include('name="student[student_number]"')
-  end
-
-  it "shows an unassigned student number without an editable number field" do
-    student.update!(student_number: nil)
-    sign_in_student
-
-    get student_profile_path
-
-    expect(response.body).to include("미지정")
     expect(response.body).not_to include('name="student[student_number]"')
   end
 

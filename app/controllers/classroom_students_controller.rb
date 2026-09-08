@@ -1,4 +1,6 @@
 class ClassroomStudentsController < ApplicationController
+  include GrowthDashboardPrepareable
+
   helper_method :return_to_context, :member_status_context, :members_return_to?,
     :managed_student_navigation_params, :managed_student_back_path
 
@@ -43,11 +45,13 @@ class ClassroomStudentsController < ApplicationController
   def show
     authorize @classroom, :manage_growth?
     @can_manage_student = policy(@student).manage?
-    @record = @student.daily_growth_records
-      .where(classroom: @classroom)
-      .includes(:daily_growth_scores, daily_virtue_configuration: :items)
-      .find_by(recorded_on: Time.zone.today)
-    @score_rows = score_rows(@record)
+    @tab = growth_dashboard_tab
+
+    if @tab == :growth
+      prepare_growth_dashboard(@student)
+    else
+      prepare_growth_today(@student, classroom: @classroom)
+    end
   end
 
   def edit
@@ -113,16 +117,6 @@ class ClassroomStudentsController < ApplicationController
   def set_classroom = @classroom = Classroom.find(params[:classroom_id])
   def set_student = @student = @classroom.students.find(params[:id])
   def authorize_manage! = authorize(@classroom, :manage_members?)
-
-  def score_rows(record)
-    return [] unless record
-
-    scores_by_virtue_id = record.daily_growth_scores.index_by(&:virtue_id)
-    record.daily_virtue_configuration.items.filter_map do |item|
-      score = scores_by_virtue_id[item.virtue_id]
-      { name: item.name, value: score.score } if score
-    end
-  end
 
   def student_params
     params.require(:student).permit(:name, :student_number, :student_pin, :gender, :avatar_key)

@@ -36,10 +36,10 @@ RSpec.describe 'Navigation', type: :request do
 
     expect(response).to redirect_to(student_growth_record_path)
 
-    get student_profile_path
+    get student_growth_path
 
     expect(navbar_links).to include(
-      student_profile_path,
+      student_growth_path(tab: 'today'),
       destroy_student_session_path
     )
     expect(navbar.text).to include(I18n.t('navigation.my_page'))

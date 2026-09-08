@@ -48,7 +48,7 @@ RSpec.describe "Student weekly growth", type: :request do
   end
 
   it "rejects access without a Student session" do
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(response).to redirect_to(new_student_session_path)
   end
@@ -57,7 +57,7 @@ RSpec.describe "Student weekly growth", type: :request do
     sign_in_student
     classroom.update!(active: false)
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
   end
@@ -65,7 +65,7 @@ RSpec.describe "Student weekly growth", type: :request do
   it "defaults to overall and presents the current Monday through Friday" do
     sign_in_student
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(response).to have_http_status(:ok)
     expect(graph_metric).to eq("overall")
@@ -80,7 +80,7 @@ RSpec.describe "Student weekly growth", type: :request do
     travel_to(Time.zone.local(2026, 9, 7, 0, 30))
     sign_in_student
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(document.at_css("[data-week-start]")["data-week-start"]).to eq("2026-09-07")
   end
@@ -92,7 +92,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday + 1, scores: { virtues.first => 5 }, owner: other_student)
     sign_in_student
 
-    get student_growth_path, params: { student_id: other_student.id, classroom_id: classroom.id }
+    get student_growth_path, params: { tab: "growth", student_id: other_student.id, classroom_id: classroom.id }
 
     expect(graph_day(monday)["data-growth-value"].to_f).to eq(40.0)
     expect(graph_day(monday + 1)["data-growth-value"]).to eq("")
@@ -103,7 +103,7 @@ RSpec.describe "Student weekly growth", type: :request do
     record = create_record(date: monday, scores: { virtues[0] => 3, virtues[1] => 5 })
     sign_in_student
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(graph_day(monday)["data-growth-value"].to_f).to eq(80.0)
     expect(graph_day(monday).css("circle").size).to eq(1)
@@ -117,7 +117,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday, scores: { virtues[0] => 1, virtues[1] => 5 })
     sign_in_student
 
-    get student_growth_path, params: { metric: virtues[0].id }
+    get student_growth_path, params: { tab: "growth", metric: virtues[0].id }
 
     expect(graph_metric).to eq(virtues[0].id.to_s)
     expect(graph_day(monday)["data-growth-value"]).to eq("1")
@@ -129,7 +129,7 @@ RSpec.describe "Student weekly growth", type: :request do
   it "keeps missing dates empty without points, lines, or fake database rows" do
     sign_in_student
 
-    expect { get student_growth_path }.not_to change {
+    expect { get student_growth_path, params: { tab: "growth" } }.not_to change {
       [DailyGrowthRecord.count, DailyGrowthScore.count]
     }
 
@@ -142,7 +142,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday, scores: { virtues[1] => 5 })
     sign_in_student
 
-    get student_growth_path, params: { metric: virtues[0].id }
+    get student_growth_path, params: { tab: "growth", metric: virtues[0].id }
 
     expect(graph_day(monday)["data-growth-value"]).to eq("")
     expect(graph_day(monday).css("circle")).to be_empty
@@ -154,7 +154,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday + 2, scores: { virtues[0] => 5 })
     sign_in_student
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(document.css("svg circle").size).to eq(2)
     expect(document.css("svg path")).to be_empty
@@ -165,7 +165,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday + 1, scores: { virtues[0] => 5 })
     sign_in_student
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     expect(document.css("svg path").size).to eq(1)
     expect(document.at_css("svg path")["stroke-linecap"]).to eq("round")
@@ -176,7 +176,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday - 3, scores: { virtues[0] => 5 })
     create_record(date: monday, scores: { virtues[0] => 1 })
     sign_in_student
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     get document.at_css('[data-week-navigation="previous"]')["href"]
 
@@ -194,7 +194,7 @@ RSpec.describe "Student weekly growth", type: :request do
     virtue.update!(active: false)
     sign_in_student
 
-    get student_growth_path, params: { metric: virtue.id }
+    get student_growth_path, params: { tab: "growth", metric: virtue.id }
 
     expect(document.at_css("[data-week-start]")["data-week-start"]).to eq("2026-09-07")
     expect(document.at_css("[data-week-end]")["data-week-end"]).to eq("2026-09-11")
@@ -208,7 +208,7 @@ RSpec.describe "Student weekly growth", type: :request do
 
   it "allows next-week navigation from a past week and preserves the metric both ways" do
     sign_in_student
-    get student_growth_path, params: { metric: virtues[0].id }
+    get student_growth_path, params: { tab: "growth", metric: virtues[0].id }
 
     get document.at_css('[data-week-navigation="previous"]')["href"]
 
@@ -225,7 +225,7 @@ RSpec.describe "Student weekly growth", type: :request do
   it "does not offer future navigation or accept a positive offset" do
     sign_in_student
 
-    get student_growth_path, params: { week_offset: 1 }
+    get student_growth_path, params: { tab: "growth", week_offset: 1 }
 
     expect(document.at_css("[data-week-start]")["data-week-start"]).to eq("2026-09-07")
     expect(document.at_css('a[data-week-navigation="next"]')).to be_nil
@@ -234,14 +234,14 @@ RSpec.describe "Student weekly growth", type: :request do
   it "falls back to the current week for a malformed offset" do
     sign_in_student
 
-    get student_growth_path, params: { week_offset: "invalid" }
+    get student_growth_path, params: { tab: "growth", week_offset: "invalid" }
 
     expect(document.at_css("[data-week-start]")["data-week-start"]).to eq("2026-09-07")
   end
 
   it "offers current active virtues and retains the week when selecting a metric" do
     sign_in_student
-    get student_growth_path, params: { week_offset: -1 }
+    get student_growth_path, params: { tab: "growth", week_offset: -1 }
 
     virtues.each do |virtue|
       expect(document.at_css(%(a[data-metric="#{virtue.id}"])).text).to eq(virtue.name)
@@ -259,13 +259,13 @@ RSpec.describe "Student weekly growth", type: :request do
     virtue.update!(active: false)
     sign_in_student
 
-    get student_growth_path, params: { week_offset: -1, metric: virtue.id }
+    get student_growth_path, params: { tab: "growth", week_offset: -1, metric: virtue.id }
 
     expect(document.at_css(%(a[data-metric="#{virtue.id}"])).text).to eq(virtue.name)
     expect(graph_metric).to eq(virtue.id.to_s)
     expect(graph_day(monday - 3)["data-growth-value"]).to eq("4")
 
-    get student_growth_path, params: { metric: virtue.id }
+    get student_growth_path, params: { tab: "growth", metric: virtue.id }
 
     expect(document.at_css(%(a[data-metric="#{virtue.id}"]))).to be_nil
     expect(graph_metric).to eq("overall")
@@ -278,7 +278,7 @@ RSpec.describe "Student weekly growth", type: :request do
     virtue.update!(active: false)
     sign_in_student
 
-    get student_growth_path, params: { metric: virtue.id }
+    get student_growth_path, params: { tab: "growth", metric: virtue.id }
 
     expect(document.at_css(%(a[data-metric="#{virtue.id}"]))).to be_nil
     expect(graph_metric).to eq("overall")
@@ -288,7 +288,7 @@ RSpec.describe "Student weekly growth", type: :request do
     unrelated_virtue = create(:classroom).virtues.first
     sign_in_student
 
-    get student_growth_path, params: { metric: unrelated_virtue.id }
+    get student_growth_path, params: { tab: "growth", metric: unrelated_virtue.id }
 
     expect(graph_metric).to eq("overall")
     expect(document.at_css(%(a[data-metric="#{unrelated_virtue.id}"]))).to be_nil
@@ -297,7 +297,7 @@ RSpec.describe "Student weekly growth", type: :request do
   it "falls back to overall for an unknown metric" do
     sign_in_student
 
-    get student_growth_path, params: { metric: "unknown" }
+    get student_growth_path, params: { tab: "growth", metric: "unknown" }
 
     expect(graph_metric).to eq("overall")
   end
@@ -307,7 +307,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday + 1, scores: { virtues[0] => 4 })
     sign_in_student
 
-    get student_growth_path
+    get student_growth_path, params: { tab: "growth" }
 
     overall_color = StudentGrowthHelper::OVERALL_GROWTH_COLOR
     expect(Virtue::COLORS.values).not_to include(overall_color)
@@ -324,7 +324,7 @@ RSpec.describe "Student weekly growth", type: :request do
     create_record(date: monday + 1, scores: { virtue => 4 })
     sign_in_student
 
-    get student_growth_path, params: { metric: virtue.id }
+    get student_growth_path, params: { tab: "growth", metric: virtue.id }
 
     expect(document.at_css("svg path")["stroke"]).to eq(virtue.color_hex)
     expect(document.css("svg circle").map { |point| point["fill"] }).to eq([virtue.color_hex] * 2)
@@ -340,7 +340,7 @@ RSpec.describe "Student weekly growth", type: :request do
     virtue.update!(active: false)
     sign_in_student
 
-    get student_growth_path, params: { week_offset: -1, metric: virtue.id }
+    get student_growth_path, params: { tab: "growth", week_offset: -1, metric: virtue.id }
 
     expect(document.at_css("svg path")["stroke"]).to eq(virtue.color_hex)
     expect(document.css("svg circle").map { |point| point["fill"] }).to eq([virtue.color_hex] * 2)
@@ -350,19 +350,20 @@ RSpec.describe "Student weekly growth", type: :request do
 
   it "links the shared growth navigation and marks only the current screen active" do
     sign_in_student
-    get student_growth_record_path
+    get student_growth_path
 
-    today_nav = document.at_css("[data-student-app-nav]")
-    expect(today_nav.at_css(%(a[href="#{student_growth_record_path}"]))["aria-current"]).to eq("page")
-    expect(today_nav.at_css(%(a[href="#{student_growth_path}"]))["aria-current"]).to be_nil
+    today_nav = document.at_css("[data-growth-dashboard-navigation]")
+    expect(today_nav.at_css('[data-growth-tab="today"]')["aria-current"]).to eq("page")
+    expect(today_nav.at_css('[data-growth-tab="growth"]')["aria-current"]).to be_nil
 
-    get today_nav.at_css(%(a[href="#{student_growth_path}"]))["href"]
+    get today_nav.at_css('[data-growth-tab="growth"]')["href"]
 
-    growth_nav = document.at_css("[data-student-app-nav]")
-    expect(growth_nav.at_css(%(a[href="#{student_growth_path}"]))["aria-current"]).to eq("page")
-    expect(growth_nav.at_css(%(a[href="#{student_growth_record_path}"]))["aria-current"]).to be_nil
-    disabled_items = growth_nav.css('[aria-disabled="true"]')
-    expect(disabled_items.size).to eq(1)
-    expect(disabled_items.first.text).to include(I18n.t("student_app.navigation.monthly"))
+    growth_nav = document.at_css("[data-growth-dashboard-navigation]")
+    expect(growth_nav.at_css('[data-growth-tab="growth"]')["aria-current"]).to eq("page")
+    expect(growth_nav.at_css('[data-growth-tab="today"]')["aria-current"]).to be_nil
+
+    monthly = growth_nav.at_css('[data-growth-tab="monthly"]')
+    expect(monthly["aria-disabled"]).to eq("true")
+    expect(monthly.text).to include(I18n.t("student_app.navigation.monthly"))
   end
 end

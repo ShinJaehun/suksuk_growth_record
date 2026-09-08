@@ -1081,14 +1081,16 @@ RSpec.describe 'Classroom students', type: :request do
 
       get classroom_student_path(classroom, student)
 
-      expect(response.body).to include(
+      document = Nokogiri::HTML(response.body)
+      today = document.at_css('[data-today-growth-record]')
+      expect(today.text).to include(
         I18n.t('teacher_growth_records.completed'),
         frozen_name,
         record.daily_growth_scores.first.score.to_s,
         '오늘의 성찰'
       )
-      expect(response.body).not_to include(current_name)
-      expect(Nokogiri::HTML(response.body).css('form, input, textarea, button')).to be_empty
+      expect(today.text).not_to include(current_name)
+      expect(document.css('form, input, textarea, button')).to be_empty
     end
   end
 

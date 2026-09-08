@@ -21,10 +21,18 @@ RSpec.describe "Student daily growth records", type: :request do
     expect(response).to redirect_to(new_student_session_path)
   end
 
-  it "shows the current active virtues to the signed-in Student" do
+  it "redirects the legacy signed-in GET to the canonical today dashboard" do
     sign_in_student
 
     get student_growth_record_path
+
+    expect(response).to redirect_to(student_growth_path(tab: "today"))
+  end
+
+  it "shows the current active virtues to the signed-in Student" do
+    sign_in_student
+
+    get student_growth_path(tab: "today")
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("오늘의 성장 기록", student.name)
@@ -40,7 +48,7 @@ RSpec.describe "Student daily growth records", type: :request do
     }
 
     record = student.daily_growth_records.find_by!(recorded_on: Time.zone.today)
-    expect(response).to redirect_to(student_growth_record_path)
+    expect(response).to redirect_to(student_growth_path(tab: "today"))
     expect(record.classroom).to eq(classroom)
     expect(record.reflection).to eq("오늘의 생각")
     expect(record.daily_growth_scores.pluck(:virtue_id, :score)).to match_array(
@@ -55,7 +63,7 @@ RSpec.describe "Student daily growth records", type: :request do
       daily_growth_record: { scores: scores_for(classroom.virtues.active), reflection: "" }
     }
 
-    expect(response).to redirect_to(student_growth_record_path)
+    expect(response).to redirect_to(student_growth_path(tab: "today"))
     expect(student.daily_growth_records.find_by!(recorded_on: Time.zone.today).reflection).to eq("")
   end
 
@@ -105,7 +113,7 @@ RSpec.describe "Student daily growth records", type: :request do
     renamed_virtue.update!(name: "책 읽기")
     sign_in_student
 
-    get student_growth_record_path
+    get student_growth_path(tab: "today", edit: 1)
 
     document = Nokogiri::HTML(response.body)
     expect(response.body).to include("저장된 생각", "오늘 기록 수정")
@@ -129,15 +137,16 @@ RSpec.describe "Student daily growth records", type: :request do
       daily_growth_record: { scores: scores_for(virtues, 5), reflection: "수정됨" }
     }
 
-    expect(response).to redirect_to(student_growth_record_path)
+    expect(response).to redirect_to(student_growth_path(tab: "today"))
     expect(record.reload.reflection).to eq("수정됨")
     expect(record.daily_growth_scores.pluck(:score)).to all(eq(5))
     expect(record.daily_growth_scores.pluck(:id, :virtue_id)).to match_array(original_scores)
     expect(record.daily_virtue_configuration).to eq(configuration)
     expect(configuration.reload.items.pluck(:virtue_id, :name)).to eq(original_items)
     follow_redirect!
-    expect(Nokogiri::HTML(response.body).css("legend").map(&:text)).to include("독서")
-    expect(Nokogiri::HTML(response.body).css("legend").map(&:text)).not_to include("책 읽기")
+    expect(response.body).to include("독서", "수정됨")
+    expect(response.body).not_to include("책 읽기")
+    expect(Nokogiri::HTML(response.body).css("form")).to be_empty
   end
 
   it "keeps snapshot labels when an update fails after a teacher rename" do
@@ -168,7 +177,7 @@ RSpec.describe "Student daily growth records", type: :request do
     added_virtue = create(:virtue, classroom:, position: 4)
     sign_in_student
 
-    get student_growth_record_path
+    get student_growth_path(tab: "today", edit: 1)
 
     expect(response.body).not_to include(added_virtue.name)
 
@@ -185,7 +194,7 @@ RSpec.describe "Student daily growth records", type: :request do
     inactive_virtue.update!(active: false)
     sign_in_student
 
-    get student_growth_record_path
+    get student_growth_path(tab: "today", edit: 1)
     expect(response.body).to include(inactive_virtue.name)
 
     patch student_growth_record_path, params: {
@@ -197,7 +206,7 @@ RSpec.describe "Student daily growth records", type: :request do
   it "previews current virtues without creating a configuration on GET" do
     sign_in_student
 
-    expect { get student_growth_record_path }.not_to change {
+    expect { get student_growth_path(tab: "today") }.not_to change {
       [DailyVirtueConfiguration.count, DailyVirtueConfigurationItem.count, DailyGrowthRecord.count]
     }
 
@@ -214,7 +223,7 @@ RSpec.describe "Student daily growth records", type: :request do
     added_virtue = create(:virtue, classroom:)
     sign_in_student
 
-    get student_growth_record_path
+    get student_growth_path(tab: "today")
 
     expect(Nokogiri::HTML(response.body).css("legend").map(&:text)).to eq(old_names)
     expect(response.body).not_to include(added_virtue.name, "책 읽기")
@@ -222,7 +231,7 @@ RSpec.describe "Student daily growth records", type: :request do
       daily_growth_record: { scores: scores_for(virtues, 4), reflection: "늦게 입력한 생각" }
     }
 
-    expect(response).to redirect_to(student_growth_record_path)
+    expect(response).to redirect_to(student_growth_path(tab: "today"))
     record = student.daily_growth_records.find_by!(recorded_on: Time.zone.today)
     expect(record.daily_virtue_configuration).to eq(first_record.daily_virtue_configuration)
     expect(record.daily_growth_scores.map(&:virtue)).to match_array(virtues)
@@ -231,7 +240,7 @@ RSpec.describe "Student daily growth records", type: :request do
   it "rejects a stale preview without freezing or rewriting the submitted scores" do
     virtues = classroom.virtues.active.to_a
     sign_in_student
-    get student_growth_record_path
+    get student_growth_path(tab: "today")
     added_virtue = create(:virtue, classroom:)
 
     expect do

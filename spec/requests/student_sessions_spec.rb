@@ -278,7 +278,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
     end
 
     travel_to Time.zone.local(2026, 5, 22, 10, 5, 0) do
-      get student_profile_path
+      get student_growth_path(tab: "today")
     end
 
     expect(response).to have_http_status(:ok)
@@ -345,7 +345,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
     post_student_pin(pin: '1234')
     session.delete(:student_last_seen_at)
 
-    get student_profile_path
+    get student_growth_path(tab: "today")
 
     expect(response).to have_http_status(:ok)
     expect(session[:student_last_seen_at]).to be_present
@@ -373,7 +373,7 @@ RSpec.describe 'Student PIN sessions', type: :request do
   it 'shows a student-specific logout link on the self page' do
     post_student_pin(pin: '1234')
 
-    get student_profile_path
+    get student_growth_path(tab: "today")
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('사용 끝내기')
