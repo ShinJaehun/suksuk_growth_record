@@ -38,7 +38,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 덕목은 Classroom 단위다.
 - 새/current Classroom에는 기본 덕목 `독서`, `봉사`, `감사`가 제공된다.
 - 성장기록 기능 도입 시 기존 current Classroom에도 기본 덕목 3개를 정확히 한 번 bootstrap한다. 이후 새 Classroom도 같은 기본 덕목으로 시작하며 중복 생성하지 않는다.
-- 담임교사는 자기 current active Classroom의 덕목을 추가, 편집, 사용 종료할 수 있다. 권한 기준은 아래 Authorization을 따른다.
+- 아래 Authorization에서 정한 성장기록 운영 권한이 있는 사용자는 current active Classroom의 덕목을 추가, 편집, 사용 종료할 수 있다.
 - 학생 입력 화면에 노출되는 active 덕목은 최대 5개다. 기본 3개에 최대 2개를 추가하는 UX를 기본으로 한다.
 - Classroom은 성장 기록을 위해 최소 1개의 active 덕목을 유지해야 하며 마지막 active 덕목은 사용 종료할 수 없다.
 - 5개 제한은 active 덕목 수에 대한 domain/application invariant이며 DB를 5개 점수 column으로 고정하지 않는다.
@@ -49,12 +49,12 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 ### Classroom 날짜별 덕목 configuration
 
 - 덕목 적용과 history의 canonical 단위는 `Classroom + 날짜`다. 날짜별로 하나의 effective virtue configuration을 가지며, 해당 날짜에 평가할 Virtue 구성과 각 Virtue의 표시 이름을 보존한다. 같은 Classroom의 같은 recorded_on에 속한 모든 학생 record는 동일한 구성과 이름을 사용한다. 학생별 최초 저장 시점에 따른 별도 configuration은 허용하지 않는다.
-- 교사가 관리하는 Virtue 상태는 앞으로 적용할 현재 설정이며 특정 날짜의 effective configuration과 구분한다. 정확한 model/table/schema 이름, persistence와 lookup/create 방식은 implementation 단계에서 결정한다.
-- 오늘 Classroom에 DailyGrowthRecord가 하나도 없다면 담임의 추가·사용 종료·rename을 오늘 configuration에 반영할 수 있다. 이후 그날 입력하는 모든 학생은 동일한 변경된 configuration을 사용한다.
-- 오늘 첫 DailyGrowthRecord가 생성되면 그 날짜 configuration은 확정(frozen)된다. 이후 담임이 현재 설정을 변경해도 오늘 configuration은 바뀌지 않으며 변경은 다음 날짜부터 적용한다. 이미 입력한 학생의 재수정과 아직 미입력인 학생의 최초 입력 모두 확정된 오늘 configuration을 사용한다.
-- 첫 DailyGrowthRecord 생성과 담임의 덕목 설정 변경이 동시에 발생하더라도 둘의 적용 순서는 원자적으로 결정되어야 한다. 설정 변경이 configuration 확정보다 먼저 완료되면 그 변경을 오늘 configuration에 포함하고, configuration 확정이 먼저 완료되면 해당 설정 변경은 다음 날짜부터 적용한다. 어떤 경우에도 같은 Classroom + 날짜에 서로 다른 configuration이 생겨서는 안 된다.
-- configuration 확정이나 이후 교사 변경으로 기존 completion을 취소하거나 재입력을 강요하지 않는다.
-- 지난 날짜의 configuration과 학생 기록은 소급 변경하지 않는다. 교사 변경으로 과거 score 추가·삭제, Virtue 교체, 표시 이름·score 값·reflection 변경을 하지 않는다. 예를 들어 9/8의 `독서`는 9/9에 rename해도 9/8에서는 그대로 유지한다.
+- 성장기록 운영 권한이 있는 사용자가 관리하는 Virtue 상태는 앞으로 적용할 현재 설정이며 특정 날짜의 effective configuration과 구분한다. 정확한 model/table/schema 이름, persistence와 lookup/create 방식은 implementation 단계에서 결정한다.
+- 오늘 Classroom에 DailyGrowthRecord가 하나도 없다면 권한 있는 사용자의 추가·사용 종료·rename을 오늘 configuration에 반영할 수 있다. 이후 그날 입력하는 모든 학생은 동일한 변경된 configuration을 사용한다.
+- 오늘 첫 DailyGrowthRecord가 생성되면 그 날짜 configuration은 확정(frozen)된다. 이후 권한 있는 사용자가 현재 설정을 변경해도 오늘 configuration은 바뀌지 않으며 변경은 다음 날짜부터 적용한다. 이미 입력한 학생의 재수정과 아직 미입력인 학생의 최초 입력 모두 확정된 오늘 configuration을 사용한다.
+- 첫 DailyGrowthRecord 생성과 권한 있는 사용자의 덕목 설정 변경이 동시에 발생하더라도 둘의 적용 순서는 원자적으로 결정되어야 한다. 설정 변경이 configuration 확정보다 먼저 완료되면 그 변경을 오늘 configuration에 포함하고, configuration 확정이 먼저 완료되면 해당 설정 변경은 다음 날짜부터 적용한다. 어떤 경우에도 같은 Classroom + 날짜에 서로 다른 configuration이 생겨서는 안 된다.
+- configuration 확정이나 이후 권한 있는 사용자의 설정 변경으로 기존 completion을 취소하거나 재입력을 강요하지 않는다.
+- 지난 날짜의 configuration과 학생 기록은 소급 변경하지 않는다. 권한 있는 사용자의 설정 변경으로 과거 score 추가·삭제, Virtue 교체, 표시 이름·score 값·reflection 변경을 하지 않는다. 예를 들어 9/8의 `독서`는 9/9에 rename해도 9/8에서는 그대로 유지한다.
 
 예: 9/8에 `독서`를 `책 읽기`로 rename하고 `배려`를 추가한 경우(이후 추가 변경 없음):
 
@@ -67,7 +67,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 
 ### 교사 덕목 관리 화면
 
-- Classroom 상세 화면에 권한 있는 담임을 위한 `덕목 관리` 진입점을 둔다. 관리 화면은 active 덕목과 사용 종료된 덕목을 구분하며 기존 position/display order를 사용한다.
+- Classroom 상세 화면에 해당 Classroom의 담임, 해당 SchoolYear의 school manager, global admin을 위한 `덕목 관리` 진입점을 둔다. 세 역할은 별도 관리 시스템 없이 같은 덕목 domain invariant와 관리 화면을 사용한다. 관리 화면은 active 덕목과 사용 종료된 덕목을 구분하며 기존 position/display order를 사용한다.
 - active 덕목의 이름·색상 수정과 사용 종료, 새 덕목 추가를 지원한다. 사용 종료된 덕목은 history 보존을 위해 목록에서 확인한다.
 - 복잡한 admin table보다 하나의 일반 page 안에 읽기 쉬운 form을 두는 작은 학급 운영 화면을 우선한다. 제목 `덕목 관리`, active 개수(예: `3 / 5`), active 목록(color swatch·이름·수정·사용 종료), 추가 form(이름·palette 선택·미선택 시 자동 배정), 사용 종료 목록으로 구성한다. modal은 필수가 아니며 business logic은 view에 두지 않는다.
 - active가 5개면 추가할 수 없고 1개면 마지막 덕목을 사용 종료할 수 없다. UI는 기존 domain invariant를 반영하며 parameter 조작이나 direct request로도 우회할 수 없어야 한다.
@@ -79,15 +79,15 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - Virtue에 palette 색상을 안정적으로 식별하는 값을 DB에 저장하고 명시적으로 변경할 때까지 유지한다. exact schema name은 구현 단계에서 결정한다. 매 request나 metric 선택마다 임시 random 값을 만들거나 virtue id modulo 방식으로 색상을 계산하지 않는다.
 - 같은 Classroom의 active Virtue는 서로 다른 색상을 사용해야 한다. 수동 선택·수정과 direct request도 다른 active Virtue가 사용하는 색상을 선택할 수 없다. 사용 종료된 Virtue는 기존 color identity를 유지하며 inactive 상태에서는 색상 중복을 허용한다. 새 덕목에서 색상을 선택하지 않으면 현재 active 덕목이 사용하지 않는 palette 색상을 자동 배정한다. 정확한 random 알고리즘은 canonical contract가 아니며 저장 후에는 고정된 color identity다.
 - 기본 덕목 `독서`, `봉사`, `감사`도 각각 유효한 색상을 가진다. 도입 전 존재하는 모든 Virtue는 안전하고 재현 가능한 migration/backfill로 하나의 유효한 색상을 갖게 하며, 이후 새 Classroom bootstrap도 기본 덕목의 색상을 함께 배정한다. backfill의 정확한 색 선택은 business contract가 아니다.
-- 색상은 Virtue의 현재 presentation identity이며 날짜별 historical configuration의 구성·이름 보존 대상에 포함하지 않는다. 담임이 active 덕목의 색상을 변경하면 과거·현재 chart 모두 현재 색상을 사용하되 날짜별 configuration과 score/history data를 rewrite하지 않는다. 날짜 적용 규칙을 따르는 rename과는 별도 정책이며, 사용 종료된 덕목도 기존 color identity를 유지한다.
+- 색상은 Virtue의 현재 presentation identity이며 날짜별 historical configuration의 구성·이름 보존 대상에 포함하지 않는다. 성장기록 운영 권한이 있는 사용자가 active 덕목의 색상을 변경하면 과거·현재 chart 모두 현재 색상을 사용하되 날짜별 configuration과 score/history data를 rewrite하지 않는다. 날짜 적용 규칙을 따르는 rename과는 별도 정책이며, 사용 종료된 덕목도 기존 color identity를 유지한다.
 - 저장된 색상은 학생 chart의 덕목별 시각적 identity이며 이후 교사 통계·월간 visualization에서도 재사용할 수 있는 기준이다.
 
 ### 덕목 관리 feature의 제외 범위
 
 - drag-and-drop/reorder, 사용 종료 덕목 reactivation, hard delete, arbitrary free-form hex/color picker는 제공하지 않는다.
 - 학생별 덕목 설정, 학교 공통/global virtue library, virtue template, score scale 변경, 기존 DailyGrowthRecord 구성 rewrite는 포함하지 않는다.
-- 월간 visualization, 교사 학급 통계, realtime/Action Cable/Turbo broadcast 추가, 학생 graph에 여러 덕목 line 동시 표시, admin support surface는 포함하지 않는다.
-- 날짜별 configuration 정책에서도 event sourcing, generic audit framework, arbitrary effective date 선택 UI, 교사의 과거 configuration 수정, 학생별 configuration, color snapshot, 전체 Virtue versioning framework는 포함하지 않는다.
+- 월간 visualization, 교사 학급 통계, realtime/Action Cable/Turbo broadcast 추가, 학생 graph에 여러 덕목 line 동시 표시는 포함하지 않는다.
+- 날짜별 configuration 정책에서도 event sourcing, generic audit framework, arbitrary effective date 선택 UI, 성장기록 운영 권한이 있는 사용자의 과거 configuration 수정, 학생별 configuration, color snapshot, 전체 Virtue versioning framework는 포함하지 않는다.
 
 ## 학생 일일 기록
 
@@ -198,17 +198,28 @@ prototype은 다음 통계를 제공한다.
 
 ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 
+## 교사용 학생 성장기록 조회
+
+- 학생 계정과 구성원을 관리하는 `/classrooms/:classroom_id/students/:id`와 성장기록 조회 책임을 분리한다.
+- 담임, 해당 SchoolYear의 school manager, global admin을 위한 Classroom-scoped read-only 조회 surface는 `/classrooms/:classroom_id/students/:student_id/growth` 형태를 canonical route contract로 한다. 정확한 controller/class 이름은 implementation concern이다.
+- 해당 Classroom에 속한 Student만 조회하며, Student가 저장한 DailyGrowthRecord / DailyGrowthScore와 날짜별 frozen configuration을 canonical source로 사용한다.
+- 오늘 기록이 없으면 미입력 상태를 표시할 수 있고, 저장된 오늘 및 과거 기록은 read-only로 보여준다. historical virtue label은 해당 날짜 frozen configuration의 이름을 사용한다.
+- 이 surface에서 교사, school manager, global admin은 Student 대신 score나 reflection을 입력하거나 수정할 수 없다.
+- 학생 자신의 `/student/growth`, `/student/growth_record` 인증·입력 경로를 재사용하거나 Student impersonation으로 접근하지 않는다.
+- 향후 오늘 입력 현황에서 Student를 선택하는 링크는 학생 관리 show가 아니라 이 성장기록 조회 surface를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
+
 ## Authorization
 
 서버측 권한은 starter의 policy, scope와 controller/domain validation 원칙을 재사용한다.
 
 - Student는 자기 기록만 생성하고 당일 수정하며 과거 기록을 조회할 수 있다.
-- 담임 teacher는 current HomeroomAssignment로 담당하는 자기 active Classroom의 덕목을 관리하고, 학생 입력 현황, 기록과 학급 통계를 조회할 수 있다.
-- 다른 Student 또는 다른 Classroom의 직접 URL과 parameter 조작으로 scope를 넓힐 수 없다.
-- school manager 또는 global admin이라는 운영 역할만으로 학생의 성장 점수와 성찰 기록 조회 권한을 자동으로 부여하지 않는다.
-- 성장기록 domain의 교사 권한은 current HomeroomAssignment를 기준으로 한다.
-- 덕목 관리 화면 접근과 변경도 이 담임 권한으로 제한한다. 담당하지 않는 Classroom의 직접 URL/parameter 요청과 Student 접근은 차단한다. school manager 또는 global admin role만으로는 덕목 관리 권한이 생기지 않으며, 기존 ClassroomPolicy의 broader admin/manager 권한을 성장 덕목 관리의 근거로 확대하지 않는다.
-- 관리자용 성장기록 조회나 지원 기능은 필요할 경우 별도 spec에서 결정한다.
+- 현재 active SchoolYear / active School / active Classroom을 전제로, current HomeroomAssignment의 담임 teacher는 담당 Classroom의 성장기록 운영 권한을 가진다.
+- school manager는 자기 current annual SchoolYear에 속한 모든 active Classroom에서, global admin은 모든 active School / active SchoolYear / active Classroom에서 같은 성장기록 운영 권한을 가진다.
+- 성장기록 운영 권한에는 Classroom 덕목 조회·추가·rename·색상 수정·사용 종료, Student 입력 여부 조회, 저장된 Student 성장기록의 read-only 조회와 학급 성장 통계 조회가 포함된다.
+- school manager와 global admin의 덕목 변경도 담임과 같은 Classroom lock 및 날짜별 configuration 적용·freeze·history 규칙을 따른다. 과거 기록이나 configuration을 rewrite하지 않는다.
+- school manager는 다른 SchoolYear 또는 다른 학교의 Classroom에 접근할 수 없고, 일반 teacher는 담당하지 않는 Classroom의 성장기록 domain에 접근할 수 없다.
+- Student는 계속 자기 기록만 접근한다. 직접 URL과 parameter 조작으로 다른 Student, Classroom, SchoolYear 또는 학교까지 scope를 넓힐 수 없다.
+- inactive School, archived 또는 non-current SchoolYear, inactive Classroom에 대한 starter의 기존 권한 경계를 확대하지 않는다.
 
 ## 데이터와 history invariants
 
@@ -229,6 +240,15 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 새 날짜별 configuration 정책에 필요한 기존 데이터 migration/backfill은 implementation 단계에서 안전하게 처리해야 한다. 정확한 model/table/column 이름, DB index, check constraint와 migration 설계는 이 문서에서 확정하지 않는다.
 
 ## Prototype non-goals
+
+이번 성장기록 운영 권한과 교사용 조회 계약의 구현 범위에는 다음을 포함하지 않는다.
+
+- 교사, school manager, global admin의 Student 대신 입력 또는 수정과 Student impersonation
+- school manager 권한의 다른 SchoolYear 또는 다른 학교 확대
+- 과거 DailyGrowthRecord / DailyGrowthScore / configuration 수정
+- 새로운 role, generic permission framework, admin 전용 별도 성장기록 시스템
+- realtime/Turbo/Action Cable 현황 갱신과 polling fallback
+- 통계, ranking, 월간 기능 구현
 
 - starter의 planning/archived SchoolYear 완성
 - rollover
@@ -254,18 +274,23 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 ## Prototype acceptance criteria
 
 1. 기존 current Classroom과 새 Classroom에 기본 덕목 `독서`, `봉사`, `감사`가 중복 없이 제공된다.
-2. 담임은 자기 active Classroom의 active 덕목을 1개 이상, 최대 5개까지 관리할 수 있다.
-3. 담임이 active 덕목을 변경해도 이미 저장된 학생 기록의 덕목 구성은 소급 변경되지 않는다.
-4. 아직 기록하지 않은 학생은 저장 시점의 active 덕목으로 오늘 기록을 작성할 수 있다.
-5. 학생은 자기 오늘 기록의 덕목을 1~5점으로 평가하여 저장할 수 있으며 성찰은 선택 사항이다.
-6. 학생은 임의의 과거·미래 날짜를 지정하여 기록할 수 없다.
-7. 학생은 같은 날 자기 기록을 다시 수정할 수 있으며 기존 기록의 덕목 구성을 유지한다.
-8. 지난 기록은 학생에게 read-only다.
-9. 학생은 다른 학생 기록에 접근할 수 없다.
-10. 학생 저장 후 담임 Classroom 화면이 realtime으로 완료 상태를 반영한다.
-11. 새로고침한 완료 상태는 DB canonical state와 일치한다.
-12. 담임은 완료 학생의 오늘 기록을 확인할 수 있다.
-13. 학생은 종합 및 덕목별 line chart를 확인할 수 있고 과거 score가 있는 사용 종료 덕목의 추이도 확인할 수 있다.
-14. 종합 성장점수는 해당 기록에 실제 존재하는 score의 산술평균이다.
-15. 덕목이 중간에 추가되어도 과거 또는 기존 기록에 0점을 자동 보충하지 않는다.
-16. 담임은 현재 active Student 기준 입력률과 실제 저장 score 기준 종합·덕목별 기본 추이를 확인할 수 있다.
+2. 담임은 자기 active Classroom의 active 덕목을 1개 이상, 최대 5개까지 관리하고 Student 성장기록을 조회할 수 있다.
+3. school manager는 자기 current annual SchoolYear의 active Classroom에서 담임과 같은 성장기록 운영 권한을 가진다.
+4. global admin은 active School / active SchoolYear / active Classroom에서 같은 성장기록 운영 권한을 가진다.
+5. 일반 teacher는 담당하지 않는 Classroom의 덕목과 Student 성장기록에 접근할 수 없고, school manager는 자기 SchoolYear 범위를 벗어날 수 없다.
+6. 권한 있는 사용자가 active 덕목을 변경해도 이미 저장된 Student 기록과 날짜별 configuration은 소급 변경되지 않으며 기존 Classroom + 날짜 configuration/history/color 계약을 유지한다.
+7. 오늘 Classroom의 날짜별 configuration이 아직 확정되지 않았다면 첫 저장 시점의 current active 덕목으로 오늘 configuration을 확정하고, 이미 확정되어 있다면 아직 기록하지 않은 학생도 그 frozen configuration으로 기록한다.
+8. 학생은 자기 오늘 기록의 덕목을 1~5점으로 평가하여 저장할 수 있으며 성찰은 선택 사항이다.
+9. 학생은 임의의 과거·미래 날짜를 지정하여 기록할 수 없다.
+10. 학생은 같은 날 자기 기록을 다시 수정할 수 있으며 기존 기록의 덕목 구성을 유지한다.
+11. 지난 기록은 학생에게 read-only다.
+12. 학생은 다른 학생 기록에 접근할 수 없다.
+13. 학생 저장 후 성장기록 운영 권한이 있는 사용자의 Classroom 현황 화면이 realtime으로 완료 상태를 반영한다.
+14. 새로고침한 완료 상태는 DB canonical state와 일치한다.
+15. 성장기록 운영 권한이 있는 사용자는 완료 학생의 오늘 기록을 read-only로 확인할 수 있다.
+16. 학생 관리 show와 Classroom-scoped 성장기록 조회 surface는 책임을 분리하며, 권한 있는 사용자는 조회 surface에서 Student 대신 입력하거나 수정할 수 없다.
+17. 향후 오늘 입력 현황의 Student 링크는 학생 관리 show가 아니라 성장기록 조회 surface를 대상으로 한다.
+18. 학생은 종합 및 덕목별 line chart를 확인할 수 있고 과거 score가 있는 사용 종료 덕목의 추이도 확인할 수 있다.
+19. 종합 성장점수는 해당 기록에 실제 존재하는 score의 산술평균이다.
+20. 덕목이 중간에 추가되어도 과거 또는 기존 기록에 0점을 자동 보충하지 않는다.
+21. 성장기록 운영 권한이 있는 사용자는 현재 active Student 기준 입력률과 실제 저장 score 기준 종합·덕목별 기본 추이를 확인할 수 있다.
