@@ -137,7 +137,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 
 ## 학생 성장 추이
 
-- 학생용 공통 navigation의 `성장` 항목은 학생 자신의 주간 성장 추이 화면으로 연결한다. `오늘` 입력 화면과 후속 `월간` 화면의 역할은 변경하지 않는다.
+- 학생용 공통 navigation의 `오늘`과 `성장`은 canonical `/student/growth` surface 안에서 각각 today와 growth tab을 선택한다. 후속 `월간` navigation의 역할은 이번 feature에서 변경하지 않는다.
 - 기본 주와 이전/다음 주 이동은 월요일부터 일요일까지의 calendar week를 기준으로 한다. 기본 화면은 application 기준 오늘이 포함된 현재 주이며 이전 주와 다음 주로 이동할 수 있다. 현재 주에서는 미래 주로 이동하는 다음 주 navigation을 제공하지 않거나 비활성화한다.
 - 주간 chart와 weekly presentation의 표시 범위는 월요일부터 금요일까지 5일이다. 토요일과 일요일은 X축과 주간 표시 범위에서 제외하며, 주말 기록이 존재해도 chart에 표시하지 않는다. 이는 visualization 정책으로, `DailyGrowthRecord` domain의 주말·휴일 입력 허용 정책은 변경하지 않는다.
 - metric navigation은 `[종합] [독서] [봉사] [감사] ...` 형태로 전환하며 기본 metric은 `종합`이다. 현재 active 덕목을 기본으로 노출하고, 사용 종료된 덕목도 주간 chart 표시 범위인 월요일부터 금요일 사이에 실제 score가 존재하면 조회할 수 있어야 한다. 구체적인 Tailwind 표현은 구현 단계에서 정한다.
@@ -152,7 +152,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 ## 월간 visualization 후속 방향
 
 - 월간 visualization은 이번 Student 성장 dashboard feature 범위에 포함하지 않는다.
-- `/student/growth`와 교사용 Student show에는 주간 chart만 표시하며 월간 chart를 그 아래에 연속 배치하지 않는다.
+- 학생 `/student/growth`와 교사용 Student show의 `growth` tab에는 주간 chart만 표시하며 월간 chart를 같은 surface 아래에 연속 배치하지 않는다.
 - 월간은 향후 학생 앱의 별도 `월간` navigation/surface에서 달력 형식으로 제공하는 방향으로 둔다. exact route와 달력 interaction은 후속 spec에서 확정한다.
 - 기존 DailyGrowthRecord / DailyGrowthScore/date 구조를 canonical source로 사용하며 월간 기능을 위해 별도 저장 모델을 미리 추가하지 않는다.
 - 기록이 없는 날짜와 없는 Virtue score를 0으로 해석하지 않는 기존 원칙은 유지한다.
