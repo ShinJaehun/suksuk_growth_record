@@ -200,13 +200,15 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 
 ## 교사용 학생 성장기록 조회
 
-- 학생 계정과 구성원을 관리하는 `/classrooms/:classroom_id/students/:id`와 성장기록 조회 책임을 분리한다.
-- 담임, 해당 SchoolYear의 school manager, global admin을 위한 Classroom-scoped read-only 조회 surface는 `/classrooms/:classroom_id/students/:student_id/growth` 형태를 canonical route contract로 한다. 정확한 controller/class 이름은 implementation concern이다.
-- 해당 Classroom에 속한 Student만 조회하며, Student가 저장한 DailyGrowthRecord / DailyGrowthScore와 날짜별 frozen configuration을 canonical source로 사용한다.
-- 오늘 기록이 없으면 미입력 상태를 표시할 수 있고, 저장된 오늘 및 과거 기록은 read-only로 보여준다. historical virtue label은 해당 날짜 frozen configuration의 이름을 사용한다.
-- 이 surface에서 교사, school manager, global admin은 Student 대신 score나 reflection을 입력하거나 수정할 수 없다.
-- 학생 자신의 `/student/growth`, `/student/growth_record` 인증·입력 경로를 재사용하거나 Student impersonation으로 접근하지 않는다.
-- 향후 오늘 입력 현황에서 Student를 선택하는 링크는 학생 관리 show가 아니라 이 성장기록 조회 surface를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
+- Classroom에서 Student를 선택했을 때의 canonical 조회 surface는 `/classrooms/:classroom_id/students/:id`다. 별도의 `/classrooms/:classroom_id/students/:student_id/growth` 조회 route를 만들지 않는다.
+- 이 Student show의 주된 책임은 권한 있는 사용자가 해당 Student의 성장기록을 read-only로 확인하는 것이다. 학생 계정·구성원 관리 상세 화면과 성장기록 조회 화면을 이중으로 두지 않는다.
+- 해당 Classroom에 속한 Student만 Classroom scope를 통해 조회하며, 담임, 해당 SchoolYear의 school manager, global admin이 아래 Authorization에 따라 접근할 수 있다.
+- Student가 저장한 DailyGrowthRecord / DailyGrowthScore와 날짜별 frozen configuration을 canonical source로 사용한다.
+- 오늘 기록이 없으면 미입력 상태를 표시하고, 오늘 기록이 있으면 학생 입력 화면과 같은 덕목·점수·성찰 구성을 read-only로 보여준다. 덕목 이름은 오늘 frozen configuration의 이름을 사용한다.
+- 교사, school manager, global admin은 이 Student show에서 Student 대신 score나 reflection을 입력하거나 수정할 수 없다.
+- 학생 자신의 `/student/growth_record`는 자기 Student session을 사용하는 입력·수정 entry point로 유지한다. 교사용 Student show와 같은 성장기록 presentation을 재사용할 수 있지만, 학생용 write 동작은 계속 current_student를 대상으로 하는 StudentGrowthRecordsController가 담당한다.
+- Student의 이름, 번호, 아바타, PIN, 활성 상태 등 계정·구성원 관리 책임은 기존 edit 및 구성원 관리 흐름에 유지한다. 성장기록 read 권한을 가진 school manager에게 이러한 Student 관리 권한까지 자동으로 부여하지 않는다.
+- 향후 오늘 입력 현황에서 Student를 선택하는 링크는 `/classrooms/:classroom_id/students/:id`를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
 
 ## Authorization
 
@@ -249,6 +251,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 새로운 role, generic permission framework, admin 전용 별도 성장기록 시스템
 - realtime/Turbo/Action Cable 현황 갱신과 polling fallback
 - 통계, ranking, 월간 기능 구현
+- 교사용 Student show의 과거 기록 목록·탐색
 
 - starter의 planning/archived SchoolYear 완성
 - rollover
@@ -288,8 +291,8 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 13. 학생 저장 후 성장기록 운영 권한이 있는 사용자의 Classroom 현황 화면이 realtime으로 완료 상태를 반영한다.
 14. 새로고침한 완료 상태는 DB canonical state와 일치한다.
 15. 성장기록 운영 권한이 있는 사용자는 완료 학생의 오늘 기록을 read-only로 확인할 수 있다.
-16. 학생 관리 show와 Classroom-scoped 성장기록 조회 surface는 책임을 분리하며, 권한 있는 사용자는 조회 surface에서 Student 대신 입력하거나 수정할 수 없다.
-17. 향후 오늘 입력 현황의 Student 링크는 학생 관리 show가 아니라 성장기록 조회 surface를 대상으로 한다.
+16. `/classrooms/:classroom_id/students/:id`는 권한 있는 사용자를 위한 Classroom-scoped Student 성장기록 read-only surface이며, 별도의 Student growth 조회 route를 두지 않는다. 권한 있는 사용자는 이 화면에서 Student 대신 입력하거나 수정할 수 없다.
+17. 향후 오늘 입력 현황의 Student 링크는 `/classrooms/:classroom_id/students/:id`를 대상으로 한다.
 18. 학생은 종합 및 덕목별 line chart를 확인할 수 있고 과거 score가 있는 사용 종료 덕목의 추이도 확인할 수 있다.
 19. 종합 성장점수는 해당 기록에 실제 존재하는 score의 산술평균이다.
 20. 덕목이 중간에 추가되어도 과거 또는 기존 기록에 0점을 자동 보충하지 않는다.
