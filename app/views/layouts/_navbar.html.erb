@@ -8,6 +8,9 @@
      data-navigation-root="navbar">
   <div class="flex items-center gap-4">
     <%= link_to root_path, class: "flex items-center gap-2" do %>
+      <%= image_tag "suksuk_logo.png",
+            class: "h-8 w-8 shrink-0 object-contain",
+            alt: t("navigation.brand") %>
       <span class="font-semibold text-slate-800"><%= t("navigation.brand") %></span>
     <% end %>
 

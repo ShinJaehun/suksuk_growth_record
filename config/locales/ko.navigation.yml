@@ -5,7 +5,7 @@ ko:
     classrooms: "교실"
     teacher_management: "선생님"
     my_page: "내 정보"
-    brand: "학교 서비스"
+    brand: "쑥쑥성장기록장"
     avatar_alt: "%{name} avatar"
     account:
       edit: "내 정보 수정"
