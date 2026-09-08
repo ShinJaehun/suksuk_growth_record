@@ -39,12 +39,16 @@
       <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.today") %></span>
     <% end %>
 
-    <span class="flex min-h-16 cursor-default flex-col items-center justify-center gap-1 bg-slate-50/50 px-2 py-2 text-center text-slate-400"
-          aria-disabled="true"
-          title="<%= t("student_app.navigation.coming_soon") %>">
+    <%= link_to student_growth_path,
+          class: class_names(
+            "flex min-h-16 flex-col items-center justify-center gap-1 px-2 py-2 text-center transition",
+            "bg-blue-50 text-blue-700" => active == :growth,
+            "text-slate-600 hover:bg-slate-50" => active != :growth
+          ),
+          aria: { current: active == :growth ? "page" : nil } do %>
       <span class="text-lg" aria-hidden="true">📈</span>
       <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.growth") %></span>
-    </span>
+    <% end %>
 
     <span class="flex min-h-16 cursor-default flex-col items-center justify-center gap-1 bg-slate-50/50 px-2 py-2 text-center text-slate-400"
           aria-disabled="true"

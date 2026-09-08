@@ -1,0 +1,18 @@
+ko:
+  student_growth:
+    title: "나의 성장"
+    week_navigation: "주간 이동"
+    previous_week: "이전 주 보기"
+    next_week: "다음 주 보기"
+    week_range: "%{start} ~ %{end}"
+    metric_navigation: "성장 지표 선택"
+    overall: "종합"
+    chart_label: "월요일부터 금요일까지 %{metric} 성장 추이"
+    no_data: "기록 없음"
+    score: "%{value}점"
+    point_label: "%{date} %{weekday}: %{value}"
+    weekdays: ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"]
+  date:
+    formats:
+      growth_week: "%Y.%m.%d"
+      growth_day: "%-m/%-d"

@@ -23,6 +23,7 @@ Rails.application.routes.draw do
   get "/student", to: "student_profile#show", as: :student_profile
   get "/student/pin/edit", to: "student_profile#edit", as: :edit_student_pin
   patch "/student/pin", to: "student_profile#update", as: :student_pin
+  get "/student/growth", to: "student_growth#show", as: :student_growth
   resource :student_growth_record,
     only: %i[show create update],
     path: "/student/growth_record",
