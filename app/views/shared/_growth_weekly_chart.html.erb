@@ -6,6 +6,7 @@
        data-week-start="<%= @week_start.iso8601 %>"
        data-week-end="<%= @chart_end.iso8601 %>">
     <%= link_to growth_dashboard_path(
+          tab: "weekly",
           classroom: classroom,
           student: student,
           week_offset: @week_offset - 1,
@@ -21,6 +22,7 @@
     </p>
     <% if @week_offset.negative? %>
       <%= link_to growth_dashboard_path(
+            tab: "weekly",
             classroom: classroom,
             student: student,
             week_offset: @week_offset + 1,
@@ -45,6 +47,7 @@
           "overall",
           t("student_growth.overall"),
           href: growth_dashboard_path(
+            tab: "weekly",
             classroom: classroom,
             student: student,
             week_offset: @week_offset,
@@ -57,6 +60,7 @@
             virtue.id.to_s,
             virtue.name,
             href: growth_dashboard_path(
+              tab: "weekly",
               classroom: classroom,
               student: student,
               week_offset: @week_offset,

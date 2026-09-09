@@ -3,7 +3,7 @@ class StudentProfileController < ApplicationController
 
   def show
     authorize current_student, :show?
-    redirect_to student_growth_path(tab: "today")
+    redirect_to student_growth_path(tab: "growth")
   end
 
   def edit

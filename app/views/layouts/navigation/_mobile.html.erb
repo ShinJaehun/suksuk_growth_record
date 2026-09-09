@@ -1,20 +1,22 @@
-<div class="flex items-center gap-3">
+<div class="flex shrink-0 items-center gap-3">
   <% if account %>
     <% actor = account[:actor] %>
 
     <% if account[:student] %>
-      <div class="hidden md:flex items-center gap-2">
+      <%= link_to account[:edit_path],
+            class: "flex items-center gap-2 rounded-xl hover:bg-slate-50",
+            data: { student_pin_link: true } do %>
         <%= student_avatar_image(
               actor,
               size: 128,
-              class: "h-10 w-10 rounded-xl object-cover border border-slate-200 bg-slate-100",
+              class: "h-8 w-8 rounded-xl object-cover border border-slate-200 bg-slate-100 md:h-10 md:w-10",
               alt: t("navigation.avatar_alt", name: account[:display_name])
             ) %>
         <div class="flex flex-col items-end text-xs text-gray-600 leading-tight">
-          <span><%= account[:display_name] %></span>
+          <span class="max-w-20 truncate md:max-w-none"><%= account[:display_name] %></span>
           <span class="text-[10px] text-gray-400">student</span>
         </div>
-      </div>
+      <% end %>
     <% else %>
       <%= link_to account[:edit_path],
             class: "hidden md:flex items-center gap-2 rounded-xl hover:bg-slate-50" do %>
@@ -37,30 +39,22 @@
           class: "hidden md:inline-block text-sm text-gray-500 hover:text-red-600" %>
 
     <details class="md:hidden relative" data-navigation-region="mobile">
-      <summary class="list-none flex items-center gap-2 cursor-pointer select-none">
-        <div class="hidden min-[380px]:flex items-center gap-2">
-          <% if account[:student] %>
-            <%= student_avatar_image(
-                  actor,
-                  size: 128,
-                  class: "h-8 w-8 rounded-xl object-cover border border-slate-200 bg-slate-100",
-                  alt: t("navigation.avatar_alt", name: account[:display_name])
-                ) %>
-          <% else %>
+      <summary class="list-none flex items-center gap-2 cursor-pointer select-none"
+               aria-label="<%= t("student_app.navigation.label") if account[:student] %>">
+        <% unless account[:student] %>
+          <div class="hidden min-[380px]:flex items-center gap-2">
             <%= user_avatar_image(
                   actor,
                   size: 128,
                   class: "h-8 w-8 rounded-xl object-cover border border-slate-200 bg-slate-100",
                   alt: t("navigation.avatar_alt", name: account[:display_name])
                 ) %>
-          <% end %>
-          <div class="flex flex-col items-end text-xs text-gray-600 leading-tight">
-            <span><%= account[:display_name] %></span>
-            <span class="text-[10px] text-gray-400">
-              <%= account[:student] ? "student" : actor.role %>
-            </span>
+            <div class="flex flex-col items-end text-xs text-gray-600 leading-tight">
+              <span><%= account[:display_name] %></span>
+              <span class="text-[10px] text-gray-400"><%= actor.role %></span>
+            </div>
           </div>
-        </div>
+        <% end %>
         <div class="w-6 h-6 flex flex-col justify-between">
           <span class="block h-[2px] bg-gray-700"></span>
           <span class="block h-[2px] bg-gray-700"></span>
@@ -90,7 +84,7 @@
           </div>
         <% end %>
 
-        <% if account[:edit_path] %>
+        <% if account[:edit_path] && !account[:student] %>
           <%= link_to t("navigation.account.edit"),
                 account[:edit_path],
                 class: "block px-3 py-1 hover:bg-gray-50" %>

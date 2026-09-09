@@ -1,0 +1,25 @@
+<nav class="grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-3"
+     aria-label="<%= t("student_growth.daily_navigation") %>"
+     data-growth-date="<%= @recorded_on.iso8601 %>">
+  <% if @previous_record_date %>
+    <%= link_to growth_dashboard_path(classroom: classroom, student: student, date: @previous_record_date.iso8601),
+          aria: { label: t("student_growth.previous_record") },
+          data: { record_navigation: "previous" },
+          class: "inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xl font-bold text-slate-700 hover:bg-slate-200" do %>
+      <span aria-hidden="true">←</span>
+    <% end %>
+  <% else %>
+    <span></span>
+  <% end %>
+  <p class="text-center text-sm font-bold text-slate-800"><%= l(@recorded_on, format: :long) %></p>
+  <% if @next_record_date %>
+    <%= link_to growth_dashboard_path(classroom: classroom, student: student, date: @next_record_date.iso8601),
+          aria: { label: t("student_growth.next_record") },
+          data: { record_navigation: "next" },
+          class: "inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xl font-bold text-slate-700 hover:bg-slate-200" do %>
+      <span aria-hidden="true">→</span>
+    <% end %>
+  <% else %>
+    <span></span>
+  <% end %>
+</nav>

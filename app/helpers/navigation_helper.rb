@@ -1,10 +1,6 @@
 module NavigationHelper
   def primary_navigation_items(context)
-    if context[:student]
-      return [
-        navigation_item('navigation.my_page', student_growth_path(tab: "today"))
-      ]
-    end
+    return [] if context[:student]
 
     user = context[:user]
     return [] unless user
@@ -26,6 +22,10 @@ module NavigationHelper
     else
       []
     end
+  end
+
+  def navigation_brand_path(context)
+    context[:student] ? student_growth_path(tab: "growth") : root_path
   end
 
   def teacher_classroom_navigation(context)
@@ -52,7 +52,7 @@ module NavigationHelper
         actor: student,
         student: true,
         display_name: student.name,
-        edit_path: nil,
+        edit_path: edit_student_pin_path,
         sign_out_label: t('navigation.account.finish'),
         sign_out_path: destroy_student_session_path
       }

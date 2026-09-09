@@ -47,10 +47,10 @@ class ClassroomStudentsController < ApplicationController
     @can_manage_student = policy(@student).manage?
     @tab = growth_dashboard_tab
 
-    if @tab == :growth
-      prepare_growth_dashboard(@student)
-    else
-      prepare_growth_today(@student, classroom: @classroom)
+    if @tab == :weekly
+      prepare_growth_week(@student)
+    elsif @tab == :growth
+      prepare_growth_daily(@student, classroom: @classroom)
     end
   end
 

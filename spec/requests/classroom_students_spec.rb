@@ -1082,7 +1082,7 @@ RSpec.describe 'Classroom students', type: :request do
       get classroom_student_path(classroom, student)
 
       document = Nokogiri::HTML(response.body)
-      today = document.at_css('[data-today-growth-record]')
+      today = document.at_css('[data-daily-growth-record]')
       expect(today.text).to include(
         I18n.t('teacher_growth_records.completed'),
         frozen_name,

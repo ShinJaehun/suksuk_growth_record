@@ -2,9 +2,9 @@ ko:
   student_app:
     navigation:
       label: "학생 메뉴"
-      today: "오늘"
       growth: "성장"
-      monthly: "월간"
+      weekly: "주간"
+      monthly: "월"
       profile: "나"
       coming_soon: "준비 중"
     profile:
@@ -12,11 +12,13 @@ ko:
 
   daily_growth_records:
     title: "오늘의 성장 기록"
+    result_title: "성장 기록"
     actions:
       create: "오늘 기록 저장"
       update: "오늘 기록 수정"
     reflection:
       label: "오늘의 생각"
+      result_label: "성찰"
       optional: "(선택)"
       placeholder: "오늘 실천하며 느낀 점을 적어 보세요."
     score_value: "%{score} / 5"
@@ -33,7 +35,7 @@ ko:
       invalid: "모든 덕목의 점수를 확인해 주세요."
 
   teacher_growth_records:
-    completed: "오늘 입력완료"
+    completed: "입력완료"
     not_completed: "오늘 아직 입력하지 않았음"
     student_number: "%{number}번"
     unassigned_student_number: "번호 미지정"

@@ -39,10 +39,21 @@ RSpec.describe 'Navigation', type: :request do
     get student_growth_path
 
     expect(navbar_links).to include(
-      student_growth_path(tab: 'today'),
+      student_growth_path(tab: 'growth'),
       destroy_student_session_path
     )
-    expect(navbar.text).to include(I18n.t('navigation.my_page'))
+    expect(navbar.text).not_to include(I18n.t('navigation.my_page'))
+    brand = navbar.at_css('a').tap { |link| expect(link.text).to include(I18n.t('navigation.brand')) }
+    expect(brand['href']).to eq(student_growth_path(tab: 'growth'))
+    identity = navbar.at_css('a[data-student-pin-link]')
+    expect(identity['href']).to eq(edit_student_pin_path)
+    expect(identity.text).to include(student.name)
+    expect(identity.at_css('img')).to be_present
+    expect(identity.ancestors('summary, details')).to be_empty
+    expect(identity['class'].split).not_to include('hidden')
+    mobile = navbar.at_css('[data-navigation-region="mobile"]')
+    expect(mobile.at_css('summary a')).to be_nil
+    expect(mobile.at_css('a[data-turbo-method="delete"]')['href']).to eq(destroy_student_session_path)
     expect(navbar_links).not_to include(
       edit_user_registration_path,
       destroy_user_session_path
@@ -56,6 +67,7 @@ RSpec.describe 'Navigation', type: :request do
     get classrooms_path
 
     expect(navbar_links).to include(classrooms_path)
+    expect(navbar.at_css('a')['href']).to eq(root_path)
   end
 
   it 'links a teacher with one classroom directly to that classroom' do

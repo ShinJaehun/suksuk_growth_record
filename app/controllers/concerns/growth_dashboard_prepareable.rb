@@ -2,21 +2,35 @@ module GrowthDashboardPrepareable
   private
 
   def growth_dashboard_tab
-    params[:tab] == "growth" ? :growth : :today
+    %w[weekly monthly].include?(params[:tab]) ? params[:tab].to_sym : :growth
   end
 
-  def prepare_growth_dashboard(student)
-    prepare_growth_week(student)
+  def growth_dashboard_date
+    value = params[:date]
+    return Time.zone.today unless value.is_a?(String) && value.match?(/\A\d{4}-\d{2}-\d{2}\z/)
+
+    date = Date.iso8601(value)
+    [date, Time.zone.today].min
+  rescue ArgumentError
+    Time.zone.today
   end
 
-  def prepare_growth_today(student, classroom: nil)
+  def prepare_growth_daily(student, classroom: nil)
+    @recorded_on = growth_dashboard_date
     records = student.daily_growth_records
     records = records.where(classroom:) if classroom
 
+    prepare_growth_history(records)
     @record = records
       .includes(:daily_growth_scores, daily_virtue_configuration: { items: :virtue })
-      .find_by(recorded_on: Time.zone.today)
+      .find_by(recorded_on: @recorded_on)
     @score_rows = growth_score_rows(@record)
+  end
+
+  def prepare_growth_history(records)
+    records = records.where(recorded_on: ..Time.zone.today)
+    @previous_record_date = records.where("recorded_on < ?", @recorded_on).maximum(:recorded_on)
+    @next_record_date = records.where("recorded_on > ?", @recorded_on).minimum(:recorded_on)
   end
 
   def prepare_growth_form(student, submitted_scores: nil, reflection: nil)

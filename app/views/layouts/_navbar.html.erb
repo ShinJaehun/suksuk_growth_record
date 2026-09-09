@@ -4,14 +4,14 @@
 <% management_groups = management_navigation_groups %>
 <% account = navigation_account(context) %>
 
-<div class="h-14 w-full max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8"
+<div class="h-14 w-full max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8"
      data-navigation-root="navbar">
-  <div class="flex items-center gap-4">
-    <%= link_to root_path, class: "flex items-center gap-2" do %>
+  <div class="flex min-w-0 items-center gap-4">
+    <%= link_to navigation_brand_path(context), class: "flex min-w-0 items-center gap-2" do %>
       <%= image_tag "suksuk_logo.png",
             class: "h-8 w-8 shrink-0 object-contain",
             alt: t("navigation.brand") %>
-      <span class="font-semibold text-slate-800"><%= t("navigation.brand") %></span>
+      <span class="truncate font-semibold text-slate-800"><%= t("navigation.brand") %></span>
     <% end %>
 
     <%= render "layouts/navigation/desktop",

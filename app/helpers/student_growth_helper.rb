@@ -50,6 +50,16 @@ module StudentGrowthHelper
     end
   end
 
+  def daily_growth_status(record, recorded_on)
+    if record
+      t("teacher_growth_records.completed")
+    elsif recorded_on == Time.zone.today
+      t("teacher_growth_records.not_completed")
+    else
+      t("student_growth.no_data")
+    end
+  end
+
   private
 
   def growth_chart_y(value, maximum)

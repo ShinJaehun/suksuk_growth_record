@@ -8,17 +8,20 @@
 
   <%= render "shared/growth_dashboard_navigation",
         active: @tab,
-        today_path: classroom_student_path(@classroom, @student),
-        growth_path: classroom_student_path(@classroom, @student, tab: "growth") %>
+        growth_path: classroom_student_path(@classroom, @student, tab: "growth"),
+        weekly_path: classroom_student_path(@classroom, @student, tab: "weekly") %>
 
-  <% if @tab == :growth %>
+  <% if @tab == :weekly %>
     <%= render "shared/growth_weekly_chart", classroom: @classroom, student: @student %>
+  <% elsif @tab == :monthly %>
+    <p class="py-8 text-center text-slate-500" data-growth-section="monthly"><%= t("student_app.navigation.coming_soon") %></p>
   <% else %>
-    <%= render "shared/growth_today_result",
+    <%= render "shared/growth_daily_navigation", classroom: @classroom, student: @student %>
+    <%= render "shared/growth_daily_result",
           record: @record,
           score_rows: @score_rows,
-          eyebrow: @student.student_number.present? ? t("teacher_growth_records.student_number", number: @student.student_number) : t("teacher_growth_records.unassigned_student_number"),
-          status_text: t(@record ? "teacher_growth_records.completed" : "teacher_growth_records.not_completed"),
+          eyebrow: nil,
+          status_text: daily_growth_status(@record, @recorded_on),
           edit_path: nil %>
   <% end %>
 </section>

@@ -1,6 +1,9 @@
 ko:
   student_growth:
     title: "나의 성장"
+    daily_navigation: "일일 기록 이동"
+    previous_record: "이전 기록 보기"
+    next_record: "다음 기록 보기"
     dashboard_navigation: "성장 기록 메뉴"
     weekly_title: "주간 성장"
     week_navigation: "주간 이동"

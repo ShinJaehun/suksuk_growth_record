@@ -5,13 +5,13 @@ class StudentGrowthRecordsController < ApplicationController
 
   def show
     authorize current_student, :manage_own_growth_record?
-    redirect_to student_growth_path(tab: "today")
+    redirect_to student_growth_path(tab: "growth")
   end
 
   def create
     authorize current_student, :manage_own_growth_record?
     DailyGrowthRecords::Save.call(student: current_student, **growth_record_attributes)
-    redirect_to student_growth_path(tab: "today"),
+    redirect_to student_growth_path(tab: "growth"),
       notice: t("daily_growth_records.notices.created"),
       status: :see_other
   rescue ActiveRecord::RecordInvalid
@@ -27,7 +27,7 @@ class StudentGrowthRecordsController < ApplicationController
       record: @record,
       **growth_record_attributes
     )
-    redirect_to student_growth_path(tab: "today"),
+    redirect_to student_growth_path(tab: "growth"),
       notice: t("daily_growth_records.notices.updated"),
       status: :see_other
   rescue ActiveRecord::RecordInvalid
@@ -49,7 +49,9 @@ class StudentGrowthRecordsController < ApplicationController
   end
 
   def render_invalid_form
-    @tab = :today
+    @tab = :growth
+    @recorded_on = Time.zone.today
+    prepare_growth_history(current_student.daily_growth_records)
     @editing = true
     prepare_growth_form(
       current_student,

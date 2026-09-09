@@ -22,7 +22,7 @@ RSpec.describe "Student self service", type: :request do
 
     get student_profile_path
 
-    expect(response).to redirect_to(student_growth_path(tab: "today"))
+    expect(response).to redirect_to(student_growth_path(tab: "growth"))
   end
 
   it "shows self-service PIN fields without teacher management fields" do
