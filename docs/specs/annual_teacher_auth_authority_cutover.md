@@ -417,13 +417,19 @@ Credential mutation과 audit insert는 하나의 transaction이어야 한다. Au
 새 password는 이전 password credential을 즉시 무효화하여 이전 credential로 신규 인증할 수
 없어야 한다. 재발급 전에 만들어진 authenticated/remembered teacher session도 정상
 application authority를 계속 유지할 수 없어야 한다. Session을 물리적으로 destroy하는지는
-implementation detail이며, 현재 `password_change_required`와 request-time eligibility 검사가
+implementation detail이며, 기존 Devise session 복원 검증과 request-time eligibility 검사가
 이 outcome을 만족한다면 기존 구조를 재사용한다.
 
 기존 session을 별도로 폐기하기 위한 session version, token blacklist 또는 custom session
 store 같은 새 persistent revocation mechanism을 이번 spec에서 요구하지 않는다. 현재
 인증/session architecture가 위 outcome을 만족하지 못한다고 확인되면 새 mechanism을 임의로
 구현하지 않고 human approval로 돌아간다.
+
+정적 audit: Devise 5.0.4는 session에 저장된 salt와 현재 password 기반
+`authenticatable_salt`를 비교한다. 재발급 완료 뒤 시작한 요청에서 이전 session은 복원되지 않으며,
+forced edit/update도 `authenticate_user!`에서 차단된다. 이 시나리오는 현재 Devise 동작으로
+기존 authority 차단 invariant를 충족한다. 기존 request spec도 재발급 후 로그인 화면 차단과
+새 temporary password 로그인을 명시한다. 테스트는 실행하지 않았으며 추가 revocation 수단은 요구하지 않는다.
 
 ## Current `/teachers` individual reissue acceptance criteria
 
