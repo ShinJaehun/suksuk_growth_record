@@ -81,6 +81,7 @@ Teacher 0..1 ↔ 0..1 Classroom
 - 기존 teacher 관리의 canonical edit surface는 `/teachers/:id/edit`다. 관리 권한이 있는 사용자는 persisted teacher의 canonical `login_id`를 `선생님 ID` 등 기존 UI와 일관된 label의 read-only presentation으로 확인한다. login_id 수정 input을 새로 활성화하지 않으며 신규 teacher 생성 form의 기존 login_id 입력은 유지한다.
 - 교사 본인의 account/profile surface는 `/users/edit`다. 로그인한 User가 teacher인 경우에만 자기 `login_id`를 read-only로 표시하고 global admin에게는 teacher login_id field를 표시하지 않는다. 두 화면의 ID 표시는 수정 권한을 부여하지 않는다.
 - login_id normalization, SchoolYear scope와 uniqueness, login route 및 authentication lookup은 그대로 유지한다.
+- 신규 teacher 생성 시 login_id 입력은 허용하지만 persisted teacher의 login_id는 변경할 수 없다. 이 불변성은 UI뿐 아니라 direct PATCH와 `Teachers::SaveWithAssignment` service 경로에도 적용한다. name/email/gender/avatar/classroom/grade의 기존 수정 동작은 유지한다.
 - `Teachers::TemporaryPassword`는 쑥쑥교실투표와 같은 canonical 규칙으로 temporary password를 생성한다. 정확히 8자이며 허용 문자는 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`다. 혼동하기 쉬운 I, O, 0, 1은 제외하고 대상 teacher의 login_id와 case-insensitive하게 동일하면 다시 생성한다. 최초 발급과 재발급 모두 같은 generator를 사용한다. `AnnualTeacherUsers::TemporaryCredential`이 이 작은 generator를 사용하며 generic credential framework로 확장하지 않는다.
 - 최초 발급·재발급 모두 `password_change_required = true`와 최초 로그인 뒤 강제 비밀번호 변경을 유지한다. 재발급하면 이전 password로 신규 인증할 수 없다.
 - 평문은 request-local one-time 결과에서만 표시하고 DB/session/flash/audit에 저장하지 않는다. 기존 결과 응답의 `no-store`/Turbo cache 방지, `TeacherCredentialEvent`, credential mutation과 audit의 transaction을 유지한다.
@@ -90,6 +91,7 @@ Acceptance:
 
 - 관리자는 `/teachers/:id/edit`에서 기존 teacher의 login_id를, teacher 본인은 `/users/edit`에서 자기 login_id를 확인할 수 있다. 두 화면 모두 기존 teacher login_id를 수정 가능하게 만들지 않으며 global admin의 `/users/edit`에는 해당 field가 없다.
 - 신규 teacher 생성 form의 기존 login_id 입력과 normalization/SchoolYear-scoped uniqueness·인증 lookup은 유지된다.
+- Persisted teacher에 다른 login_id를 제출하는 direct PATCH와 service 호출 후에도 저장된 login_id는 기존 값이다. 신규 생성 입력과 name/email/gender/avatar/classroom/grade의 정상 수정은 계속 가능하다. 이 불변성 보강은 normalization·uniqueness·인증 lookup을 변경하지 않으며 DB migration이나 generic immutable-attribute framework를 추가하지 않는다.
 - 최초 발급·재발급 temporary password는 지정 charset만 사용하는 정확히 8자이고 login_id와 case-insensitive하게 동일한 후보는 재생성한다.
 - forced-change, request-local one-time 표시, 평문 비저장, audit transaction, 재발급 후 이전 password 신규 인증 차단과 credential-generation rate-limit recovery가 유지된다.
 
