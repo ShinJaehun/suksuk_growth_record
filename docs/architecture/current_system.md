@@ -76,12 +76,12 @@ Teacher 0..1 ↔ 0..1 Classroom
 
 ### Teacher credential 사용성 계약
 
-아래는 현재 Teacher 운영·인증 흐름에 적용할 승인된 사용성 계약이며 구현 완료를 뜻하지 않는다.
+현재 Teacher 운영·인증 흐름의 credential 표시와 발급 계약은 다음과 같다.
 
 - 기존 teacher 관리의 canonical edit surface는 `/teachers/:id/edit`다. 관리 권한이 있는 사용자는 persisted teacher의 canonical `login_id`를 `선생님 ID` 등 기존 UI와 일관된 label의 read-only presentation으로 확인한다. login_id 수정 input을 새로 활성화하지 않으며 신규 teacher 생성 form의 기존 login_id 입력은 유지한다.
 - 교사 본인의 account/profile surface는 `/users/edit`다. 로그인한 User가 teacher인 경우에만 자기 `login_id`를 read-only로 표시하고 global admin에게는 teacher login_id field를 표시하지 않는다. 두 화면의 ID 표시는 수정 권한을 부여하지 않는다.
 - login_id normalization, SchoolYear scope와 uniqueness, login route 및 authentication lookup은 그대로 유지한다.
-- 현재 `SecureRandom.alphanumeric(20)` temporary password 생성 규칙은 쑥쑥교실투표의 canonical 규칙으로 대체한다. 정확히 8자이며 허용 문자는 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`다. 혼동하기 쉬운 I, O, 0, 1은 제외하고 대상 teacher의 login_id와 case-insensitive하게 동일하면 다시 생성한다. 최초 발급과 재발급 모두 같은 generator를 사용한다. 구현은 쑥쑥교실투표의 작은 `Teachers::TemporaryPassword` 구조를 참고하며 generic credential framework를 만들지 않는다.
+- `Teachers::TemporaryPassword`는 쑥쑥교실투표와 같은 canonical 규칙으로 temporary password를 생성한다. 정확히 8자이며 허용 문자는 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`다. 혼동하기 쉬운 I, O, 0, 1은 제외하고 대상 teacher의 login_id와 case-insensitive하게 동일하면 다시 생성한다. 최초 발급과 재발급 모두 같은 generator를 사용한다. `AnnualTeacherUsers::TemporaryCredential`이 이 작은 generator를 사용하며 generic credential framework로 확장하지 않는다.
 - 최초 발급·재발급 모두 `password_change_required = true`와 최초 로그인 뒤 강제 비밀번호 변경을 유지한다. 재발급하면 이전 password로 신규 인증할 수 없다.
 - 평문은 request-local one-time 결과에서만 표시하고 DB/session/flash/audit에 저장하지 않는다. 기존 결과 응답의 `no-store`/Turbo cache 방지, `TeacherCredentialEvent`, credential mutation과 audit의 transaction을 유지한다.
 - rate-limit의 credential-generation recovery 계약을 유지한다. 재발급된 credential은 기존 credential의 실패 누적으로 잠긴 인증 시도와 구분되며 기존 rate-limit/authentication 경계를 변경하지 않는다.

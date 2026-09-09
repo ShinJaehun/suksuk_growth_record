@@ -133,6 +133,10 @@ RSpec.describe 'Teacher operations', type: :request do
 
     document = Nokogiri::HTML(response.body)
     teacher_form = document.at_css("form[action='#{teachers_path}']")
+    login_id_input = teacher_form.at_css('input[name="user[login_id]"]')
+    expect(login_id_input).to be_present
+    expect(login_id_input['readonly']).to be_nil
+    expect(login_id_input['disabled']).to be_nil
     expect(teacher_form).to be_present
     expect(teacher_form['data-turbo']).to eq('false')
     expect(document.css('select[name="membership_grade"]').size).to eq(1)
@@ -255,6 +259,8 @@ RSpec.describe 'Teacher operations', type: :request do
     teacher_form = document.at_css("form[action='#{teacher_path(teacher)}']")
     expect(teacher_form).to be_present
     expect(teacher_form['data-turbo']).to be_nil
+    expect(teacher_form.at_css('[data-teacher-login-id] dd').text).to eq(teacher.login_id)
+    expect(teacher_form.at_css('input[name="user[login_id]"]')).to be_nil
     expect(document.at_css('select[name="membership_grade"] option[value="5"][selected]')).to be_present
     expect(document.at_css(%(select[name="classroom_id"] option[value="#{classroom.id}"][selected]))).to be_present
   end

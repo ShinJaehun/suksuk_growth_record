@@ -9,6 +9,8 @@ RSpec.describe AnnualTeacherUsers::TemporaryCredential do
   it "issues a temporary password and audit event in one transaction" do
     actor = create(:user, :admin)
     teacher = annual_teacher
+    allow(Teachers::TemporaryPassword).to receive(:generate).with(login_id: teacher.login_id)
+      .and_return("ABCDEFGH")
 
     result = described_class.call(
       teacher:,
@@ -17,7 +19,7 @@ RSpec.describe AnnualTeacherUsers::TemporaryCredential do
     )
 
     expect(result).to be_success
-    expect(result.temporary_password).to be_present
+    expect(result.temporary_password).to eq("ABCDEFGH")
     expect(teacher.reload).to be_password_change_required
     expect(teacher.valid_password?(result.temporary_password)).to be(true)
     expect(result.event).to have_attributes(actor_user: actor, teacher_user: teacher)

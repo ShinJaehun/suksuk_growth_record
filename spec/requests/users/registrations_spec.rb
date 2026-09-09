@@ -40,12 +40,15 @@ RSpec.describe 'Users::Registrations', type: :request do
   end
 
   describe 'GET /users/edit' do
-    it 'allows teacher access' do
+    it 'allows teacher access and displays the login ID read-only' do
       sign_in teacher
 
       get edit_user_registration_path
 
       expect(response).to have_http_status(:ok)
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[data-teacher-login-id] dd').text).to eq(teacher.login_id)
+      expect(document.at_css('input[name="user[login_id]"]')).to be_nil
     end
 
     it 'shows teacher avatar choices to teachers' do
@@ -66,6 +69,10 @@ RSpec.describe 'Users::Registrations', type: :request do
       sign_in admin
 
       get edit_user_registration_path
+
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[data-teacher-login-id]')).to be_nil
+      expect(document.at_css('input[name="user[login_id]"]')).to be_nil
 
       expect(response.body).to include('name="user[avatar_key]"')
       expect(response.body).to include('value="teacherM04"')

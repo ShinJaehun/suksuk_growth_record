@@ -69,6 +69,10 @@
                 label_html: { class: "mb-2 block text-sm font-medium text-slate-700" } %>
 
           <% if current_user.teacher? %>
+            <dl data-teacher-login-id>
+              <dt class="mb-2 text-sm font-medium text-slate-700"><%= t("users.teacher_sessions.login_id") %></dt>
+              <dd class="break-all font-mono text-sm text-slate-900"><%= current_user.login_id %></dd>
+            </dl>
             <%= f.input :gender,
                   collection: [["남성", "male"], ["여성", "female"]],
                   include_blank: "선택해 주세요",
