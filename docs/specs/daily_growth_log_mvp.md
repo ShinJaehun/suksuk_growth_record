@@ -218,6 +218,9 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 학생 `/student/growth`와 교사용 Student show는 Student identity를 같은 visual contract로 표시한다. 왼쪽에는 Student avatar/thumbnail을 두고, 오른쪽 text는 학교 이름(중간 크기), 학년·반·번호(작은 크기), Student 이름(가장 큰 크기) 순서와 hierarchy를 사용한다.
 - Student identity/profile card는 성장과 주간 tab 전환에 따라 폭, typography와 정보 순서가 바뀌지 않는 안정된 header surface로 유지한다. 학생용과 교사용에서 identity/body markup과 typography를 중복 구현하지 않고 공통 presentation partial을 재사용한다. exact partial/helper 이름과 Tailwind class는 implementation concern이다.
 - Student identity와 일일 결과 presentation은 학생용·교사용에서 공통으로 재사용한다. 교사용 Student show의 기존 `교실로 돌아가기`, 권한 있는 사용자의 `학생 정보·PIN 수정` 등 teacher-facing action과 authorization 책임은 기존 teacher-facing view에 유지하고 학생용 surface에 노출하지 않는다. 공통 partial에는 permission이나 business logic을 넣지 않는다.
+- Student show 조회 권한과 Student edit/manage 권한은 별개다. `/classrooms/:classroom_id/students/:id`를 정상 조회할 수 있는 모든 teacher-facing 사용자에게 `교실로 돌아가기`를 표시하며 `can_manage_student` 조건에 묶지 않는다.
+- `학생 정보·PIN 수정`은 실제 `StudentPolicy#manage?`가 허용할 때 표시한다. 접근 가능한 operational Classroom의 global admin과 실제 담당 teacher는 이 action 및 기존 edit/update 권한을 유지한다. operational lifecycle은 현재 정책을 따르며 archived/inactive SchoolYear 등으로 확대하지 않는다.
+- school manager는 growth read 권한만으로 Student 관리 권한을 얻지 않으며 실제 담당 teacher인 경우에만 기존 관리 권한을 사용한다. 일반 타반 teacher의 권한도 확대하지 않는다. 최종 경계는 view 노출 여부가 아닌 Pundit/controller의 조회·edit/update 인가다.
 - `성장`, `주간`, `월` navigation은 profile card 아래의 별도 compact navigation surface로 둔다.
 - 학생의 canonical growth GET surface는 `/student/growth` 하나다. 기본/`tab=growth`는 선택 날짜의 일일 결과/입력 surface, `tab=weekly`는 주간 chart다.
 - GET `/student`는 별도 profile/dashboard presentation을 유지하지 않고 `/student/growth?tab=growth`로 redirect한다.
@@ -237,6 +240,11 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 교사, school manager, global admin은 Student show에서 Student 대신 score나 reflection을 입력하거나 수정할 수 없다. 학생의 오늘 기록 edit capability는 current_student에게만 존재한다.
 - Student의 이름, 번호, 아바타, PIN, 활성 상태 등 계정·구성원 관리 책임은 기존 edit 및 구성원 관리 흐름에 유지한다. 성장기록 read 권한을 가진 school manager에게 이러한 Student 관리 권한까지 자동으로 부여하지 않는다.
 - 향후 오늘 입력 현황에서 Student를 선택하는 링크는 `/classrooms/:classroom_id/students/:id`를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
+
+### Classroom Student card thumbnail
+
+- `/classrooms/:id`의 Student card thumbnail은 같은 화면 homeroom teacher thumbnail의 기존 visual contract를 재사용한다. 명시적인 border color, slate background, object-cover, shrink behavior와 radius/size를 일치시킨다. 현재 기준은 `h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-cover`다.
+- 기존 Student avatar helper와 source, avatar_key, gender, fallback 및 Student card의 이름·번호·링크 구조는 유지한다. 새 avatar component/helper/framework, avatar 선택 기능 변경, 전체 Classroom card redesign과 unrelated refactor는 포함하지 않는다.
 
 ## Authorization
 
@@ -273,7 +281,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 
 이번 Student 성장 dashboard feature의 구현 범위에는 다음을 포함하지 않는다.
 
-- 교사, school manager, global admin의 Student 대신 입력 또는 수정과 Student impersonation
+- 교사, school manager, global admin의 Student 성장기록 대신 입력 또는 수정과 Student impersonation
 - school manager 권한의 다른 SchoolYear 또는 다른 학교 확대
 - 과거 DailyGrowthRecord / DailyGrowthScore / configuration 수정
 - 새로운 role, generic permission framework, admin 전용 별도 성장기록 시스템
@@ -284,7 +292,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - 새로운 generic chart framework, arbitrary date range와 yearly chart
 - 일일/주간 metric 계산과 score 저장 방식 변경
 - growth 또는 Student 관리 권한 확대
-- teacher-facing action 변경, Student self-service PIN 기능 재설계와 navbar 전체 IA 재설계
+- 위 Student show action 정합성 수정 외의 teacher-facing action 변경, Student self-service PIN 기능 재설계와 navbar 전체 IA 재설계
 - 인증 구조 변경, `/users/sign_in` 또는 teacher login 변경
 - 새 DB schema/model
 
@@ -333,7 +341,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 20. 덕목이 중간에 추가되어도 과거 또는 기존 기록에 0점을 자동 보충하지 않는다.
 21. 성장기록 운영 권한이 있는 사용자는 현재 active Student 기준 입력률과 실제 저장 score 기준 종합·덕목별 기본 추이를 확인할 수 있다.
 22. 학생용과 교사용 Student show의 선택 날짜 score는 같은 일일 결과 presentation에서 frozen Virtue 이름과 current presentation color를 사용한 최대 5의 1~5 가로 막대, `score / 5`, 기존 행동 의미 문구로 표시된다.
-23. 교사용 Student show는 모든 조회 날짜의 reflection을 read-only로 보존하며 score 또는 reflection 입력·수정 form이나 teacher-facing write action을 제공하지 않는다.
+23. 교사용 Student show는 모든 조회 날짜의 reflection을 read-only로 보존하며 score 또는 reflection 입력·수정 form이나 teacher-facing 성장기록 write action을 제공하지 않는다.
 24. 학생용과 교사용 주간 chart는 같은 월~금 범위, 종합·Virtue metric 계산, missing 처리와 Virtue color identity를 사용한다.
 25. 교사용 주간 chart는 이전 주로 이동할 수 있고 미래 주로 이동할 수 없다.
 26. 학생의 canonical growth GET surface는 `/student/growth` 하나이며 기본/`tab=growth`는 일일 결과/입력, `tab=weekly`는 주간 chart만 표시한다. 학생용과 교사용 모두 누락되거나 지원하지 않는 tab은 growth로 처리한다.
@@ -347,7 +355,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 34. growth read 권한은 Student 관리 권한을 확대하지 않는다.
 35. 학생과 교사의 Student identity card는 avatar 왼쪽, 학교 이름·학년/반/번호·Student 이름 순서의 동일한 정보 및 visual hierarchy를 사용한다.
 36. Student identity presentation은 공통 partial로 재사용하며 teacher-facing action과 permission logic은 공통 partial에 넣지 않는다.
-37. 교사용 Student show의 기존 `교실로 돌아가기`와 권한별 `학생 정보·PIN 수정` action은 유지되고 학생용 surface에는 노출되지 않는다.
+37. 교사용 Student show를 정상 조회할 수 있는 사용자는 edit/manage 권한과 무관하게 `교실로 돌아가기`를 본다. 이 link는 `can_manage_student` 조건에 묶지 않으며 `학생 정보·PIN 수정`만 실제 manage 권한으로 구분한다. 두 action은 학생용 surface에는 노출되지 않는다.
 38. GET `/student`는 `/student/growth?tab=growth`로 redirect하며 `/student/pin/edit`과 `/student/pin` 계약은 유지한다.
 39. canonical growth에서 오늘 미입력 Student는 입력 form을, 입력완료 Student는 결과 막대·행동 문구·reflection을 보고, 일반 GET 진입만으로 DB row가 생성되지 않는다.
 40. 학생 canonical dashboard와 교사용 Student show는 동일한 content max-width contract를 사용하며 별도 `/student` presentation은 유지하지 않는다.
@@ -357,3 +365,6 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 44. 과거 기록은 학생에게 read-only이고 교사/manager/admin은 모든 날짜에서 read-only다. 잘못된/future date는 조회 전에 오늘로 fallback하며 exception, 미래 record lookup 또는 미래 날짜 입력 form/기록 생성을 일으키지 않는다. 과거·미래 write나 edit query로 오늘만 수정 가능한 경계를 우회할 수 없다.
 45. 유효한 과거 date에 기록이 없으면 데이터 없음으로 표시하고 입력 form이나 0점으로 대체하지 않는다. 과거 결과의 frozen Virtue 이름/current color를 유지하며 fallback을 포함한 모든 일일 조회 GET은 DB row를 생성하지 않는다.
 46. 학생 navbar는 desktop/mobile 모두 `내 정보` primary item 없이 브랜드에서 `/student/growth?tab=growth`로, avatar + 이름에서 `/student/pin/edit`로 이동한다. mobile PIN link와 hamburger toggle은 독립적으로 동작하며 기존 PIN 권한/동작은 유지한다.
+47. 접근 가능한 operational Classroom에서 global admin과 실제 담당 teacher는 Student show의 `학생 정보·PIN 수정` action을 사용하고 기존 edit/update 인가를 유지한다. Pundit/controller가 최종 권한 경계다.
+48. 이번 UI 정합성 수정은 Student 관리 권한이나 growth record 권한을 확대하지 않는다. 미담당 school manager와 일반 타반 teacher에게 Student 관리 권한을 부여하지 않으며 archived/inactive SchoolYear 등 기존 operational lifecycle 밖으로 권한을 확대하지 않는다.
+49. Classroom Student card thumbnail은 같은 화면 teacher thumbnail의 명시적 border color, slate background, object-cover, shrink behavior, radius/size와 일치한다. Student avatar source·avatar_key·gender·fallback과 이름·번호·링크 구조는 유지한다.
