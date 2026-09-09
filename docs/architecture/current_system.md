@@ -74,6 +74,27 @@ Teacher 0..1 ↔ 0..1 Classroom
 - teacher 생성 시 temporary password를 자동 발급하며 기존 teacher update에서는 password를 변경하지 않는다.
 - teacher 목록은 annual school, `User.grade`, 단일 classroom과 lifecycle 상태를 표시한다.
 
+### Teacher credential 사용성 계약
+
+아래는 현재 Teacher 운영·인증 흐름에 적용할 승인된 사용성 계약이며 구현 완료를 뜻하지 않는다.
+
+- 기존 teacher 관리의 canonical edit surface는 `/teachers/:id/edit`다. 관리 권한이 있는 사용자는 persisted teacher의 canonical `login_id`를 `선생님 ID` 등 기존 UI와 일관된 label의 read-only presentation으로 확인한다. login_id 수정 input을 새로 활성화하지 않으며 신규 teacher 생성 form의 기존 login_id 입력은 유지한다.
+- 교사 본인의 account/profile surface는 `/users/edit`다. 로그인한 User가 teacher인 경우에만 자기 `login_id`를 read-only로 표시하고 global admin에게는 teacher login_id field를 표시하지 않는다. 두 화면의 ID 표시는 수정 권한을 부여하지 않는다.
+- login_id normalization, SchoolYear scope와 uniqueness, login route 및 authentication lookup은 그대로 유지한다.
+- 현재 `SecureRandom.alphanumeric(20)` temporary password 생성 규칙은 쑥쑥교실투표의 canonical 규칙으로 대체한다. 정확히 8자이며 허용 문자는 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`다. 혼동하기 쉬운 I, O, 0, 1은 제외하고 대상 teacher의 login_id와 case-insensitive하게 동일하면 다시 생성한다. 최초 발급과 재발급 모두 같은 generator를 사용한다. 구현은 쑥쑥교실투표의 작은 `Teachers::TemporaryPassword` 구조를 참고하며 generic credential framework를 만들지 않는다.
+- 최초 발급·재발급 모두 `password_change_required = true`와 최초 로그인 뒤 강제 비밀번호 변경을 유지한다. 재발급하면 이전 password로 신규 인증할 수 없다.
+- 평문은 request-local one-time 결과에서만 표시하고 DB/session/flash/audit에 저장하지 않는다. 기존 결과 응답의 `no-store`/Turbo cache 방지, `TeacherCredentialEvent`, credential mutation과 audit의 transaction을 유지한다.
+- rate-limit의 credential-generation recovery 계약을 유지한다. 재발급된 credential은 기존 credential의 실패 누적으로 잠긴 인증 시도와 구분되며 기존 rate-limit/authentication 경계를 변경하지 않는다.
+
+Acceptance:
+
+- 관리자는 `/teachers/:id/edit`에서 기존 teacher의 login_id를, teacher 본인은 `/users/edit`에서 자기 login_id를 확인할 수 있다. 두 화면 모두 기존 teacher login_id를 수정 가능하게 만들지 않으며 global admin의 `/users/edit`에는 해당 field가 없다.
+- 신규 teacher 생성 form의 기존 login_id 입력과 normalization/SchoolYear-scoped uniqueness·인증 lookup은 유지된다.
+- 최초 발급·재발급 temporary password는 지정 charset만 사용하는 정확히 8자이고 login_id와 case-insensitive하게 동일한 후보는 재생성한다.
+- forced-change, request-local one-time 표시, 평문 비저장, audit transaction, 재발급 후 이전 password 신규 인증 차단과 credential-generation rate-limit recovery가 유지된다.
+
+이번 변경에는 `/teacher` 또는 GET `/teachers/:id` 신규 route, persisted login_id 수정 기능, SchoolYear-scoped teacher login 변경, `/users/sign_in` 통합, global admin 인증 변경, DB migration/schema 변경, temporary password 만료시간, 새 credential table/framework와 UI 전체 redesign을 포함하지 않는다. 완료된 historical cutover 문서는 재작성하지 않는다.
+
 ## 학생 관리
 
 - 학생의 classroom 소속 source는 `Student.classroom_id`다.
