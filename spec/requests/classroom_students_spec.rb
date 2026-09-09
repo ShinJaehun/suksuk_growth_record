@@ -52,6 +52,11 @@ RSpec.describe 'Classroom students', type: :request do
         ['1번', '2번', '5번', '번호 미지정', '번호 미지정']
       )
       expect(response.body).not_to include(inactive_student.name, '12번')
+      cards.each do |card|
+        expect(card.at_css('img')['class'].split).to include(
+          'h-10', 'w-10', 'shrink-0', 'rounded-lg', 'border', 'border-slate-200', 'bg-slate-100', 'object-cover'
+        )
+      end
     end
   end
 
@@ -1002,10 +1007,18 @@ RSpec.describe 'Classroom students', type: :request do
       get classroom_student_path(classroom, student)
 
       expect(response).to have_http_status(:ok)
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[data-student-teacher-action="back"]')['href']).to eq(classroom_path(classroom))
+      expect(document.at_css('[data-student-teacher-action="edit"]')['href'])
+        .to eq(edit_classroom_student_path(classroom, student))
     end
 
     it 'rejects a teacher from the student page in an unassigned URL classroom' do
       get classroom_student_path(past_classroom, past_student)
+
+      expect(response).to redirect_to(root_path)
+
+      get edit_classroom_student_path(past_classroom, past_student)
 
       expect(response).to redirect_to(root_path)
     end
@@ -1022,13 +1035,22 @@ RSpec.describe 'Classroom students', type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it 'allows an admin to view inactive student records' do
+    it 'allows an admin to view and manage an inactive Student in an operational Classroom' do
       sign_out teacher
       sign_in create(:user, :admin)
 
       get classroom_student_path(past_classroom, past_student)
 
       expect(response).to have_http_status(:ok)
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[data-student-teacher-action="back"]')['href']).to eq(classroom_path(past_classroom))
+      edit_link = document.at_css('[data-student-teacher-action="edit"]')
+      expect(edit_link['href']).to eq(edit_classroom_student_path(past_classroom, past_student))
+
+      get edit_link['href']
+
+      expect(response).to have_http_status(:ok)
+      expect(Nokogiri::HTML(response.body).at_css('input[name="student[student_pin]"]')).to be_present
     end
 
     it 'allows a manager in the Classroom SchoolYear without granting Student management' do
@@ -1043,6 +1065,13 @@ RSpec.describe 'Classroom students', type: :request do
       expect(response).to have_http_status(:ok)
       expect(StudentPolicy.new(manager, student).manage?).to eq(false)
       expect(response.body).not_to include(edit_classroom_student_path(classroom, student))
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[data-student-teacher-action="back"]')['href']).to eq(classroom_path(classroom))
+      expect(document.at_css('[data-student-teacher-action="edit"]')).to be_nil
+
+      get edit_classroom_student_path(classroom, student)
+
+      expect(response).to redirect_to(root_path)
     end
 
     it 'rejects a manager outside the Classroom SchoolYear' do
