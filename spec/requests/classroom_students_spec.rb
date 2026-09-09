@@ -1457,9 +1457,7 @@ RSpec.describe 'Classroom students', type: :request do
       patch reactivate_classroom_student_path(classroom, student)
 
       expect(membership.reload).to be_inactive
-      expect(response).to redirect_to(
-        public_student_login_path(student_login_token: classroom.student_login_token)
-      )
+      expect(response).to redirect_to(new_student_session_path)
     end
   end
 

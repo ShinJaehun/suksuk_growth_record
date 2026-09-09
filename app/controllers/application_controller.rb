@@ -129,10 +129,9 @@ class ApplicationController < ActionController::Base
     return unless session[:student_id].present?
     return if student_session_ttl_exempt_controller?
 
-    classroom_id = session[:student_login_classroom_id]
     unless current_student
       clear_student_session
-      return redirect_to student_session_timeout_redirect_path(classroom_id),
+      return redirect_to new_student_session_path,
                          alert: '사용 시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.'
     end
 
@@ -145,9 +144,8 @@ class ApplicationController < ActionController::Base
     end
 
     if now - last_seen_at.to_i > STUDENT_SESSION_TTL.to_i
-      classroom_id = session[:student_login_classroom_id]
       clear_student_session
-      redirect_to student_session_timeout_redirect_path(classroom_id),
+      redirect_to new_student_session_path,
                   alert: '사용 시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.'
     else
       session[:student_last_seen_at] = now
@@ -156,15 +154,6 @@ class ApplicationController < ActionController::Base
 
   def student_session_ttl_exempt_controller?
     devise_controller? || is_a?(StudentSessionsController)
-  end
-
-  def student_session_timeout_redirect_path(classroom_id)
-    return new_student_session_path if classroom_id.blank?
-
-    classroom = Classroom.find_by(id: classroom_id)
-    return new_student_session_path unless classroom
-
-    public_student_login_path(student_login_token: classroom.student_login_token)
   end
 
   def role_landing_path

@@ -269,12 +269,13 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(session[:student_id]).to eq(student.id)
   end
 
-  it 'keeps a student signed in within the TTL and refreshes last seen' do
+  it 'keeps the session and refreshes last seen within the TTL after token regeneration' do
     travel_to Time.zone.local(2026, 5, 22, 10, 0, 0) do
       post public_student_login_path(student_login_token: classroom.student_login_token), params: {
         student_id: student.id,
         student_pin: '1234'
       }
+      classroom.regenerate_student_login_token
     end
 
     travel_to Time.zone.local(2026, 5, 22, 10, 5, 0) do
@@ -282,62 +283,76 @@ RSpec.describe 'Student PIN sessions', type: :request do
     end
 
     expect(response).to have_http_status(:ok)
+    expect(session[:student_id]).to eq(student.id)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
     expect(session[:student_last_seen_at]).to eq(Time.zone.local(2026, 5, 22, 10, 5, 0).to_i)
   end
 
   it 'ends an existing student session after the classroom is deactivated' do
     post_student_pin(pin: '1234')
+    classroom.regenerate_student_login_token
     classroom.update!(active: false)
 
     get student_profile_path
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
+    expect(session[:student_id]).to be_nil
     expect(controller.current_user).to be_nil
   end
 
   it 'ends an existing Student session when the SchoolYear is no longer active' do
     post_student_pin(pin: '1234')
+    classroom.regenerate_student_login_token
     classroom.school_year.update_columns(status: 'archived')
 
     get student_profile_path
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
     expect(session[:student_id]).to be_nil
   end
 
   it 'ends an existing Student session when the SchoolYear is planning' do
     post_student_pin(pin: '1234')
+    classroom.regenerate_student_login_token
     classroom.school_year.update_columns(status: 'planning')
 
     get student_profile_path
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
     expect(session[:student_id]).to be_nil
   end
 
   it 'ends an existing Student session when the School is inactive' do
     post_student_pin(pin: '1234')
+    classroom.regenerate_student_login_token
     classroom.school_year.school.update!(active: false)
 
     get student_profile_path
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
     expect(session[:student_id]).to be_nil
   end
 
-  it 'redirects an expired student session to the classroom PIN login page' do
+  it 'expires the session without revealing the regenerated token' do
     travel_to Time.zone.local(2026, 5, 22, 10, 0, 0) do
       post public_student_login_path(student_login_token: classroom.student_login_token), params: {
         student_id: student.id,
         student_pin: '1234'
       }
+      classroom.regenerate_student_login_token
     end
 
     travel_to Time.zone.local(2026, 5, 22, 10, 21, 1) do
       get student_profile_path
     end
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
+    expect(session[:student_id]).to be_nil
     expect(controller.current_user).to be_nil
   end
 
@@ -351,17 +366,20 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(session[:student_last_seen_at]).to be_present
   end
 
-  it 'redirects student logout back to the classroom PIN login page' do
+  it 'redirects student logout to the token-free login page after token regeneration' do
     post public_student_login_path(student_login_token: classroom.student_login_token), params: {
       student_id: student.id,
       student_pin: '1234'
     }
 
     expect(session[:student_login_classroom_id]).to eq(classroom.id)
+    classroom.regenerate_student_login_token
 
     delete destroy_student_session_path
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
+    expect(session[:student_id]).to be_nil
   end
 
   it 'falls back to the global student login page without a stored classroom' do
@@ -518,7 +536,9 @@ RSpec.describe 'Student PIN sessions', type: :request do
 
     get student_profile_path
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
+    expect([response.location, response.body].join).not_to include(classroom.reload.student_login_token)
+    expect(session[:student_id]).to be_nil
     expect(controller.current_user).to be_nil
   end
 

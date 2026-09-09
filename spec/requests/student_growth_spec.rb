@@ -59,7 +59,7 @@ RSpec.describe "Student weekly growth", type: :request do
 
     get student_growth_path, params: { tab: "weekly" }
 
-    expect(response).to redirect_to(public_student_login_path(student_login_token: classroom.student_login_token))
+    expect(response).to redirect_to(new_student_session_path)
   end
 
   it "defaults to overall and presents the current Monday through Friday" do

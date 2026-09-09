@@ -261,6 +261,15 @@ RSpec.describe 'Classroom student login link', type: :request do
     expect(response).to have_http_status(:not_found)
     expect(response.body).to include('학생 로그인 주소를 사용할 수 없습니다.')
 
+    expect([response.location, response.body].join).not_to include(new_token)
+
+    post public_student_login_path(student_login_token: old_token),
+         params: { student_id: student.id, student_pin: '1234' }
+
+    expect(response).to have_http_status(:not_found)
+    expect([response.location, response.body].join).not_to include(new_token)
+    expect(session[:student_id]).to be_nil
+
     get public_student_login_path(student_login_token: new_token)
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('학생 PIN 로그인')

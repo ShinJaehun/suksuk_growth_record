@@ -37,12 +37,8 @@ RSpec.describe ApplicationController, type: :controller do
     session[:student_login_classroom_id] = classroom_id
   end
 
-  def expect_student_session_rejected_to(classroom)
-    expect(response).to redirect_to(
-      public_student_login_path(
-        student_login_token: classroom.student_login_token
-      )
-    )
+  def expect_student_session_rejected
+    expect(response).to redirect_to(new_student_session_path)
     expect(session[:student_id]).to be_nil
     expect(session[:student_login_classroom_id]).to be_nil
     expect(session[:student_last_seen_at]).to be_nil
@@ -78,7 +74,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect_student_session_rejected_to(student.classroom)
+    expect_student_session_rejected
   end
 
   it 'rejects an inactive Classroom' do
@@ -88,7 +84,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect_student_session_rejected_to(student.classroom)
+    expect_student_session_rejected
   end
 
   it 'rejects a planning SchoolYear' do
@@ -98,7 +94,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect_student_session_rejected_to(student.classroom)
+    expect_student_session_rejected
   end
 
   it 'rejects an archived SchoolYear' do
@@ -108,7 +104,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect_student_session_rejected_to(student.classroom)
+    expect_student_session_rejected
   end
 
   it 'rejects an inactive School' do
@@ -118,7 +114,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect_student_session_rejected_to(student.classroom)
+    expect_student_session_rejected
   end
 
   it 'rejects a mismatched session Classroom' do
@@ -128,7 +124,7 @@ RSpec.describe ApplicationController, type: :controller do
 
     get :index
 
-    expect_student_session_rejected_to(other_classroom)
+    expect_student_session_rejected
   end
 
   it 'rejects a Student session without a stored Classroom' do

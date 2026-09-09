@@ -218,9 +218,7 @@ RSpec.describe 'Users::Sessions', type: :request do
 
     get student_profile_path
 
-    expect(response).to redirect_to(
-      public_student_login_path(student_login_token: classroom.student_login_token)
-    )
+    expect(response).to redirect_to(new_student_session_path)
     expect(session[:student_id]).to be_nil
     expect(controller.current_user).to be_nil
   end

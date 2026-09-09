@@ -41,9 +41,8 @@ class StudentSessionsController < ApplicationController
   end
 
   def destroy
-    classroom_id = session[:student_login_classroom_id]
     clear_student_session
-    redirect_to student_logout_redirect_path(classroom_id), notice: t('student_sessions.signed_out')
+    redirect_to new_student_session_path, notice: t('student_sessions.signed_out')
   end
 
   private
@@ -97,13 +96,5 @@ class StudentSessionsController < ApplicationController
       student_id: student.id,
       remote_ip: request.remote_ip
     )
-  end
-
-  def student_logout_redirect_path(classroom_id)
-    return new_student_session_path if classroom_id.blank?
-    classroom = Classroom.find_by(id: classroom_id)
-    return new_student_session_path unless classroom
-
-    public_student_login_path(student_login_token: classroom.student_login_token)
   end
 end
