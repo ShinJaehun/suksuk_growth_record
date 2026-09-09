@@ -265,8 +265,9 @@ RSpec.describe 'Teacher operations', type: :request do
     expect(document.at_css(%(select[name="classroom_id"] option[value="#{classroom.id}"][selected]))).to be_present
   end
 
-  it 'moves and removes a single classroom assignment' do
+  it 'moves and removes a single classroom assignment without changing a submitted login ID' do
     teacher = annual_teacher(school: school, grade: 4)
+    original_login_id = teacher.login_id
     first = create(:classroom, annual_school: school, grade: 4, teacher: teacher)
     second = create(:classroom, annual_school: school, grade: 4)
     sign_in manager
@@ -274,8 +275,10 @@ RSpec.describe 'Teacher operations', type: :request do
     patch teacher_path(teacher), params: {
       membership_grade: 4,
       classroom_id: second.id,
-      user: { name: teacher.name, email: teacher.email }
+      user: { name: '수정된 이름', email: teacher.email, login_id: 'replacement-id' }
     }
+    expect(response).to redirect_to(teachers_path)
+    expect(teacher.reload).to have_attributes(name: '수정된 이름', login_id: original_login_id)
     expect(first.reload.teacher).to be_nil
     expect(second.reload.teacher).to eq(teacher)
 

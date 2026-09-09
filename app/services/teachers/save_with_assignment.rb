@@ -36,7 +36,8 @@ module Teachers
         validate_annual_school_immutability
         raise ActiveRecord::Rollback if teacher.errors.any?
 
-        teacher.assign_attributes(attributes)
+        profile_attributes = teacher.persisted? ? attributes.except(:login_id, "login_id") : attributes
+        teacher.assign_attributes(profile_attributes)
         normalize_inputs
         validate_inactive_assignment_lock
         validate_inputs

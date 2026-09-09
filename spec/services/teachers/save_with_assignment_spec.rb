@@ -32,10 +32,13 @@ RSpec.describe Teachers::SaveWithAssignment do
     teacher = annual_teacher(school: school, grade: nil, name: "변경 전")
     login_id = teacher.login_id
 
-    result = save(teacher: teacher, school: school, grade: nil, attributes: { name: "변경 후" })
+    [:login_id, "login_id"].each do |key|
+      result = save(teacher: teacher, school: school, grade: nil,
+        attributes: { name: "변경 후", key => "replacement-id" })
 
-    expect(result).to be_success
-    expect(teacher.reload).to have_attributes(name: "변경 후", login_id: login_id)
+      expect(result).to be_success
+      expect(teacher.reload).to have_attributes(name: "변경 후", login_id: login_id)
+    end
   end
 
   it "preserves an inactive classroom assignment during a profile update" do
