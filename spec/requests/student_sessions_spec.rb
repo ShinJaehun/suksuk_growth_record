@@ -442,6 +442,65 @@ RSpec.describe 'Student PIN sessions', type: :request do
     expect(controller.current_user).to be_nil
   end
 
+  it 'allows the new PIN after a teacher reset without clearing another student block' do
+    other_student = create(:student, classroom: classroom, student_pin: '5678')
+    5.times do
+      post_student_pin(pin: '0000')
+      post_student_pin(pin: '0000', target_student: other_student)
+    end
+
+    sign_in teacher
+    patch classroom_student_path(classroom, student), params: { student: { student_pin: '4321' } }
+    expect(response).to redirect_to(edit_classroom_student_path(classroom, student))
+    sign_out teacher
+
+    post_student_pin(pin: '4321')
+    expect(response).to redirect_to(student_growth_record_path)
+    delete destroy_student_session_path
+
+    post_student_pin(pin: '5678', target_student: other_student)
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include(I18n.t('student_sessions.throttled'))
+  end
+
+  it 'starts a fresh failure count after a teacher changes the PIN' do
+    4.times { post_student_pin(pin: '0000') }
+
+    sign_in teacher
+    patch classroom_student_path(classroom, student), params: { student: { student_pin: '4321' } }
+    expect(response).to redirect_to(edit_classroom_student_path(classroom, student))
+    sign_out teacher
+
+    4.times do
+      post_student_pin(pin: '0000')
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t('student_sessions.invalid'))
+      expect(response.body).not_to include(I18n.t('student_sessions.throttled'))
+    end
+
+    post_student_pin(pin: '0000')
+    expect(response.body).to include(I18n.t('student_sessions.throttled'))
+    post_student_pin(pin: '4321')
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include(I18n.t('student_sessions.throttled'))
+  end
+
+  it 'allows the new PIN after a self-service change despite the previous PIN block' do
+    post_student_pin(pin: '1234')
+    expect(response).to redirect_to(student_growth_record_path)
+    5.times { post_student_pin(pin: '0000') }
+    expect(response.body).to include(I18n.t('student_sessions.throttled'))
+
+    patch student_pin_path, params: {
+      student: { student_pin: '4321', student_pin_confirmation: '4321' }
+    }
+    expect(response).to redirect_to(student_profile_path)
+    delete destroy_student_session_path
+
+    post_student_pin(pin: '4321')
+    expect(response).to redirect_to(student_growth_record_path)
+  end
+
   it 'allows login again after the throttle window expires' do
     travel_to Time.zone.local(2026, 5, 22, 10, 0, 0) do
       5.times { post_student_pin(pin: '0000') }

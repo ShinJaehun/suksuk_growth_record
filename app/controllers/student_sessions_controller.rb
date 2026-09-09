@@ -94,6 +94,7 @@ class StudentSessionsController < ApplicationController
     StudentPinAttemptLimiter.new(
       classroom_id: @classroom.id,
       student_id: student.id,
+      pin_digest: student.student_pin_digest,
       remote_ip: request.remote_ip
     )
   end

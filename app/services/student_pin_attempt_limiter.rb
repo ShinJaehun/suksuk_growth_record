@@ -5,9 +5,10 @@ class StudentPinAttemptLimiter
   WINDOW = 10.minutes
   KEY_PREFIX = "student_pin_attempts:v1".freeze
 
-  def initialize(classroom_id:, student_id:, remote_ip:, cache: Rails.cache)
+  def initialize(classroom_id:, student_id:, pin_digest:, remote_ip:, cache: Rails.cache)
     @classroom_id = classroom_id
     @student_id = student_id
+    @pin_digest = pin_digest
     @remote_ip = remote_ip.to_s
     @cache = cache
   end
@@ -41,16 +42,16 @@ class StudentPinAttemptLimiter
   end
 
   def failure_key
-    digest = Digest::SHA256.hexdigest([classroom_id, student_id, remote_ip].join(":"))
+    digest = Digest::SHA256.hexdigest([classroom_id, student_id, pin_digest, remote_ip].join(":"))
     "#{KEY_PREFIX}:failures:#{digest}"
   end
 
   def block_key
-    digest = Digest::SHA256.hexdigest([classroom_id, student_id, remote_ip].join(":"))
+    digest = Digest::SHA256.hexdigest([classroom_id, student_id, pin_digest, remote_ip].join(":"))
     "#{KEY_PREFIX}:blocked:#{digest}"
   end
 
   private
 
-  attr_reader :classroom_id, :student_id, :remote_ip, :cache
+  attr_reader :classroom_id, :student_id, :pin_digest, :remote_ip, :cache
 end
