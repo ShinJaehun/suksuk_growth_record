@@ -21,6 +21,13 @@
 - Classroom 비활성, SchoolYear non-active(planning/archived), School 비활성으로 eligibility를 잃은 session은 기존대로 종료하며 사용할 수 없는 classroom token URL로 redirect하지 않는다.
 - Token generation 저장 방식 등 별도 session/token framework를 구현 계약으로 요구하지 않는다.
 
+### Student PIN credential과 실패 제한
+
+- 실패 누적과 차단은 현재 PIN credential에 귀속된다. 권한 있는 teacher의 PIN 재설정 또는 허용된 Student self-service PIN 변경이 성공하면 이전 PIN의 실패 횟수와 차단을 새 credential에 승계하지 않으며, 새 PIN으로 즉시 인증할 수 있어야 한다.
+- PIN이 변경되지 않은 동안에는 기존 5회 실패 / 10분 차단과 classroom/student/IP 분리를 유지한다. 공유 NAT를 이유로 brute-force 방어를 약화하지 않는다.
+- 모든 limiter를 전역 reset하지 않는다. 해당 Student의 이전 PIN credential에 속한 제한만 새 credential과 분리하며, 다른 Student의 제한은 유지한다. 구체적인 구현 수단은 이 spec에서 강제하지 않는다.
+- 위 Token/session 경계(Audit 3), PIN 변경 권한과 기존 로그인 eligibility는 변경하지 않는다.
+
 ## 권한
 
 - student는 자기 정보와 자신이 직접 속한 active Classroom만 조회한다.
@@ -59,11 +66,13 @@
 5. 다른 student/classroom URL 조작은 권한 범위를 넓히지 않는다.
 6. student용 strong parameters는 허용된 self-service 값으로 제한된다.
 7. teacher/admin 학생 관리는 담당 classroom과 policy scope 안에서만 가능하다.
-8. student PIN, token과 avatar 기존 정책을 유지한다.
+8. 위 PIN credential별 실패 제한 계약 외 student PIN, token과 avatar 기존 정책을 유지한다.
 9. 재발급 후 old token URL의 GET·POST 로그인은 거부되며 새 token URL로 redirect하지 않는다.
 10. Old token으로 로그인한 session이 있는 상태에서 token을 재발급한 뒤 logout, TTL 만료, ineligibility 경로를 각각 요청해도 응답 본문·link·Location에 새 token이 노출되지 않는다.
 11. Token 재발급만으로 기존 Student session을 종료하지 않는다. 기존 eligibility와 TTL이 유효한 session은 계속 사용할 수 있다.
 12. Logout, TTL 만료 또는 Classroom/SchoolYear/School lifecycle로 session을 종료할 때 classroom token URL로 redirect하지 않고 `/student_login`을 사용한다.
+13. 기존 PIN으로 5회 실패해 차단된 Student도 teacher의 PIN 재설정 직후 같은 classroom/student/IP에서 새 PIN으로 로그인할 수 있다. 허용된 Student self-service PIN 변경에도 동일하게 적용한다.
+14. 차단 전 누적 실패도 PIN 변경 후 승계되지 않으며 새 PIN의 실패는 새로 누적한다. PIN이 바뀌지 않으면 5회 실패 / 10분 차단과 classroom/student/IP 분리를 유지하고, 한 Student의 PIN 변경은 다른 Student의 제한을 해제하지 않는다.
 
 ## Non-goals
 
@@ -71,5 +80,5 @@
 - Student용 Devise 모델 또는 범용 인증 프레임워크 추가
 - 학생의 학교 전역 membership
 - 학생 domain 전면 재설계
-- Student PIN/rate-limit 정책 변경
-- DB migration 또는 generic token/session framework의 선제 도입
+- 위 credential별 실패 제한 분리 외 Student PIN/rate-limit 정책 변경
+- DB migration 또는 generic credential/rate-limit/token/session framework의 선제 도입
