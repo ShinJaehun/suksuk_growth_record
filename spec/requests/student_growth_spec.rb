@@ -12,6 +12,10 @@ RSpec.describe "Student weekly growth", type: :request do
     travel_to(Time.zone.local(2026, 9, 9, 12)) { example.run }
   end
 
+  before do
+    allow(PublicHolidays::Calendar).to receive(:for_year).and_return([])
+  end
+
   def sign_in_student
     post public_student_login_path(student_login_token: classroom.student_login_token), params: {
       student_id: student.id,
@@ -366,7 +370,9 @@ RSpec.describe "Student weekly growth", type: :request do
     expect(weekly_nav.at_css('[data-growth-tab="growth"]')["aria-current"]).to be_nil
 
     monthly = weekly_nav.at_css('[data-growth-tab="monthly"]')
-    expect(monthly["aria-disabled"]).to eq("true")
+    expect(monthly.name).to eq("a")
+    expect(monthly["href"]).to eq(student_growth_path(tab: "monthly"))
+    expect(monthly["aria-current"]).to be_nil
     expect(monthly.text).to include(I18n.t("student_app.navigation.monthly"))
   end
 end

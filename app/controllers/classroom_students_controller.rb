@@ -45,13 +45,14 @@ class ClassroomStudentsController < ApplicationController
   def show
     authorize @classroom, :manage_growth?
     @can_manage_student = policy(@student).manage?
-    @tab = growth_dashboard_tab
+    @tab = params[:tab] == "monthly" ? :monthly : :weekly
 
     if @tab == :weekly
-      prepare_growth_week(@student)
-    elsif @tab == :growth
-      prepare_growth_daily(@student, classroom: @classroom)
+      prepare_growth_week(@student, classroom: @classroom)
+    elsif @tab == :monthly
+      prepare_growth_month(@student, classroom: @classroom)
     end
+    prepare_growth_daily(@student, classroom: @classroom)
   end
 
   def edit

@@ -7,5 +7,7 @@
 
 <%= render "shared/growth_dashboard_navigation",
       active: active,
+      full_width: true,
       growth_path: student_growth_path(tab: "growth"),
-      weekly_path: student_growth_path(tab: "weekly") %>
+      weekly_path: student_growth_path(tab: "weekly"),
+      monthly_path: student_growth_path(tab: "monthly") %>

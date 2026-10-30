@@ -1,0 +1,127 @@
+.growth-content {
+  width: 100%;
+  max-width: 40rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.teacher-growth-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; align-items: start; }
+@media (min-width: 1024px) {
+  .teacher-growth-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.growth-period-navigation {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+.growth-period-navigation__title { color: #0f172a; font-size: clamp(0.75rem, 2vw, 1rem); font-weight: 700; text-align: center; }
+.growth-period-navigation__control {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 1.75rem;
+  line-height: 1;
+  text-decoration: none;
+}
+a.growth-period-navigation__control:hover { background: #eef2f6; }
+.growth-period-navigation__control[aria-disabled="true"] { background: transparent; color: #cbd5e1; }
+a.growth-period-navigation__control:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.growth-weekly__day { cursor: default; }
+a.growth-weekly__day { cursor: pointer; }
+a.growth-weekly__day:hover text { fill: #1d4ed8; }
+a.growth-weekly__day:focus-visible { outline: 2px solid #2563eb; }
+
+/* Keeps the seven-column calendar adapted from suksuk_praise. */
+.growth-monthly {
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  border: 1px solid #e8edf3;
+  border-radius: 1.5rem;
+  background: #fff;
+  box-shadow: 0 4px 24px rgb(15 23 42 / 3%);
+}
+
+.growth-monthly__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.growth-monthly__title { color: #64748b; font-size: 0.875rem; font-weight: 700; }
+
+.growth-monthly .growth-metric-navigation { flex-wrap: wrap; overflow-x: visible; margin: 1rem 0 0.5rem; gap: 0.5rem; }
+.growth-monthly [data-metric] { border: 1px solid #e8edf3; background: #fff; color: #64748b; font-size: 0.8125rem; }
+.growth-monthly [data-metric]:hover { background: #f8fafc; }
+.growth-monthly [data-metric][aria-current="true"] { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.growth-monthly [data-metric]:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.growth-monthly__notice { margin-bottom: 1rem; color: #64748b; font-size: 0.8125rem; }
+
+.growth-calendar { padding-inline: 0.25rem; }
+.growth-calendar__weekdays,
+.growth-calendar__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.growth-calendar__week { border-top: 1px solid #f1f5f9; }
+.growth-calendar__weekday { padding: 0.75rem 0; color: #94a3b8; font-size: 0.6875rem; font-weight: 600; text-align: center; }
+.growth-calendar__weekday--saturday { color: #0369a1; }
+.growth-calendar__weekday--sunday { color: #be123c; }
+
+.growth-calendar__day {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 4rem 1rem;
+  align-items: center;
+  padding: 0.125rem 0;
+  border-radius: 0.875rem;
+  color: #334155;
+  text-align: center;
+  text-decoration: none;
+  cursor: default;
+}
+
+a.growth-calendar__day { cursor: pointer; }
+a.growth-calendar__day:hover { background: #f8fafc; box-shadow: inset 0 0 0 1px #e2e8f0; }
+a.growth-calendar__day:focus-visible { z-index: 1; outline: 2px solid #2563eb; outline-offset: -2px; }
+.growth-calendar__day-visual {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.growth-calendar__date { position: relative; z-index: 1; font-size: 0.8125rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.growth-calendar__day--saturday .growth-calendar__date { color: #0369a1; }
+.growth-calendar__day--sunday .growth-calendar__date,
+.growth-calendar__day--public-holiday .growth-calendar__date { color: #be123c; }
+.growth-calendar__day--muted .growth-calendar__date,
+.growth-calendar__day--future .growth-calendar__date { color: #cbd5e1; }
+.growth-calendar__day--today .growth-calendar__date { color: #1d4ed8; font-weight: 800; text-decoration: underline; text-underline-offset: 0.2em; }
+.growth-calendar__day--scored .growth-calendar__date { color: #fff; }
+.growth-calendar__day--selected { background: #eff6ff; box-shadow: inset 0 0 0 2px #93c5fd; }
+.growth-calendar__holidays { min-width: 0; overflow: hidden; color: #be123c; font-size: 0.625rem; line-height: 1rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.growth-calendar__bubble { position: absolute; top: 50%; left: 50%; display: block; width: 5rem; height: 5rem; max-width: none; transform: translate(-50%, -50%); pointer-events: none; }
+
+@media (max-width: 640px) {
+  .growth-monthly__header { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .growth-monthly .growth-metric-navigation { margin-top: 1rem; }
+  .growth-monthly [data-metric] { padding: 0.5rem 0.75rem; }
+  .growth-calendar__day { grid-template-rows: 3.25rem 0.875rem; border-radius: 0.5rem; }
+  .growth-calendar__bubble { width: 4rem; height: 4rem; }
+  .growth-calendar__date { font-size: 0.6875rem; }
+  .growth-calendar__holidays { font-size: 0.5625rem; }
+}

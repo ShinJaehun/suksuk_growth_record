@@ -1,11 +1,11 @@
-<section class="mx-auto w-full max-w-6xl space-y-6 py-4" data-growth-dashboard>
+<section class="growth-content space-y-6 py-4" data-growth-dashboard>
   <%= render "shared/student_app_header", active: @tab %>
 
   <% if @tab == :weekly %>
     <h1 class="text-2xl font-extrabold tracking-tight text-slate-900"><%= t("student_growth.title") %></h1>
     <%= render "shared/growth_weekly_chart", classroom: nil, student: nil %>
   <% elsif @tab == :monthly %>
-    <p class="py-8 text-center text-slate-500" data-growth-section="monthly"><%= t("student_app.navigation.coming_soon") %></p>
+    <%= render "shared/growth_monthly_calendar", classroom: nil, student: nil %>
   <% else %>
     <%= render "shared/growth_daily_navigation", classroom: nil, student: nil %>
     <% if @editing %>

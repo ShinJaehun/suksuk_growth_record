@@ -6,6 +6,7 @@ ko:
     next_record: "다음 기록 보기"
     dashboard_navigation: "성장 기록 메뉴"
     weekly_title: "주간 성장"
+    empty_past_record: "이날 작성한 성장기록이 없습니다."
     week_navigation: "주간 이동"
     previous_week: "이전 주 보기"
     next_week: "다음 주 보기"
@@ -17,6 +18,18 @@ ko:
     score: "%{value}점"
     point_label: "%{date} %{weekday}: %{value}"
     weekdays: ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"]
+    monthly:
+      title: "월간 성장"
+      navigation: "월간 이동"
+      previous: "이전 달"
+      next: "다음 달"
+      month_title: "%{year}년 %{month}월"
+      weekdays: ["일", "월", "화", "수", "목", "금", "토"]
+      today: "오늘"
+      future: "미래 날짜"
+      no_record: "기록 없음"
+      no_score: "덕목 점수 없음"
+      holidays_unavailable: "공휴일 정보를 불러오지 못해 날짜 이동을 잠시 사용할 수 없어요."
   date:
     formats:
       growth_week: "%Y.%m.%d"

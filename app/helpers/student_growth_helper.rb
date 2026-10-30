@@ -5,13 +5,15 @@ module StudentGrowthHelper
     virtue ? virtue.color_hex : OVERALL_GROWTH_COLOR
   end
 
-  def student_growth_chart(weekly_data, overall:)
+  def student_growth_chart(weekly_data, overall:, classroom: nil, student: nil)
     maximum = overall ? 100 : 5
     points = weekly_data.each_with_index.map do |day, index|
       value = day[:value]
       day.merge(
         x: 50 + index * 100,
         y: growth_chart_y(value, maximum),
+        href: growth_date_selection_path(day[:date], classroom: classroom, student: student),
+        selected: classroom.present? && day[:date] == @recorded_on,
         weekday: t("student_growth.weekdays")[day[:date].wday],
         label: value.nil? ? t("student_growth.no_data") : student_growth_value_label(value, overall:)
       )
@@ -58,6 +60,90 @@ module StudentGrowthHelper
     else
       t("student_growth.no_data")
     end
+  end
+
+  def growth_visualization_params(classroom: nil)
+    query = { tab: @tab.to_s, metric: @metric }
+    if @tab == :monthly
+      query[:month] = @calendar_month_param
+    else
+      query[:week_offset] = @week_offset
+    end
+    query[:date] = @recorded_on.iso8601 if classroom
+    query
+  end
+
+  def growth_record_path(date, classroom: nil, student: nil)
+    query = classroom ? growth_visualization_params(classroom: classroom) : {}
+    growth_dashboard_path(classroom: classroom, student: student, **query, date: date.iso8601)
+  end
+
+  def growth_date_selection_path(date, classroom: nil, student: nil)
+    return if date > Time.zone.today || date.saturday? || date.sunday? || @holidays_unavailable
+    return if @public_holidays_by_date.fetch(date, []).any?
+    return unless @records_by_date[date] || (classroom && date < Time.zone.today)
+
+    growth_record_path(date, classroom: classroom, student: student)
+  end
+
+  def growth_calendar_weekday_classes(index)
+    class_names("growth-calendar__weekday",
+      "growth-calendar__weekday--sunday" => index.zero?,
+      "growth-calendar__weekday--saturday" => index == 6)
+  end
+
+  def growth_calendar_day(date, classroom: nil, student: nil)
+    in_month = date.between?(@calendar_month, @calendar_month.end_of_month)
+    future = date > @today
+    record = @records_by_date[date] if in_month && !future
+    value = @monthly_values[date] if record
+    state = if !in_month
+      "outside_month"
+    elsif future
+      "future"
+    elsif record.nil?
+      "no_record"
+    elsif value.nil?
+      "no_score"
+    else
+      "scored"
+    end
+    holidays = in_month ? @public_holidays_by_date.fetch(date, []) : []
+    status = if value
+      t("student_growth.score", value: number_with_precision(value, precision: 1, strip_insignificant_zeros: true))
+    elsif in_month && state != "no_record"
+      t("student_growth.monthly.#{state}")
+    end
+    labels = [l(date, format: :growth_week), status]
+    labels << t("student_growth.monthly.today") if date == @today
+    labels.concat(holidays.map { |holiday| holiday.fetch(:name) })
+    href = growth_date_selection_path(date, classroom: classroom, student: student) if in_month
+    selected = classroom.present? && date == @recorded_on
+
+    {
+      date: date, value: value, radius: value && growth_calendar_bubble_radius(value),
+      holidays: holidays,
+      tag: href ? :a : :div,
+      attributes: {
+        href: href,
+        class: class_names("growth-calendar__day",
+          "growth-calendar__day--scored" => value.present?,
+          "growth-calendar__day--selected" => selected,
+          "growth-calendar__day--saturday" => date.saturday?,
+          "growth-calendar__day--sunday" => date.sunday?,
+          "growth-calendar__day--muted" => !in_month,
+          "growth-calendar__day--today" => date == @today,
+          "growth-calendar__day--public-holiday" => holidays.any?,
+          "growth-calendar__day--future" => in_month && future),
+        aria: { label: labels.compact.join(", "), current: selected ? "date" : nil },
+        data: { calendar_date: date.iso8601, growth_value: value, calendar_state: state }
+      }
+    }
+  end
+
+  def growth_calendar_bubble_radius(value)
+    # A shared 1..5 scale: small scores remain visible and 5 fits inside the cell.
+    (9 + value.clamp(1, 5) * 6).round(2)
   end
 
   private

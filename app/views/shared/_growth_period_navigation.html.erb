@@ -1,0 +1,24 @@
+<%= content_tag :nav, class: "growth-period-navigation",
+      aria: { label: navigation_label }, data: navigation_data do %>
+  <% if previous_path %>
+    <%= link_to previous_path, class: "growth-period-navigation__control",
+          aria: { label: previous_label }, data: { data_key => "previous" } do %>
+      <span aria-hidden="true">‹</span>
+    <% end %>
+  <% else %>
+    <span class="growth-period-navigation__control" aria-disabled="true" aria-label="<%= previous_label %>">
+      <span aria-hidden="true">‹</span>
+    </span>
+  <% end %>
+  <p class="growth-period-navigation__title"><%= title %></p>
+  <% if next_path %>
+    <%= link_to next_path, class: "growth-period-navigation__control",
+          aria: { label: next_label }, data: { data_key => "next" } do %>
+      <span aria-hidden="true">›</span>
+    <% end %>
+  <% else %>
+    <span class="growth-period-navigation__control" aria-disabled="true" aria-label="<%= next_label %>">
+      <span aria-hidden="true">›</span>
+    </span>
+  <% end %>
+<% end %>
