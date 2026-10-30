@@ -8,20 +8,27 @@
 
   <%= render "shared/growth_dashboard_navigation",
         active: @tab,
-        growth_path: classroom_student_path(@classroom, @student, tab: "growth"),
-        weekly_path: classroom_student_path(@classroom, @student, tab: "weekly") %>
+        teacher_view: true,
+        weekly_path: classroom_student_path(@classroom, @student, tab: "weekly", date: @recorded_on.iso8601, metric: @metric, week_offset: @week_offset || 0),
+        monthly_path: classroom_student_path(@classroom, @student, tab: "monthly", date: @recorded_on.iso8601, metric: @metric, month: @calendar_month_param) %>
 
-  <% if @tab == :weekly %>
-    <%= render "shared/growth_weekly_chart", classroom: @classroom, student: @student %>
-  <% elsif @tab == :monthly %>
-    <p class="py-8 text-center text-slate-500" data-growth-section="monthly"><%= t("student_app.navigation.coming_soon") %></p>
-  <% else %>
-    <%= render "shared/growth_daily_navigation", classroom: @classroom, student: @student %>
-    <%= render "shared/growth_daily_result",
-          record: @record,
-          score_rows: @score_rows,
-          eyebrow: nil,
-          status_text: daily_growth_status(@record, @recorded_on),
-          edit_path: nil %>
-  <% end %>
+  <div class="teacher-growth-layout">
+    <section class="min-w-0 space-y-4" data-growth-record-panel>
+      <%= render "shared/growth_daily_navigation", classroom: @classroom, student: @student %>
+      <%= render "shared/growth_daily_result",
+            record: @record,
+            score_rows: @score_rows,
+            eyebrow: nil,
+            status_text: daily_growth_status(@record, @recorded_on),
+            empty_message: @recorded_on < Time.zone.today ? t("student_growth.empty_past_record") : nil,
+            edit_path: nil %>
+    </section>
+    <div class="growth-content" data-growth-visualization-panel>
+      <% if @tab == :monthly %>
+        <%= render "shared/growth_monthly_calendar", classroom: @classroom, student: @student %>
+      <% else %>
+        <%= render "shared/growth_weekly_chart", classroom: @classroom, student: @student %>
+      <% end %>
+    </div>
+  </div>
 </section>

@@ -1,0 +1,17 @@
+<nav class="growth-metric-navigation flex gap-2 overflow-x-auto pb-2" aria-label="<%= t("student_growth.metric_navigation") %>">
+  <%= student_growth_metric_link(
+        "overall",
+        t("student_growth.overall"),
+        href: growth_dashboard_path(classroom: classroom, student: student, **period, metric: "overall"),
+        current_metric: @metric
+      ) %>
+  <% @virtues.each do |virtue| %>
+    <%= student_growth_metric_link(
+          virtue.id.to_s,
+          virtue.name,
+          href: growth_dashboard_path(classroom: classroom, student: student, **period, metric: virtue.id),
+          current_metric: @metric,
+          color: virtue.color_hex
+        ) %>
+  <% end %>
+</nav>

@@ -9,6 +9,8 @@ class StudentGrowthController < ApplicationController
 
     if @tab == :weekly
       prepare_growth_week(current_student)
+    elsif @tab == :monthly
+      prepare_growth_month(current_student)
     elsif @tab == :growth
       prepare_growth_daily(current_student)
       @can_edit_record = @recorded_on == Time.zone.today

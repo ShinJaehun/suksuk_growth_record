@@ -1,35 +1,49 @@
-<nav class="mx-auto grid w-full max-w-md grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-     aria-label="<%= t("student_growth.dashboard_navigation") %>"
-     data-growth-dashboard-navigation>
-  <%= link_to growth_path,
-        class: class_names(
-          "flex min-h-14 flex-col items-center justify-center gap-1 px-3 py-2 text-center transition",
-          "bg-blue-50 text-blue-700" => active == :growth,
-          "text-slate-600 hover:bg-slate-50" => active != :growth
-        ),
-        aria: { current: active == :growth ? "page" : nil },
-        data: { growth_tab: "growth" } do %>
-    <span class="text-lg" aria-hidden="true">📝</span>
-    <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.growth") %></span>
-  <% end %>
+<div class="pb-6">
+  <nav class="<%= class_names(
+         "mx-auto grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm",
+         "max-w-md" => !local_assigns[:full_width],
+         "grid-cols-2" => local_assigns[:teacher_view],
+         "grid-cols-3" => !local_assigns[:teacher_view]
+       ) %>"
+       aria-label="<%= t("student_growth.dashboard_navigation") %>"
+       data-growth-dashboard-navigation>
+    <% unless local_assigns[:teacher_view] %>
+      <%= link_to growth_path,
+            class: class_names(
+              "flex min-h-14 flex-col items-center justify-center gap-1 px-3 py-2 text-center transition",
+              "bg-blue-50 text-blue-700" => active == :growth,
+              "text-slate-600 hover:bg-slate-50" => active != :growth
+            ),
+            aria: { current: active == :growth ? "page" : nil },
+            data: { growth_tab: "growth" } do %>
+        <span class="text-lg" aria-hidden="true">📝</span>
+        <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.growth") %></span>
+      <% end %>
+    <% end %>
 
-  <%= link_to weekly_path,
-        class: class_names(
-          "flex min-h-14 flex-col items-center justify-center gap-1 border-x border-slate-200 px-3 py-2 text-center transition",
-          "bg-blue-50 text-blue-700" => active == :weekly,
-          "text-slate-600 hover:bg-slate-50" => active != :weekly
-        ),
-        aria: { current: active == :weekly ? "page" : nil },
-        data: { growth_tab: "weekly" } do %>
-    <span class="text-lg" aria-hidden="true">📈</span>
-    <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.weekly") %></span>
-  <% end %>
+    <%= link_to weekly_path,
+          class: class_names(
+            "flex min-h-14 flex-col items-center justify-center gap-1 border-r border-slate-200 px-3 py-2 text-center transition",
+            "bg-blue-50 text-blue-700" => active == :weekly,
+            "border-l" => !local_assigns[:teacher_view],
+            "text-slate-600 hover:bg-slate-50" => active != :weekly
+          ),
+          aria: { current: active == :weekly ? "page" : nil },
+          data: { growth_tab: "weekly" } do %>
+      <span class="text-lg" aria-hidden="true">📈</span>
+      <span class="text-xs font-semibold sm:text-sm"><%= t(local_assigns[:teacher_view] ? "student_growth.weekly_title" : "student_app.navigation.weekly") %></span>
+    <% end %>
 
-  <span class="flex min-h-14 cursor-default flex-col items-center justify-center gap-1 bg-slate-50/50 px-3 py-2 text-center text-slate-400"
-        aria-disabled="true"
-        title="<%= t("student_app.navigation.coming_soon") %>"
-        data-growth-tab="monthly">
-    <span class="text-lg" aria-hidden="true">📅</span>
-    <span class="text-xs font-semibold sm:text-sm"><%= t("student_app.navigation.monthly") %></span>
-  </span>
-</nav>
+    <%= link_to monthly_path,
+          class: class_names(
+            "flex min-h-14 flex-col items-center justify-center gap-1 px-3 py-2 text-center transition",
+            "bg-blue-50 text-blue-700" => active == :monthly,
+            "text-slate-600 hover:bg-slate-50" => active != :monthly
+          ),
+          aria: { current: active == :monthly ? "page" : nil },
+          data: { growth_tab: "monthly" } do %>
+      <span class="text-lg" aria-hidden="true">📅</span>
+      <span class="text-xs font-semibold sm:text-sm"><%= t(local_assigns[:teacher_view] ? "student_growth.monthly.title" : "student_app.navigation.monthly") %></span>
+    <% end %>
+  </nav>
+</div>

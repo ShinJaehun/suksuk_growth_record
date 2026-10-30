@@ -1,0 +1,37 @@
+<section class="growth-monthly" data-growth-section="monthly" data-growth-metric="<%= @metric %>">
+  <header class="growth-monthly__header">
+    <h2 class="growth-monthly__title"><%= t("student_growth.monthly.title") %></h2>
+
+    <%= render "shared/growth_period_navigation",
+          title: t("student_growth.monthly.month_title", year: @calendar_month.year, month: @calendar_month.month),
+          navigation_label: t("student_growth.monthly.navigation"),
+          previous_label: t("student_growth.monthly.previous"),
+          next_label: t("student_growth.monthly.next"),
+          previous_path: growth_dashboard_path(classroom: classroom, student: student, **growth_visualization_params(classroom: classroom), month: @previous_calendar_month_param),
+          next_path: @calendar_month < @today.beginning_of_month ? growth_dashboard_path(classroom: classroom, student: student, **growth_visualization_params(classroom: classroom), month: @next_calendar_month_param) : nil,
+          data_key: :month_navigation,
+          navigation_data: { calendar_month: @calendar_month_param } %>
+  </header>
+
+  <%= render "shared/growth_metric_navigation", classroom: classroom, student: student,
+        period: growth_visualization_params(classroom: classroom) %>
+
+  <% if @holidays_unavailable %>
+    <p class="growth-monthly__notice" role="status"><%= t("student_growth.monthly.holidays_unavailable") %></p>
+  <% end %>
+
+  <div class="growth-calendar">
+    <div class="growth-calendar__weekdays">
+      <% t("student_growth.monthly.weekdays").each_with_index do |weekday, index| %>
+        <div class="<%= growth_calendar_weekday_classes(index) %>"><%= weekday %></div>
+      <% end %>
+    </div>
+    <% @calendar_weeks.each do |week| %>
+      <div class="growth-calendar__week">
+        <% week.each do |date| %>
+          <%= render "shared/growth_calendar_day", day: growth_calendar_day(date, classroom: classroom, student: student) %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</section>

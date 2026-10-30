@@ -11,6 +11,10 @@ RSpec.describe "Student growth dashboard", type: :request do
     travel_to(Time.zone.local(2026, 9, 9, 12)) { example.run }
   end
 
+  before do
+    allow(PublicHolidays::Calendar).to receive(:for_year).and_return([])
+  end
+
   def sign_in_student
     post public_student_login_path(student_login_token: classroom.student_login_token), params: {
       student_id: student.id,
@@ -53,7 +57,7 @@ RSpec.describe "Student growth dashboard", type: :request do
 
     dashboard = document.at_css("[data-growth-dashboard]")
     identity = document.at_css("[data-student-identity]")
-    expect(dashboard["class"].split).to include("max-w-6xl")
+    expect(dashboard["class"].split).to include("growth-content")
     expect(identity.css("[data-student-identity-field]").map { |node| node["data-student-identity-field"] })
       .to eq(%w[school classroom name])
     expect(identity.text).to include(classroom.school_year.school.name, classroom.class_label, "7번", student.name)
@@ -122,7 +126,7 @@ RSpec.describe "Student growth dashboard", type: :request do
     expect(document.at_css(%([data-graph-date="#{Time.zone.today.iso8601}"]))["data-growth-value"]).to eq("3")
   end
 
-  it "shows one selected read-only surface at a time on the teacher dashboard" do
+  it "shows the selected record beside the weekly chart on the teacher dashboard" do
     teacher = create(:user, :teacher, :active_annual_teacher,
                      annual_school: classroom.school_year.school, annual_grade: classroom.grade)
     create(:homeroom_assignment, classroom:, teacher:)
@@ -146,8 +150,9 @@ RSpec.describe "Student growth dashboard", type: :request do
     expect(identity.text).to include(classroom.school_year.school.name, classroom.class_label, "7번", student.name)
     expect(document.at_css('[data-student-teacher-action="back"]')).to be_present
     expect(document.at_css('[data-student-teacher-action="edit"]')).to be_present
-    expect(document.at_css('[data-growth-tab="growth"]')["aria-current"]).to eq("page")
-    expect(document.at_css('[data-growth-section="weekly"]')).to be_nil
+    expect(document.css('[data-growth-tab="growth"]')).to be_empty
+    expect(document.at_css('[data-growth-tab="weekly"]')["aria-current"]).to eq("page")
+    expect(document.at_css('[data-growth-section="weekly"]')).to be_present
     today = document.at_css("[data-daily-growth-record]")
     expect(today.text).to include(
       frozen_name,
@@ -161,7 +166,7 @@ RSpec.describe "Student growth dashboard", type: :request do
     get classroom_student_path(classroom, student, tab: "weekly")
 
     expect(document.at_css('[data-growth-tab="weekly"]')["aria-current"]).to eq("page")
-    expect(document.at_css("[data-daily-growth-record]")).to be_nil
+    expect(document.at_css("[data-daily-growth-record]")).to be_present
     expect(document.at_css('[data-growth-section="weekly"]')).to be_present
     document.css('a[data-metric], a[data-week-navigation]').each do |link|
       expect(URI.parse(link["href"]).path).to eq(classroom_student_path(classroom, student))
@@ -170,6 +175,97 @@ RSpec.describe "Student growth dashboard", type: :request do
     expect(document.css("form, input, textarea, button")).to be_empty
     expect(record.reload.daily_growth_scores.pluck(:score)).to match_array([3, 5])
   end
+  it "links a Student's recorded weekday point and labels to their own read-only daily record" do
+    record = create_record(date: Date.new(2026, 9, 7), scores: { virtues.first => 3 }, reflection: "내 기록")
+    create_record(date: Time.zone.today, scores: { virtues.first => 4 })
+    other_student = create(:student, classroom: classroom)
+    create(:daily_growth_record, :with_score, student: other_student,
+      recorded_on: Date.new(2026, 9, 8), reflection: "다른 학생 비공개 기록")
+    allow(PublicHolidays::Calendar).to receive(:for_year)
+      .and_return([{ date: Time.zone.today, name: "공휴일" }])
+    sign_in_student
+
+    get student_growth_path, params: { tab: "weekly", student_id: other_student.id }
+
+    link = document.at_css('a[data-graph-date="2026-09-07"]')
+    expect(link.at_css("circle")).to be_present
+    expect(link.css("text").map(&:text)).to include("월요일", "9/7")
+    expect(Rack::Utils.parse_query(URI.parse(link["href"]).query))
+      .to eq("tab" => "growth", "date" => "2026-09-07")
+    %w[2026-09-08 2026-09-09 2026-09-10].each do |date|
+      expect(document.at_css(%([data-graph-date="#{date}"]))["href"]).to be_nil
+    end
+
+    expect { get link["href"] }.not_to change {
+      [DailyVirtueConfiguration.count, DailyGrowthRecord.count, DailyGrowthScore.count,
+       record.reload.attributes, record.daily_growth_scores.map(&:attributes)]
+    }
+
+    expect(document.at_css('[data-daily-growth-record]').text).to include("내 기록")
+    expect(response.body).not_to include("다른 학생 비공개 기록")
+    expect(document.css('form, [data-edit-today-growth]')).to be_empty
+  end
+
+  it "keeps the teacher's selected record independent of the weekly period and metric" do
+    teacher = create(:user, :teacher, :active_annual_teacher,
+      annual_school: classroom.school_year.school, annual_grade: classroom.grade)
+    create(:homeroom_assignment, classroom: classroom, teacher: teacher)
+    record = create_record(date: Date.new(2026, 9, 7), scores: { virtues.first => 3 }, reflection: "선택한 기록")
+    other_student = create(:student, classroom: classroom)
+    create(:daily_growth_record, :with_score, student: other_student,
+      recorded_on: Date.new(2026, 9, 1), reflection: "다른 학생의 과거 비공개 기록")
+    sign_in teacher
+    path = classroom_student_path(classroom, student)
+
+    get path, params: { tab: "weekly", date: "2026-09-07", week_offset: -1,
+                       metric: virtues.first.id, student_id: other_student.id }
+
+    expect(document.at_css('[data-daily-growth-record]').text).to include("선택한 기록")
+    expect(document.at_css('[data-week-start]')["data-week-start"]).to eq("2026-08-31")
+    empty_link = document.at_css('a[data-graph-date="2026-09-01"]')
+    expect(empty_link.css("circle")).to be_empty
+    expect(Rack::Utils.parse_query(URI.parse(empty_link["href"]).query))
+      .to eq("tab" => "weekly", "week_offset" => "-1", "metric" => virtues.first.id.to_s, "date" => "2026-09-01")
+
+    expect { get empty_link["href"] }.not_to change {
+      [DailyVirtueConfiguration.count, DailyGrowthRecord.count, DailyGrowthScore.count,
+       record.reload.attributes, record.daily_growth_scores.map(&:attributes)]
+    }
+
+    expect(document.at_css('[data-daily-growth-record]').text.strip)
+      .to eq(I18n.t("student_growth.empty_past_record"))
+    expect(document.css('[data-score-bar], form')).to be_empty
+    expect(response.body).not_to include("다른 학생의 과거 비공개 기록")
+    expect(document.at_css('[data-graph-date="2026-09-01"]')["aria-current"]).to eq("date")
+    get document.at_css('[data-week-navigation="next"]')["href"]
+
+    expect(document.at_css('[data-growth-date]')["data-growth-date"]).to eq("2026-09-01")
+    expect(document.at_css('[data-week-start]')["data-week-start"]).to eq("2026-09-07")
+    get document.at_css('a[data-graph-date="2026-09-07"]')["href"]
+
+    expect(document.at_css('[data-daily-growth-record]').text).to include("선택한 기록")
+    expect(document.at_css('[data-graph-date="2026-09-07"]')["aria-current"]).to eq("date")
+    get document.at_css(%(a[data-metric="#{virtues.second.id}"]))["href"]
+
+    expect(document.at_css('[data-growth-date]')["data-growth-date"]).to eq("2026-09-07")
+    expect(document.at_css('[data-daily-growth-record]').text).to include("선택한 기록")
+    expect(document.at_css('[data-growth-section="weekly"]')).to be_present
+  end
+
+  it "blocks weekly date links for students and teachers when holidays are unavailable" do
+    create_record(date: Date.new(2026, 9, 7), scores: { virtues.first => 3 })
+    allow(PublicHolidays::Calendar).to receive(:for_year).and_return(nil)
+    sign_in_student
+    get student_growth_path, params: { tab: "weekly" }
+    expect(document.css('a[data-graph-date]')).to be_empty
+    expect(document.at_css('[data-graph-date="2026-09-07"] circle')).to be_present
+
+    sign_in create(:user, :admin)
+    get classroom_student_path(classroom, student), params: { tab: "weekly" }
+    expect(document.css('a[data-graph-date]')).to be_empty
+    expect(document.at_css('[data-daily-growth-record]')).to be_present
+  end
+
   %w[student teacher manager admin].each do |actor_role|
     context "daily navigation as #{actor_role}" do
       let(:dashboard_path) do
@@ -178,6 +274,11 @@ RSpec.describe "Student growth dashboard", type: :request do
         else
           classroom_student_path(classroom, student)
         end
+      end
+
+      let(:record_navigation_query) do
+        actor_role == "student" ? { "tab" => "growth" } :
+          { "tab" => "weekly", "metric" => "overall", "week_offset" => "0" }
       end
 
       before do
@@ -198,27 +299,33 @@ RSpec.describe "Student growth dashboard", type: :request do
         end
       end
 
-      it "defaults missing, unsupported, and legacy tabs to daily growth" do
+      it "defaults missing, unsupported, and legacy tabs to the actor's default dashboard" do
         [nil, "unknown", "today", "growth"].each do |tab|
           get dashboard_path, params: { tab: tab }
 
           expect(response).to have_http_status(:ok)
-          expect(document.at_css('[data-growth-tab="growth"]')["aria-current"]).to eq("page")
+          active_tab = actor_role == "student" ? "growth" : "weekly"
+          expect(document.at_css(%([data-growth-tab="#{active_tab}"]))["aria-current"]).to eq("page")
           expect(document.at_css('[data-growth-date]')["data-growth-date"]).to eq("2026-09-09")
-          expect(document.at_css('[data-growth-section="weekly"]')).to be_nil
+          expect(document.at_css('[data-growth-section="weekly"]').present?).to eq(actor_role != "student")
         end
       end
 
-      it "shows only a preparation state for monthly without creating rows" do
+      it "shows the monthly calendar with an actor-appropriate record panel without creating rows" do
+        allow(PublicHolidays::Calendar).to receive(:for_year).with(2026).and_return([])
         expect { get dashboard_path, params: { tab: "monthly" } }.not_to change {
           [DailyVirtueConfiguration.count, DailyVirtueConfigurationItem.count,
            DailyGrowthRecord.count, DailyGrowthScore.count]
         }
 
         expect(response).to have_http_status(:ok)
-        expect(document.at_css('[data-growth-section="monthly"]').text)
-          .to include(I18n.t("student_app.navigation.coming_soon"))
-        expect(document.css('[data-growth-date], [data-growth-section="weekly"], form')).to be_empty
+        expect(document.at_css('[data-growth-section="monthly"]')).to be_present
+        expect(document.at_css('[data-calendar-month]')["data-calendar-month"]).to eq("2026-09")
+        expect(document.at_css('[data-growth-tab="monthly"]')["aria-current"]).to eq("page")
+        expect(document.css('[data-calendar-state="no_record"]').size).to eq(9)
+        expect(document.css('[data-growth-section="weekly"], form')).to be_empty
+        expect(document.at_css('[data-growth-date]').present?).to eq(actor_role != "student")
+        expect(document.at_css('[data-daily-growth-record]').present?).to eq(actor_role != "student")
       end
 
       it "reads past frozen scores and reflection without allowing edit mode" do
@@ -249,7 +356,8 @@ RSpec.describe "Student growth dashboard", type: :request do
         }
 
         expect(document.at_css('[data-growth-date]')["data-growth-date"]).to eq("2026-09-08")
-        expect(document.at_css('[data-daily-growth-record]').text).to include(I18n.t("student_growth.no_data"))
+        empty_key = actor_role == "student" ? "student_growth.no_data" : "student_growth.empty_past_record"
+        expect(document.at_css('[data-daily-growth-record]').text).to include(I18n.t(empty_key))
         expect(document.css('form, [data-score-bar], [data-edit-today-growth]')).to be_empty
       end
 
@@ -301,10 +409,10 @@ RSpec.describe "Student growth dashboard", type: :request do
         next_path = document.at_css('[data-record-navigation="next"]')["href"]
         expect(URI.parse(previous_path).path).to eq(dashboard_path)
         expect(Rack::Utils.parse_query(URI.parse(previous_path).query))
-          .to eq("tab" => "growth", "date" => "2026-09-05")
+          .to eq(record_navigation_query.merge("date" => "2026-09-05"))
         expect(URI.parse(next_path).path).to eq(dashboard_path)
         expect(Rack::Utils.parse_query(URI.parse(next_path).query))
-          .to eq("tab" => "growth", "date" => "2026-09-09")
+          .to eq(record_navigation_query.merge("date" => "2026-09-09"))
 
         get next_path
 
@@ -313,22 +421,26 @@ RSpec.describe "Student growth dashboard", type: :request do
         expect(document.at_css('[data-record-navigation="previous"]')).to be_nil
       end
 
-      it "returns to an unrecorded today through growth navigation without a separate today action" do
+      it "returns to an unrecorded today through the canonical entry without a separate today action" do
         create_record(date: Date.new(2026, 9, 8), scores: { virtues.first => 3 })
         get dashboard_path, params: { tab: "growth", date: "2026-09-08" }
 
         expect(document.at_css('[data-record-navigation="next"]')).to be_nil
-        growth_link = document.at_css('[data-growth-tab="growth"]')
-        expect(growth_link["href"]).to eq("#{dashboard_path}?tab=growth")
         expect(document.css('[data-growth-tab="today"]')).to be_empty
-
-        get growth_link["href"]
+        if actor_role == "student"
+          growth_link = document.at_css('[data-growth-tab="growth"]')
+          expect(growth_link["href"]).to eq("#{dashboard_path}?tab=growth")
+          get growth_link["href"]
+        else
+          expect(document.css('[data-growth-tab="growth"]')).to be_empty
+          get dashboard_path
+        end
 
         expect(document.at_css('[data-growth-date]')["data-growth-date"]).to eq("2026-09-09")
         previous_path = document.at_css('[data-record-navigation="previous"]')["href"]
         expect(URI.parse(previous_path).path).to eq(dashboard_path)
         expect(Rack::Utils.parse_query(URI.parse(previous_path).query))
-          .to eq("tab" => "growth", "date" => "2026-09-08")
+          .to eq(record_navigation_query.merge("date" => "2026-09-08"))
         if actor_role == "student"
           expect(document.at_css('[data-growth-today-form]')).to be_present
         else

@@ -1,0 +1,15 @@
+<%= content_tag day[:tag], **day[:attributes] do %>
+  <span class="growth-calendar__day-visual">
+    <% if day[:value] %>
+      <svg viewBox="0 0 100 100" class="growth-calendar__bubble" aria-hidden="true" focusable="false">
+        <circle cx="50" cy="50" r="<%= day[:radius] %>" fill="<%= student_growth_color(@selected_virtue) %>" />
+      </svg>
+    <% end %>
+    <span class="growth-calendar__date"><%= day[:date].day %></span>
+  </span>
+  <span class="growth-calendar__holidays">
+    <% day[:holidays].each do |holiday| %>
+      <span class="growth-calendar__holiday"><%= holiday.fetch(:name) %></span>
+    <% end %>
+  </span>
+<% end %>

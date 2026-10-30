@@ -120,13 +120,13 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 
 ### 일일 기록 history와 오늘 진입
 
-- 학생 `/student/growth`와 교사용 `/classrooms/:classroom_id/students/:id`는 `tab=growth`에서 같은 일일 결과 presentation과 날짜 탐색 계약을 사용한다.
+- 학생 `/student/growth`의 성장 탭과 교사용 `/classrooms/:classroom_id/students/:id`의 주간·월간 왼쪽 기록은 같은 일일 결과 presentation과 실제 기록 날짜 탐색 계약을 사용한다. 교사용 기존 `tab=growth` 링크도 날짜를 보존하는 주간 성장 화면으로 처리한다.
 - 선택 날짜는 `date=YYYY-MM-DD` query로 표현한다. 예: `/student/growth?tab=growth&date=2026-09-08`. `date`가 생략되거나 parsing할 수 없거나 유효하지 않거나 application 기준 미래이면 오늘로 fallback한다. 오늘 date는 기존 오늘 결과/입력을, 유효한 과거 date는 해당 날짜의 read-only 결과를 표시한다. history 이전/다음 화살표만 실제 저장된 기록의 대상 날짜를 `tab=growth&date=YYYY-MM-DD`로 전달한다.
 - 학생은 오늘 기록이 없으면 기존 입력 form을, 있으면 결과와 수정 동작을 본다. 과거 기록은 read-only이며 edit query나 direct write로 수정할 수 없다. 교사, school manager, global admin은 모든 날짜에서 read-only다.
 - 잘못된/future `date`는 기록 조회 전에 오늘로 fallback하여 exception, 미래 record lookup 또는 미래 날짜 입력 form/기록 생성을 일으키지 않는다. 미래 기록은 history 이동 대상에도 포함하지 않으며 fallback GET 자체로 DB row를 생성하지 않는다.
 - 이전/다음 화살표는 조회 권한 범위 안에서 해당 Student에게 실제 저장된 DailyGrowthRecord의 날짜를 기준으로 이동한다. 선택 날짜보다 이른 기록 중 가장 최근 날짜가 이전, 더 늦은 기록 중 가장 이른 날짜가 다음이다. calendar day를 하나씩 이동하지 않으며 주말 기록도 포함한다. 대상 기록이 없는 방향의 화살표는 비활성화하거나 표시하지 않는다.
 - 예: 오늘이 2026-09-09이고 저장 기록이 9/4, 9/5, 9/8, 9/9라면 9/8의 이전은 9/5, 다음은 9/9다.
-- `성장` navigation 자체가 canonical 오늘 진입점이다. 학생은 `/student/growth?tab=growth`, 교사는 `/classrooms/:classroom_id/students/:id?tab=growth`로 연결하며 link에 `date`를 붙이지 않는다. 과거 조회 중에도 `성장`을 클릭하면 오늘로 돌아가며 별도 Today button/tab/action은 추가하지 않는다. 예: 오늘이 9/9이고 마지막 기록이 9/8이면 9/8의 다음 화살표는 없고 `성장` navigation으로 9/9 입력 form을 연다. 미입력 오늘에서 이전은 가장 최근 저장 기록으로 이동하며, 기록이 전혀 없어도 성장 navigation으로 오늘 입력이 가능하다. 교사는 오늘 기록이 없으면 read-only 미입력 상태를 본다.
+- 학생의 `성장` navigation은 `/student/growth?tab=growth`로 연결하고 date를 붙이지 않는 오늘 진입점이다. 과거 조회 중에도 오늘로 돌아가며 별도 Today action은 추가하지 않는다. 교사용은 성장 탭 대신 주간·월간 두 탭을 사용하고 날짜 생략 시 오늘 기록을 읽기 전용으로 표시한다.
 - query로 지정한 과거 날짜에 기록이 없으면 데이터 없음 상태를 표시하고 입력 form이나 0점 결과를 만들지 않는다. 일반 history GET은 configuration이나 record를 생성하지 않는다.
 - 과거 결과는 해당 날짜의 frozen Virtue 이름과 Virtue의 current presentation color를 사용한다. 현재 active 덕목으로 재구성하거나 missing record/score를 0점으로 보충하지 않는다.
 
@@ -148,7 +148,7 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 
 ## 학생 성장 추이
 
-- 학생용 공통 navigation은 canonical `/student/growth` 안에서 `성장` → `tab=growth`(일일 결과/입력), `주간` → `tab=weekly`(기존 월~금 line chart), `월` → `tab=monthly`(후속 준비 중)로 구분한다.
+- 학생용 공통 navigation은 canonical `/student/growth` 안에서 `성장` → `tab=growth`(일일 결과/입력), `주간` → `tab=weekly`(기존 월~금 line chart), `월` → `tab=monthly`(월간 bubble calendar)로 구분한다. 학생 3탭과 교사 2탭 아래 여백을 공통 navigation에서 일관되게 제공한다.
 - 기본 주와 이전/다음 주 이동은 월요일부터 일요일까지의 calendar week를 기준으로 한다. 기본 화면은 application 기준 오늘이 포함된 현재 주이며 이전 주와 다음 주로 이동할 수 있다. 현재 주에서는 미래 주로 이동하는 다음 주 navigation을 제공하지 않거나 비활성화한다.
 - 주간 chart와 weekly presentation의 표시 범위는 월요일부터 금요일까지 5일이다. 토요일과 일요일은 X축과 주간 표시 범위에서 제외하며, 주말 기록이 존재해도 chart에 표시하지 않는다. 이는 visualization 정책으로, `DailyGrowthRecord` domain의 주말·휴일 입력 허용 정책은 변경하지 않는다.
 - metric navigation은 `[종합] [독서] [봉사] [감사] ...` 형태로 전환하며 기본 metric은 `종합`이다. 현재 active 덕목을 기본으로 노출하고, 사용 종료된 덕목도 주간 chart 표시 범위인 월요일부터 금요일 사이에 실제 score가 존재하면 조회할 수 있어야 한다. 구체적인 Tailwind 표현은 구현 단계에서 정한다.
@@ -158,15 +158,34 @@ starter의 planning/archived SchoolYear full operation, rollover와 planning-yea
 - 색상 기능의 승인 contract에 따라 `종합` graph는 Virtue palette와 시각적으로 구분되는 product 고정색을, 개별 덕목 graph의 line과 point marker는 위 Virtue 색상 정책의 저장된 현재 색상을 사용한다. metric navigation의 작은 color indicator/swatch는 선택 사항이며 구체 UI는 구현 단계에서 결정한다.
 - 기록이 없는 날짜와 record는 있지만 선택한 덕목 score가 없는 날짜는 모두 0점이 아닌 데이터 없음으로 취급한다. 새 덕목은 실제 score가 처음 생긴 날짜부터 나타나며, 데이터 없음과 실제 낮은 점수를 시각적으로 혼동시키지 않는다.
 - 첫 prototype은 `suksuk_praise` 학생 주간 dashboard의 SVG graph visual을 최대한 그대로 재사용한다. 월~금 5개 point 위치, viewBox/spacing/grid, 두꺼운 둥근 line/path, 원형 point marker, 날짜/요일 배치와 이전/다음 주 navigation 패턴을 재사용하되 praise/coupon 전용 icon·marker·count와 summary card는 가져오지 않으며 새 chart library를 추가하지 않는다.
-- 월간 visualization, 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다.
+- 교사 학급 통계 chart, realtime, Action Cable/Turbo 변경, score 저장 방식 변경, 새 DB column/model, ranking, 학생 간 비교, arbitrary 기간 선택 UI와 chart library 도입 확정은 이 prototype의 범위가 아니다. 월간 visualization은 아래 별도 승인 정책을 따른다.
 
-## 월간 visualization 후속 방향
+## 월간 visualization 승인 정책
 
-- 월간 visualization은 이번 Student 성장 dashboard feature 범위에 포함하지 않는다.
-- 학생 `/student/growth`와 교사용 Student show의 `weekly` tab에는 주간 chart만 표시하며 월간 chart를 같은 surface 아래에 연속 배치하지 않는다.
-- 월간은 향후 학생용과 교사용 dashboard의 `월`(`tab=monthly`)에서 calendar-style로 제공하는 방향만 유지한다. 달력 interaction은 후속 spec에서 확정하며 이번에는 구현하지 않는다.
-- 기존 DailyGrowthRecord / DailyGrowthScore/date 구조를 canonical source로 사용하며 월간 기능을 위해 별도 저장 모델을 미리 추가하지 않는다.
-- 기록이 없는 날짜와 없는 Virtue score를 0으로 해석하지 않는 기존 원칙은 유지한다.
+아래는 월간 visualization 구현을 위한 승인된 contract이며 구현 완료를 뜻하지 않는다.
+
+- 학생 `/student/growth?tab=monthly`와 교사용 `/classrooms/:classroom_id/students/:id?tab=monthly`에서 월간 bubble calendar를 제공한다.
+- 학생 `/student/growth`의 `weekly`에는 주간 chart만 표시한다. 교사용 Student show는 선택 날짜의 성장기록과 현재 탭의 주간 chart 또는 월간 달력을 나란히 표시하며 두 시각화를 동시에 나열하지 않는다.
+- 주간과 같은 `종합` / 개별 Virtue 선택을 제공하며 기본 metric은 `종합`이다. 현재 active 덕목과 조회 대상 월에 실제 score가 존재하는 inactive 덕목을 선택할 수 있다. 선택 UI의 Virtue identity와 이름 정책은 주간과 동일하다.
+- 선택한 metric의 점수는 날짜별 하나의 원 크기로 표현한다. `종합`은 해당 날짜에 실제 존재하는 score의 산술평균(1.0~5.0)을 그대로 크기 기준으로 사용하며 주간의 percentage 환산을 적용하지 않는다. 개별 덕목은 실제 1~5점을 사용한다. 같은 척도에서 점수가 클수록 원이 커지며 학생용과 교사용은 같은 크기 기준을 사용한다.
+- 날짜 숫자는 버블 중앙에 겹쳐 표시하며, 선택 metric의 점수가 없는 날은 원 없이 같은 위치에 날짜만 표시한다. 점수 텍스트, 별도 종합·점수 범위 요약, 점수 크기 설명과 날짜 클릭 안내는 화면에서 제외하고 날짜·점수·공휴일 정보는 접근성 label에 유지한다. 달력 최대 너비와 셀 높이는 조밀하게 유지하며 모바일에서 가로 스크롤 없이 날짜 정렬·가독성·클릭 영역을 보존한다.
+- 개별 덕목 원은 Virtue의 저장된 current presentation color를 재사용하며 inactive 덕목도 기존 color identity를 유지한다. `종합`은 주간과 같은 product 고정색을 사용한다.
+- application `Time.zone` 기준 당월을 기본으로 이전/다음 월 이동을 지원하며 미래 월로는 이동하지 않는다. 월 이동과 metric 선택은 `tab=monthly`를 유지한다. 정확한 월 query parameter와 원 크기 산식은 implementation concern이다.
+- 월 전체 날짜를 표시하며 토요일·일요일을 평일과 구분하고 대한민국 공휴일(대체공휴일 포함)을 표시한다. 주말·공휴일의 실제 저장 기록도 같은 점수 규칙으로 표시하며 기존 입력 허용 정책은 변경하지 않는다.
+- 당월의 미래 날짜는 미래 상태로 구분하고 점수 원이나 일일 상세 진입을 제공하지 않는다. 오늘까지의 미입력 날짜에는 날짜 숫자와 공휴일 표시만 유지하며 `입력 없음`·`기록 없음` 안내 문구를 표시하지 않는다. record는 있지만 선택 덕목 score가 없는 날짜도 점수 원을 만들거나 0점으로 보충하지 않으며 데이터 없음 상태는 접근성 label로 구분한다.
+- 학생의 월간 달력은 오늘까지의 실제 DailyGrowthRecord가 있는 비공휴일 평일만 `tab=growth&date=YYYY-MM-DD`로 연결한다. 교사용은 같은 조건의 기록 있는 날짜와 기록 없는 과거 평일을 현재 월간 탭 안에서 선택할 수 있다. 선택 덕목 score 유무는 실제 record 존재 여부와 별개다. 주말·공휴일·미래 날짜는 정적 셀이며 공휴일 조회 실패 시에도 link를 차단한다. 과거 학생 기록 및 교사용 모든 기록은 read-only다.
+- 월간 자체는 학생 본인 및 기존 성장기록 조회 권한이 있는 교사용 사용자의 read-only surface다. Classroom scope, 담임·school manager·global admin의 기존 authorization과 operational lifecycle 경계를 확대하지 않는다.
+- 기존 DailyGrowthRecord / DailyGrowthScore/date와 날짜별 frozen configuration을 canonical source로 사용하며 월간용 별도 저장 모델을 추가하지 않는다. 월간 진입, 월 이동, metric 선택과 일일 상세 조회 GET은 DailyVirtueConfiguration, DailyGrowthRecord 또는 다른 DB row를 생성하지 않는다.
+- 애니메이션, 학급 전체 통계와 실시간 갱신은 이번 월간 구현에서 제외한다.
+
+## 성장기록·시각화 날짜 연동
+
+- 학생 주간·월간 날짜 선택은 실제 기록이 있는 비공휴일 평일만 성장 탭의 해당 날짜로 이동한다. 주간은 점과 날짜 label을 같은 link로 제공한다. 학생의 기존 오늘 입력·과거 read-only 정책은 유지한다.
+- 교사용 주간·월간은 기록 있는 비공휴일 평일과 미입력 과거 비공휴일 평일을 선택할 수 있다. 선택한 날짜는 시각화에서 강조하고 왼쪽 성장기록만 해당 날짜로 표시하며 탭·기간·metric을 유지한다. 다른 학생·교실로 scope를 확대하지 않는다.
+- 주말·공휴일·미래 날짜는 두 시각화 모두 클릭할 수 없다. 공휴일 조회 실패 시 주간·월간의 날짜 link를 차단하며 실제 기록·점수 표시는 유지한다.
+- `date`와 `week_offset`·`month`는 독립 상태다. 교사용 기간 이동이나 metric 변경만으로 선택 날짜를 바꾸지 않으며 기간 밖 날짜의 선택 기록도 유지한다. 날짜 선택 시 현재 시각화의 탭·기간·metric을 query에 보존한다.
+- 기록·주간·월간 탐색은 공통 `[〈] 날짜 또는 기간 [〉]` presentation과 원형 버튼·비활성 상태를 사용한다. 이동 단위는 실제 이전·다음 기록, 이전·다음 주, 이전·다음 달이며 기존 미래 이동 제한과 history 범위를 유지한다.
+- 일반 GET 및 기존 Rails/Turbo navigation으로 조회하며 새 write action, DB model·column, JavaScript controller와 애니메이션은 추가하지 않는다.
 
 ## 교사 Classroom workflow와 realtime
 
@@ -222,7 +241,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - `학생 정보·PIN 수정`은 실제 `StudentPolicy#manage?`가 허용할 때 표시한다. 접근 가능한 operational Classroom의 global admin과 실제 담당 teacher는 이 action 및 기존 edit/update 권한을 유지한다. operational lifecycle은 현재 정책을 따르며 archived/inactive SchoolYear 등으로 확대하지 않는다.
 - school manager는 growth read 권한만으로 Student 관리 권한을 얻지 않으며 실제 담당 teacher인 경우에만 기존 관리 권한을 사용한다. 일반 타반 teacher의 권한도 확대하지 않는다. 최종 경계는 view 노출 여부가 아닌 Pundit/controller의 조회·edit/update 인가다.
 - `성장`, `주간`, `월` navigation은 profile card 아래의 별도 compact navigation surface로 둔다.
-- 학생의 canonical growth GET surface는 `/student/growth` 하나다. 기본/`tab=growth`는 선택 날짜의 일일 결과/입력 surface, `tab=weekly`는 주간 chart다.
+- 학생의 canonical growth GET surface는 `/student/growth` 하나다. 기본/`tab=growth`는 선택 날짜의 일일 결과/입력 surface, `tab=weekly`는 주간 chart, `tab=monthly`는 월간 bubble calendar다.
 - GET `/student`는 별도 profile/dashboard presentation을 유지하지 않고 `/student/growth?tab=growth`로 redirect한다.
 - 학생 로그인 상태의 primary navigation에서 `내 정보` 항목을 제거한다. navbar의 `쑥쑥성장기록장` 로고/브랜드는 `/student/growth?tab=growth`로, Student avatar + 이름은 `/student/pin/edit`로 연결한다. desktop과 mobile 모두 같은 의미를 사용한다.
 - mobile의 hamburger/menu toggle과 Student identity/PIN link는 별도 조작 대상으로 구분한다. identity 클릭이 menu toggle을 겸하거나 PIN link를 toggle 내부에 중첩하지 않으며 작은 화면에서도 PIN 진입을 제공한다. menu는 열기/닫기와 기존 로그아웃 등 menu action을 담당한다.
@@ -232,11 +251,11 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - canonical growth dashboard의 일반 GET 진입은 조회만 수행하며 DailyVirtueConfiguration, DailyGrowthRecord 또는 다른 DB row를 생성하지 않는다.
 - StudentGrowthRecordsController는 계속 current_student의 오늘 기록 생성·수정 write를 담당한다. 저장 또는 수정 성공 후에는 학생 canonical growth GET의 오늘 결과 surface로 redirect하여 저장된 결과를 보여준다.
 - 기존 `/student/growth_record` GET은 별도 일일 presentation을 유지하지 않고 canonical `/student/growth?tab=growth`로 redirect한다. UI navigation은 canonical `/student/growth` surface를 사용한다.
-- 교사용 Student show의 canonical route는 계속 `/classrooms/:classroom_id/students/:id`다. 기본/`tab=growth`는 선택 날짜의 저장 결과와 reflection만, `tab=weekly`는 주간 chart만 표시한다.
+- 교사용 Student show의 canonical route는 `/classrooms/:classroom_id/students/:id`다. `주간 성장`과 `월간 성장` 두 탭에서 왼쪽 선택 날짜의 성장기록, 오른쪽 해당 시각화를 표시한다. 넓은 화면은 2열, 좁은 화면은 1열이며 학생 정보와 기존 관리 action은 유지한다. 기본·미지원 tab과 기존 `tab=growth`는 주간 성장으로 처리하고 date는 보존한다.
 - 학생용과 교사용 `tab=weekly`는 기존 월~금 범위, metric 계산, missing 처리, Virtue identity/color 및 week navigation 계약을 그대로 사용한다. `metric`과 `week_offset`은 weekly surface에서 사용하고 metric/이전·다음 주 navigation link는 `tab=weekly`를 명시한다.
-- 학생용과 교사용 모두 `tab`이 없거나 지원하지 않는 값(기존 `today` 포함)이면 기본 `growth` surface로 처리한다.
-- `월`(`tab=monthly`) navigation은 학생용과 교사용 모두 비활성/준비 중 상태로 표시한다. 직접 `tab=monthly`로 진입해도 calendar나 chart 없이 준비 중 상태만 표시한다.
-- 학생 `/student/growth`와 교사용 Student show는 동일한 content max-width contract를 사용한다. 별도 `/student` max-width surface는 두지 않으며 정확한 Tailwind `max-w-*` 값은 implementation concern이다.
+- 학생용은 tab 생략·미지원 값(기존 today 포함)을 growth로 처리한다. 교사용은 monthly를 제외한 tab을 weekly로 처리하며 별도 성장 탭은 제공하지 않는다.
+- `월`(`tab=monthly`) navigation은 학생용과 교사용 모두 활성화하며 직접 진입해도 위 월간 visualization 승인 정책에 따른 bubble calendar를 표시한다.
+- 학생 `/student/growth`의 카드·시각화·3탭 메뉴는 공통 container에서 최대 너비 640px(40rem)을 사용한다. 교사용 전체 화면은 기존 프로필 폭을 유지하며 2열 오른쪽 주간·월간 시각화만 같은 최대 너비를 사용한다. 좁은 화면에서는 1열로 배치하며 별도 `/student` surface는 두지 않는다.
 - 교사, school manager, global admin은 Student show에서 Student 대신 score나 reflection을 입력하거나 수정할 수 없다. 학생의 오늘 기록 edit capability는 current_student에게만 존재한다.
 - Student의 이름, 번호, 아바타, PIN, 활성 상태 등 계정·구성원 관리 책임은 기존 edit 및 구성원 관리 흐름에 유지한다. 성장기록 read 권한을 가진 school manager에게 이러한 Student 관리 권한까지 자동으로 부여하지 않는다.
 - 향후 오늘 입력 현황에서 Student를 선택하는 링크는 `/classrooms/:classroom_id/students/:id`를 대상으로 한다. realtime/Turbo/Action Cable 현황 갱신은 별도 feature에서 구현한다.
@@ -288,7 +307,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - Classroom 전체 오늘 입력 현황과 완료·미입력 Student 목록
 - realtime, Turbo broadcast, Action Cable과 polling
 - 학급 평균·학급 통계, Student 간 비교와 ranking
-- 현재 성장 화면에 월간 chart를 함께 배치하는 것과 월간 전용 surface 구현
+- 학생의 일일 결과 아래에 월간 chart를 배치하거나 주간·월간 chart를 동시에 나열하는 것(교사용 월간 탭의 선택 기록·달력 연동은 승인 범위)
 - 새로운 generic chart framework, arbitrary date range와 yearly chart
 - 일일/주간 metric 계산과 score 저장 방식 변경
 - growth 또는 Student 관리 권한 확대
@@ -300,7 +319,7 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 - rollover
 - `/admin/teachers` planning-year bulk bootstrap
 - `/admin/classrooms` planning-year bulk configuration
-- 월간 bubble calendar 실제 구현
+- 월간 bubble calendar 애니메이션
 - 고급 비교 분석
 - 학생 ranking과 점수순 정렬
 - 자동 평가 또는 AI 판정
@@ -344,13 +363,13 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 23. 교사용 Student show는 모든 조회 날짜의 reflection을 read-only로 보존하며 score 또는 reflection 입력·수정 form이나 teacher-facing 성장기록 write action을 제공하지 않는다.
 24. 학생용과 교사용 주간 chart는 같은 월~금 범위, 종합·Virtue metric 계산, missing 처리와 Virtue color identity를 사용한다.
 25. 교사용 주간 chart는 이전 주로 이동할 수 있고 미래 주로 이동할 수 없다.
-26. 학생의 canonical growth GET surface는 `/student/growth` 하나이며 기본/`tab=growth`는 일일 결과/입력, `tab=weekly`는 주간 chart만 표시한다. 학생용과 교사용 모두 누락되거나 지원하지 않는 tab은 growth로 처리한다.
+26. 학생의 canonical growth GET surface는 `/student/growth`이며 기본/growth는 일일 결과·입력, weekly는 주간 chart, monthly는 월간 달력이다. 학생의 미지원 tab은 growth, 교사용 미지원 tab은 weekly로 처리한다.
 27. 오늘 기록이 없는 학생은 growth surface에서 입력할 수 있고, 저장 후에는 같은 canonical growth surface에서 막대·행동 문구·reflection 결과를 확인한다.
 28. 오늘 기록이 있는 학생은 명시적 수정 동작으로 자신의 기록을 수정할 수 있지만 교사, school manager와 global admin에게 Student 대신 입력·수정하는 기능을 제공하지 않는다.
 29. 기존 `/student/growth_record` GET은 `/student/growth?tab=growth`로 redirect하고 별도 화면을 유지하지 않는다. UI navigation은 `/student/growth` canonical surface를 사용하며 StudentGrowthRecordsController의 create/update write 책임은 유지한다.
-30. 교사용 Student show는 기본/`tab=growth`에서 선택 날짜의 일일 결과만, `tab=weekly`에서 주간 chart만 표시하고 두 내용을 한 화면에 동시에 나열하지 않는다.
+30. 교사용 Student show는 weekly와 monthly 두 탭으로 왼쪽 선택 날짜의 read-only 성장기록과 오른쪽 현재 탭의 시각화를 함께 표시한다. 주간 chart와 월간 달력을 동시에 표시하지 않으며 좁은 화면에서는 1열로 배치한다.
 31. 학생용과 교사용 weekly surface는 기존 주간 계산·missing·Virtue color 계약을 유지하고 metric/week navigation query에 `tab=weekly`를 명시한다.
-32. 학생용과 교사용 Student surface는 profile/header 아래에 `성장`, `주간`, `월` navigation을 별도 presentation으로 표시하며 각각 growth/weekly/monthly에 대응한다. 월은 비활성/준비 중이며 직접 `tab=monthly` 진입도 준비 중 상태다.
+32. 학생은 profile/header 아래 성장·주간·월 3탭을 유지하고 교사용은 주간 성장·월간 성장 2탭을 사용한다. 공통 partial로 일일 결과와 주간·월간 시각화를 재사용하며 metric·기간·선택 날짜, 공휴일·주말·미래·미입력 정책 및 GET 무변경 계약을 유지한다.
 33. 교사용 Student show는 담임, 같은 current annual SchoolYear의 school manager와 global admin에게 active lifecycle 범위 안에서만 허용되며 일반 타반 teacher와 범위 밖 manager를 차단한다.
 34. growth read 권한은 Student 관리 권한을 확대하지 않는다.
 35. 학생과 교사의 Student identity card는 avatar 왼쪽, 학교 이름·학년/반/번호·Student 이름 순서의 동일한 정보 및 visual hierarchy를 사용한다.
@@ -358,12 +377,12 @@ ranking, 점수순 학생 정렬과 학생 간 경쟁은 MVP 범위 밖이다.
 37. 교사용 Student show를 정상 조회할 수 있는 사용자는 edit/manage 권한과 무관하게 `교실로 돌아가기`를 본다. 이 link는 `can_manage_student` 조건에 묶지 않으며 `학생 정보·PIN 수정`만 실제 manage 권한으로 구분한다. 두 action은 학생용 surface에는 노출되지 않는다.
 38. GET `/student`는 `/student/growth?tab=growth`로 redirect하며 `/student/pin/edit`과 `/student/pin` 계약은 유지한다.
 39. canonical growth에서 오늘 미입력 Student는 입력 form을, 입력완료 Student는 결과 막대·행동 문구·reflection을 보고, 일반 GET 진입만으로 DB row가 생성되지 않는다.
-40. 학생 canonical dashboard와 교사용 Student show는 동일한 content max-width contract를 사용하며 별도 `/student` presentation은 유지하지 않는다.
-41. 학생용과 교사용 growth는 date 생략·parsing 불가·유효하지 않은 date·application 기준 미래 date를 오늘로 fallback한다. 오늘 date는 기존 오늘 결과/입력을, 유효한 과거 date는 해당 날짜 read-only 결과를 표시한다. history 이전/다음 화살표만 실제 저장된 기록의 날짜를 `tab=growth&date=YYYY-MM-DD`로 전달한다.
+40. 학생 canonical dashboard의 카드·시각화·탭은 공통 640px container를 사용한다. 교사용은 기존 프로필 폭 안에 반응형 2열로 배치하고 오른쪽 시각화만 같은 최대 너비를 사용한다.
+41. 학생·교사의 date 생략·parsing 불가·유효하지 않은 date·미래 date는 오늘로 fallback한다. 이전·다음 기록 탐색은 실제 저장 날짜를 사용하며 학생은 growth로, 교사용은 현재 시각화의 탭·기간·metric을 유지한 채 date만 변경한다.
 42. 오늘이 9/9이고 저장 기록이 9/4, 9/5, 9/8, 9/9이면 9/8에서 이전은 9/5, 다음은 9/9다. 주말 기록도 포함하고 이동할 저장 기록이 없는 방향의 화살표는 비활성화하거나 표시하지 않는다.
-43. `성장` navigation은 학생 `/student/growth?tab=growth`, 교사 `/classrooms/:classroom_id/students/:id?tab=growth`로 연결하고 date를 붙이지 않는다. 과거 조회 중 클릭하면 오늘로 돌아가며 별도 Today button/tab/action은 없다. 오늘이 9/9이고 마지막 기록이 9/8이면 9/8의 다음 화살표는 없고 성장 navigation으로 학생은 오늘 입력 form을, 교사는 read-only 미입력 상태를 본다. 미입력 오늘의 이전은 9/8이며 저장 기록이 전혀 없어도 성장 navigation으로 오늘 입력이 가능하다.
+43. 학생의 성장 navigation은 `/student/growth?tab=growth`로 연결하고 date 없이 오늘 기록으로 돌아간다. 교사용은 2탭이며 날짜 생략 시 오늘 기록을 표시한다. 별도 Today action은 추가하지 않는다.
 44. 과거 기록은 학생에게 read-only이고 교사/manager/admin은 모든 날짜에서 read-only다. 잘못된/future date는 조회 전에 오늘로 fallback하며 exception, 미래 record lookup 또는 미래 날짜 입력 form/기록 생성을 일으키지 않는다. 과거·미래 write나 edit query로 오늘만 수정 가능한 경계를 우회할 수 없다.
-45. 유효한 과거 date에 기록이 없으면 데이터 없음으로 표시하고 입력 form이나 0점으로 대체하지 않는다. 과거 결과의 frozen Virtue 이름/current color를 유지하며 fallback을 포함한 모든 일일 조회 GET은 DB row를 생성하지 않는다.
+45. 유효한 과거 date에 기록이 없으면 입력 form·빈 점수표·0점 없이 표시한다. 교사용 과거 미입력 영역은 `이날 작성한 성장기록이 없습니다.` 문구만 표시한다. 과거 결과의 frozen Virtue 이름과 current color를 유지하고 모든 조회 GET은 DB row를 생성·변경하지 않는다.
 46. 학생 navbar는 desktop/mobile 모두 `내 정보` primary item 없이 브랜드에서 `/student/growth?tab=growth`로, avatar + 이름에서 `/student/pin/edit`로 이동한다. mobile PIN link와 hamburger toggle은 독립적으로 동작하며 기존 PIN 권한/동작은 유지한다.
 47. 접근 가능한 operational Classroom에서 global admin과 실제 담당 teacher는 Student show의 `학생 정보·PIN 수정` action을 사용하고 기존 edit/update 인가를 유지한다. Pundit/controller가 최종 권한 경계다.
 48. 이번 UI 정합성 수정은 Student 관리 권한이나 growth record 권한을 확대하지 않는다. 미담당 school manager와 일반 타반 teacher에게 Student 관리 권한을 부여하지 않으며 archived/inactive SchoolYear 등 기존 operational lifecycle 밖으로 권한을 확대하지 않는다.
