@@ -149,13 +149,13 @@ module StudentGrowthHelper
   private
 
   def growth_chart_y(value, maximum)
-    value.nil? ? nil : 150 - (value.fdiv(maximum) * 120).round
+    value.nil? ? nil : 180 - (value.fdiv(maximum) * 160).round
   end
 
   def growth_chart_ticks(maximum, overall:)
     (0..5).map do |step|
       value = maximum * step / 5
-      { value: value, y: 150 - step * 24, label: student_growth_value_label(value, overall:) }
+      { value: value, y: 180 - step * 32, label: student_growth_value_label(value, overall:) }
     end
   end
 

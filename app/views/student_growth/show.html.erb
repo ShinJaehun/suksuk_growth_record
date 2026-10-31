@@ -2,7 +2,6 @@
   <%= render "shared/student_app_header", active: @tab %>
 
   <% if @tab == :weekly %>
-    <h1 class="text-2xl font-extrabold tracking-tight text-slate-900"><%= t("student_growth.title") %></h1>
     <%= render "shared/growth_weekly_chart", classroom: nil, student: nil %>
   <% elsif @tab == :monthly %>
     <%= render "shared/growth_monthly_calendar", classroom: nil, student: nil %>
